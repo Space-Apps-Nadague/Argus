@@ -1,9 +1,6 @@
 /**
- * ARGUS — Multimodal Gemini Flight Surgeon AI Service + Offline Verified Fallback
+ * ARGUS — Autonomous Flight Surgeon AI Service + Offline Verified Fallback
  * Single Source of Truth: specs/00-architecture.md & specs/01-data-schema.md (§4)
- *
- * SDK Note: Uses @google/genai >= 2.29.1 Interactions API (`client.interactions.create`)
- * with model `gemini-3.8-flash` (upgraded from deprecated `gemini-2.5-flash`).
  *
  * Architectural Guardrail (AGENTS.md):
  * Deterministic Green/Yellow/Red triage status is ALWAYS computed by `triageEngine.ts`
@@ -33,26 +30,27 @@ import {
   evaluateZoneStatus,
 } from '../utils/triageEngine';
 
-export const GEMINI_MODEL_ID = 'gemini-3.8-flash';
+export const CLINICAL_AI_MODEL_ID = 'gemini-3.8-flash';
 
 function getResolvedApiKey(runtimeKey?: string): string | undefined {
   if (runtimeKey && runtimeKey.trim().length > 0) {
     return runtimeKey.trim();
   }
-  const envKey = import.meta.env.VITE_GEMINI_API_KEY;
+  const envKey =
+    import.meta.env.VITE_AI_API_KEY || import.meta.env.VITE_GEMINI_API_KEY;
   if (typeof envKey === 'string' && envKey.trim().length > 0) {
     return envKey.trim();
   }
   return undefined;
 }
 
-export function hasConfiguredGeminiKey(runtimeKey?: string): boolean {
+export function hasConfiguredAiKey(runtimeKey?: string): boolean {
   return Boolean(getResolvedApiKey(runtimeKey));
 }
 
 /**
  * Generates plain-language Flight Surgeon guidance & step-by-step self-exam countermeasures
- * using Gemini 3.8 Flash structured output, with instant deterministic offline fallback.
+ * using structured AI output, with instant deterministic offline fallback.
  */
 export async function synthesizeFlightSurgeonGuidance(params: {
   scenarioId: ScenarioId;
@@ -123,7 +121,7 @@ ${metricsSummary}
 Generate structured JSON clinical guidance for a non-physician crew member. Keep explanations clear, calm, and grounded in NASA Human Research Program countermeasures.`;
 
     const interaction = await client.interactions.create({
-      model: GEMINI_MODEL_ID,
+      model: CLINICAL_AI_MODEL_ID,
       input: prompt,
       store: false,
       response_format: {
@@ -201,7 +199,7 @@ Generate structured JSON clinical guidance for a non-physician crew member. Keep
         Array.isArray(parsed.guidedSteps) && parsed.guidedSteps.length > 0
           ? parsed.guidedSteps
           : offlineFallback.guidedSteps,
-      source: 'gemini_live',
+      source: 'live_ai',
     };
   } catch (err) {
     console.warn(
@@ -214,7 +212,7 @@ Generate structured JSON clinical guidance for a non-physician crew member. Keep
 
 /**
  * Analyzes a 1-click sample medical image or user-uploaded image (base64)
- * using Gemini 3.8 Flash multimodal input, with deterministic offline fallback.
+ * using multimodal Clinical AI, with deterministic offline fallback.
  */
 export async function analyzeVisualSelfExam(params: {
   sample?: VisualExamSample;
@@ -286,7 +284,7 @@ Analyze this crew self-exam medical image (${
     }
 
     const interaction = await client.interactions.create({
-      model: GEMINI_MODEL_ID,
+      model: CLINICAL_AI_MODEL_ID,
       input: inputParts,
       store: false,
       response_format: {
@@ -332,7 +330,7 @@ Analyze this crew self-exam medical image (${
       recommendedAction:
         parsed.recommendedAction || fallbackAnalysis.recommendedAction,
       analyzedAtIso: nowIso,
-      source: 'gemini_vision',
+      source: 'live_vision_ai',
     };
   } catch (err) {
     console.warn('[ARGUS Vision] Falling back to offline verified sample analysis:', err);

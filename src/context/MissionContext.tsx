@@ -13,6 +13,7 @@ import React, {
 } from 'react';
 import {
   AnatomicalLayer,
+  BiologicalSex,
   BodyZoneId,
   CrewMemberProfile,
   EarthTelemetryPacket,
@@ -48,7 +49,15 @@ function loadInitialCrewRoster(): CrewMemberProfile[] {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+        return parsed.map((member: CrewMemberProfile) => ({
+          ...member,
+          sex:
+            member.sex === 'male' || member.sex === 'female'
+              ? member.sex
+              : member.id === 'crew-chen'
+              ? 'male'
+              : 'female',
+        }));
       }
     }
   } catch {
@@ -81,6 +90,7 @@ interface MissionState {
 type MissionAction =
   | { type: 'SELECT_CREW_MEMBER'; payload: string }
   | { type: 'ADD_CREW_MEMBER'; payload: CrewMemberProfile }
+  | { type: 'UPDATE_CREW_SEX'; payload: { crewId: string; sex: BiologicalSex } }
   | { type: 'DELETE_CREW_MEMBER'; payload: string }
   | { type: 'SET_CREW_MODAL_OPEN'; payload: boolean }
   | { type: 'SET_ENVIRONMENT'; payload: GravityEnvironment }
@@ -187,6 +197,15 @@ function missionReducer(
         countermeasureStreakSols: action.payload.countermeasureStreakSols,
         completedStepIds: [],
         guidance: nextGuidance,
+      };
+    }
+    case 'UPDATE_CREW_SEX': {
+      const nextRoster = state.crewRoster.map((c) =>
+        c.id === action.payload.crewId ? { ...c, sex: action.payload.sex } : c
+      );
+      return {
+        ...state,
+        crewRoster: nextRoster,
       };
     }
     case 'DELETE_CREW_MEMBER': {
@@ -342,6 +361,7 @@ interface MissionContextValue extends MissionState {
   createCrewMember: (
     newMember: Omit<CrewMemberProfile, 'id' | 'isCustom'>
   ) => CrewMemberProfile;
+  updateCrewMemberSex: (crewId: string, sex: BiologicalSex) => void;
   deleteCrewMember: (crewId: string) => void;
   setCrewModalOpen: (open: boolean) => void;
   setEnvironment: (env: GravityEnvironment) => void;
@@ -351,7 +371,7 @@ interface MissionContextValue extends MissionState {
   setAnatomicalLayer: (layer: AnatomicalLayer) => void;
   setChartWindowDays: (days: 14 | 30) => void;
   toggleStepCompleted: (stepId: string) => void;
-  requestLiveGeminiGuidance: () => Promise<void>;
+  requestLiveAiGuidance: () => Promise<void>;
   runSampleVisualExam: (sample: VisualExamSample) => Promise<void>;
   runUploadedVisualExam: (file: File) => Promise<void>;
   clearVisualExam: () => void;
@@ -427,6 +447,13 @@ export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({
     dispatch({ type: 'DELETE_CREW_MEMBER', payload: crewId });
   }, []);
 
+  const updateCrewMemberSex = useCallback(
+    (crewId: string, sex: BiologicalSex) => {
+      dispatch({ type: 'UPDATE_CREW_SEX', payload: { crewId, sex } });
+    },
+    []
+  );
+
   const setCrewModalOpen = useCallback((open: boolean) => {
     dispatch({ type: 'SET_CREW_MODAL_OPEN', payload: open });
   }, []);
@@ -463,7 +490,7 @@ export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({
     dispatch({ type: 'SET_RUNTIME_API_KEY', payload: key });
   }, []);
 
-  const requestLiveGeminiGuidance = useCallback(async () => {
+  const requestLiveAiGuidance = useCallback(async () => {
     dispatch({ type: 'SET_SYNTHESIZING_AI', payload: true });
     try {
       const updated = await synthesizeFlightSurgeonGuidance({
@@ -614,6 +641,7 @@ export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({
       readinessScore,
       selectCrewMember,
       createCrewMember,
+      updateCrewMemberSex,
       deleteCrewMember,
       setCrewModalOpen,
       setEnvironment,
@@ -623,7 +651,7 @@ export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({
       setAnatomicalLayer,
       setChartWindowDays,
       toggleStepCompleted,
-      requestLiveGeminiGuidance,
+      requestLiveAiGuidance,
       runSampleVisualExam,
       runUploadedVisualExam,
       clearVisualExam,
@@ -638,6 +666,7 @@ export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({
       readinessScore,
       selectCrewMember,
       createCrewMember,
+      updateCrewMemberSex,
       deleteCrewMember,
       setCrewModalOpen,
       setEnvironment,
@@ -647,7 +676,7 @@ export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({
       setAnatomicalLayer,
       setChartWindowDays,
       toggleStepCompleted,
-      requestLiveGeminiGuidance,
+      requestLiveAiGuidance,
       runSampleVisualExam,
       runUploadedVisualExam,
       clearVisualExam,

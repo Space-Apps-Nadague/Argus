@@ -4,6 +4,7 @@
  */
 
 import {
+  BiologicalSex,
   BodyZoneId,
   BodyZoneMetadata,
   CrewMemberProfile,
@@ -24,6 +25,7 @@ export const DEFAULT_CREW_ROSTER: CrewMemberProfile[] = [
     name: 'CDR Elena Vance',
     callsign: 'VALKYRIE',
     role: 'Mission Commander',
+    sex: 'female',
     age: 41,
     bloodType: 'O+',
     restingHrBaselineBpm: 61,
@@ -39,6 +41,7 @@ export const DEFAULT_CREW_ROSTER: CrewMemberProfile[] = [
     name: 'FE Marcus Chen',
     callsign: 'APEX',
     role: 'Flight Engineer',
+    sex: 'male',
     age: 37,
     bloodType: 'A+',
     restingHrBaselineBpm: 64,
@@ -54,6 +57,7 @@ export const DEFAULT_CREW_ROSTER: CrewMemberProfile[] = [
     name: 'Dr. Amara Okafor',
     callsign: 'PULSE',
     role: 'Flight Surgeon / Medical Officer',
+    sex: 'female',
     age: 35,
     bloodType: 'B+',
     restingHrBaselineBpm: 58,
@@ -69,6 +73,7 @@ export const DEFAULT_CREW_ROSTER: CrewMemberProfile[] = [
     name: 'MS Sofia Lindqvist',
     callsign: 'SOLARIS',
     role: 'EVA Surface Specialist',
+    sex: 'female',
     age: 39,
     bloodType: 'O-',
     restingHrBaselineBpm: 63,

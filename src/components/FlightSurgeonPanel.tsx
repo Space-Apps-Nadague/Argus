@@ -36,7 +36,7 @@ export const FlightSurgeonPanel: React.FC = () => {
     completedStepIds,
     toggleStepCompleted,
     isSynthesizingAi,
-    requestLiveGeminiGuidance,
+    requestLiveAiGuidance,
     visualExamAnalysis,
     activePreviewImageUrl,
     isAnalyzingVisual,
@@ -106,24 +106,24 @@ export const FlightSurgeonPanel: React.FC = () => {
           </div>
         </div>
 
-        {/* AI Source Badge + Live Gemini Refresh Button */}
+        {/* AI Source Badge + Live Clinical AI Refresh Button */}
         <div className="flex items-center gap-1.5">
           <span
             className={`px-2 py-0.5 rounded text-[10px] font-mono font-semibold border ${
-              guidance.source === 'gemini_live'
+              guidance.source === 'live_ai'
                 ? 'bg-cyan-500/15 text-cyan-300 border-cyan-400/50'
                 : 'bg-slate-900 text-slate-300 border-slate-700'
             }`}
           >
-            {guidance.source === 'gemini_live'
-              ? 'GEMINI 3.8 FLASH'
+            {guidance.source === 'live_ai'
+              ? 'LIVE CLINICAL AI'
               : 'OFFLINE HRP CACHE'}
           </span>
           <button
             type="button"
-            onClick={requestLiveGeminiGuidance}
+            onClick={requestLiveAiGuidance}
             disabled={isSynthesizingAi}
-            title="Synthesize or refresh guidance via Gemini 3.8 Flash API"
+            title="Synthesize or refresh guidance via Live Clinical AI"
             className="p-1.5 rounded bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-400/40 transition-colors disabled:opacity-50"
           >
             <RefreshCw

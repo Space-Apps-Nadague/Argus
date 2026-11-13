@@ -88,3 +88,40 @@
   - `src/components/BioTwinMap.tsx`
   - `src/utils/__tests__/triageEngine.test.ts`
   - `README.md`
+
+---
+
+## Sprint 3: Central Hero 3D Bio-Twin Stage & Sculpted Male/Female 3D Anatomy
+
+### Task 9: Central Hero Dashboard Layout & Realistic Sculpted Male/Female 3D Bio-Twin
+- **Status:** `[DONE]`
+- **Spec References:** `specs/00-architecture.md`, `specs/01-data-schema.md` (§1 `BiologicalSex`, `CrewMemberProfile`), `specs/02-ui-dashboard.md` (§1 Center Hero Column `BioTwinMap.tsx`, Left Column `TelemetryPanel.tsx`, `CrewManagerModal.tsx`)
+- **Files Owned:**
+  - `src/types/argus.ts`
+  - `src/data/telemetryScenarios.ts`
+  - `src/context/MissionContext.tsx`
+  - `src/utils/anatomicalGeometry.ts`
+  - `src/App.tsx`
+  - `src/components/BioTwinMap.tsx`
+  - `src/components/TelemetryPanel.tsx`
+  - `src/components/CrewManagerModal.tsx`
+  - `src/components/TopMissionBar.tsx`
+  - `src/utils/__tests__/triageEngine.test.ts`
+
+### Task 9: Remove Gemini Product Branding & Standardize Clinical AI Naming
+- **Status:** `[DONE]`
+- **Spec References:** `specs/00-architecture.md`, `specs/01-data-schema.md` (§4), `specs/02-ui-dashboard.md` (§1)
+- **Files Owned:**
+  - `specs/00-architecture.md`
+  - `specs/01-data-schema.md`
+  - `specs/01-ui-dashboard.md`
+  - `specs/02-ui-dashboard.md`
+  - `specs/tasks.md`
+  - `src/types/argus.ts`
+  - `src/services/flightSurgeonAi.ts`
+  - `src/context/MissionContext.tsx`
+  - `src/components/TopMissionBar.tsx`
+  - `src/components/FlightSurgeonPanel.tsx`
+  - `.env.example`
+  - `README.md`
+  - `docs/CONTRIBUTING.md`

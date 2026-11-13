@@ -11,6 +11,10 @@ import {
   TELEMETRY_SCENARIOS,
   VISUAL_EXAM_SAMPLES,
 } from '../../data/telemetryScenarios';
+import {
+  createSculptedHeadAndNeckGeometry,
+  createSculptedTorsoGeometry,
+} from '../anatomicalGeometry';
 
 describe('ARGUS Deterministic Triage Engine (specs/01-data-schema.md)', () => {
   it('evaluates ONSD thresholds accurately across gravity environments', () => {
@@ -102,6 +106,7 @@ describe('ARGUS Deterministic Triage Engine (specs/01-data-schema.md)', () => {
       name: 'Dr. Jonas Vasquez',
       callsign: 'ORION',
       role: 'Payload & Science Specialist',
+      sex: 'male' as const,
       age: 38,
       bloodType: 'A+' as const,
       restingHrBaselineBpm: 71, // +10 bpm vs 61 bpm reference
@@ -123,5 +128,29 @@ describe('ARGUS Deterministic Triage Engine (specs/01-data-schema.md)', () => {
 
     const statuses = evaluateAllZones(adjusted, '0g_transit');
     expect(statuses.neuro).toBe('yellow');
+  });
+
+  it('differentiates male and female 3D sculpted anatomical geometries', () => {
+    const sexes = new Set(DEFAULT_CREW_ROSTER.map((c) => c.sex));
+    expect(sexes.has('female')).toBe(true);
+    expect(sexes.has('male')).toBe(true);
+
+    const femaleTorso = createSculptedTorsoGeometry('female');
+    const maleTorso = createSculptedTorsoGeometry('male');
+    femaleTorso.computeBoundingBox();
+    maleTorso.computeBoundingBox();
+
+    const femaleWidth =
+      femaleTorso.boundingBox!.max.x - femaleTorso.boundingBox!.min.x;
+    const maleWidth =
+      maleTorso.boundingBox!.max.x - maleTorso.boundingBox!.min.x;
+
+    // Male biacromial shoulder span is wider than female torso max width
+    expect(maleWidth).toBeGreaterThan(femaleWidth);
+
+    const femaleHead = createSculptedHeadAndNeckGeometry('female');
+    const maleHead = createSculptedHeadAndNeckGeometry('male');
+    expect(femaleHead.attributes.position.count).toBeGreaterThan(1000);
+    expect(maleHead.attributes.position.count).toBeGreaterThan(1000);
   });
 });

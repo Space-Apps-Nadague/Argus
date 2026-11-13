@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useMission } from '../context/MissionContext';
 import {
+  BiologicalSex,
   BloodType,
   CrewMemberProfile,
   CrewRole,
@@ -73,6 +74,7 @@ export const CrewManagerModal: React.FC = () => {
 
   const [name, setName] = useState('');
   const [callsign, setCallsign] = useState('');
+  const [sex, setSex] = useState<BiologicalSex>('female');
   const [role, setRole] = useState<string>('Payload & Science Specialist');
   const [age, setAge] = useState<number>(36);
   const [bloodType, setBloodType] = useState<BloodType>('O+');
@@ -98,6 +100,7 @@ export const CrewManagerModal: React.FC = () => {
     name: name || 'New Astronaut',
     callsign: callsign || 'NOVA',
     role,
+    sex,
     age,
     bloodType,
     restingHrBaselineBpm,
@@ -128,6 +131,7 @@ export const CrewManagerModal: React.FC = () => {
       name: name.trim(),
       callsign: cleanCallsign,
       role: role.trim() || 'Payload & Science Specialist',
+      sex,
       age: Math.max(20, Math.min(75, Number(age) || 35)),
       bloodType,
       restingHrBaselineBpm: Math.max(
@@ -271,7 +275,11 @@ export const CrewManagerModal: React.FC = () => {
                           )}
                         </div>
                         <p className="text-xs text-slate-400 font-mono mt-0.5">
-                          {member.role} • Age {member.age} • Blood{' '}
+                          {member.role} •{' '}
+                          <span className="uppercase text-cyan-300">
+                            {member.sex === 'male' ? '♂ Male' : '♀ Female'}
+                          </span>{' '}
+                          • Age {member.age} • Blood{' '}
                           <span className="text-slate-200 font-semibold">
                             {member.bloodType}
                           </span>{' '}
@@ -363,6 +371,32 @@ export const CrewManagerModal: React.FC = () => {
                   {formError}
                 </div>
               )}
+
+              {/* Biological Sex / 3D Bio-Twin Anatomy Selector */}
+              <div>
+                <label className="block text-[11px] font-mono uppercase text-slate-400 mb-1">
+                  3D Bio-Twin Anatomy / Biological Sex
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {(['female', 'male'] as const).map((sexOption) => {
+                    const active = sex === sexOption;
+                    return (
+                      <button
+                        key={sexOption}
+                        type="button"
+                        onClick={() => setSex(sexOption)}
+                        className={`py-1.5 px-3 rounded-lg border font-mono text-xs font-bold uppercase transition-all flex items-center justify-center gap-1.5 ${
+                          active
+                            ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300 shadow-[0_0_12px_rgba(34,211,238,0.2)]'
+                            : 'bg-slate-900 border-slate-700 text-slate-400 hover:text-slate-200'
+                        }`}
+                      >
+                        <span>{sexOption === 'female' ? '♀ Female Anatomy' : '♂ Male Anatomy'}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 <div className="sm:col-span-2">

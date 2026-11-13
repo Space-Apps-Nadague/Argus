@@ -15,6 +15,8 @@ export type ScenarioId = 'nominal' | 'sans_alert' | 'high_co2' | 'solar_storm';
 
 export type BloodType = 'O+' | 'O-' | 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-';
 
+export type BiologicalSex = 'female' | 'male';
+
 export type CrewRole =
   | 'Mission Commander'
   | 'Flight Engineer'
@@ -27,6 +29,7 @@ export interface CrewMemberProfile {
   name: string;
   callsign: string;
   role: CrewRole | string;
+  sex: BiologicalSex;
   age: number;
   bloodType: BloodType;
   restingHrBaselineBpm: number;
@@ -89,7 +92,7 @@ export interface FlightSurgeonGuidance {
   plainLanguageExplanation: string;
   earthConsultUrgency: 'routine_downlink' | 'priority_packet' | 'immediate_emergency_packet';
   guidedSteps: CountermeasureStep[];
-  source: 'gemini_live' | 'offline_verified_cache';
+  source: 'live_ai' | 'offline_verified_cache';
 }
 
 export interface VisualExamSample {
@@ -112,7 +115,7 @@ export interface VisualExamAnalysis {
   plainCrewGuidance: string;
   recommendedAction: string;
   analyzedAtIso: string;
-  source: 'gemini_vision' | 'offline_verified_cache';
+  source: 'live_vision_ai' | 'offline_verified_cache';
 }
 
 export interface EarthTelemetryPacket {

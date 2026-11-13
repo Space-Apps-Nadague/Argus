@@ -40,6 +40,8 @@ ARGUS tracks a roster of astronauts (`DEFAULT_CREW_ROSTER` + user-created custom
 ```typescript
 export type BloodType = 'O+' | 'O-' | 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-';
 
+export type BiologicalSex = 'female' | 'male';
+
 export type CrewRole =
   | 'Mission Commander'
   | 'Flight Engineer'
@@ -52,6 +54,7 @@ export interface CrewMemberProfile {
   name: string;
   callsign: string;
   role: CrewRole | string;
+  sex: BiologicalSex;           // Determines 3D Bio-Twin male vs. female anatomical morphology
   age: number;
   bloodType: BloodType;
   restingHrBaselineBpm: number; // Pre-flight resting HR baseline (e.g., 54-72 bpm)
@@ -134,7 +137,7 @@ Calculated deterministically in `src/utils/triageEngine.ts`:
 
 ## 4. AI Structured Output Schema (`FlightSurgeonGuidance` & `VisualExamAnalysis`)
 
-The AI layer (`src/services/flightSurgeonAi.ts`) uses `@google/genai` (`client.interactions.create` with model `gemini-3.8-flash`) and `response_format` JSON Schema to generate or refresh guidance while guaranteeing deterministic offline fallback when no API key is configured.
+The AI layer (`src/services/flightSurgeonAi.ts`) uses structured JSON Schema output to generate or refresh guidance while guaranteeing deterministic offline fallback when no API key is configured.
 
 ```typescript
 export interface CountermeasureStep {
@@ -156,7 +159,7 @@ export interface FlightSurgeonGuidance {
   plainLanguageExplanation: string;
   earthConsultUrgency: 'routine_downlink' | 'priority_packet' | 'immediate_emergency_packet';
   guidedSteps: CountermeasureStep[];
-  source: 'gemini_live' | 'offline_verified_cache';
+  source: 'live_ai' | 'offline_verified_cache';
 }
 
 export interface VisualExamSample {
@@ -179,7 +182,7 @@ export interface VisualExamAnalysis {
   plainCrewGuidance: string;
   recommendedAction: string;
   analyzedAtIso: string;
-  source: 'gemini_vision' | 'offline_verified_cache';
+  source: 'live_vision_ai' | 'offline_verified_cache';
 }
 
 export interface EarthTelemetryPacket {

@@ -27,7 +27,7 @@ import {
   evaluateAllZones,
   STATUS_COLORS,
 } from '../utils/triageEngine';
-import { hasConfiguredGeminiKey } from '../services/flightSurgeonAi';
+import { hasConfiguredAiKey } from '../services/flightSurgeonAi';
 
 const ENVIRONMENTS: { id: GravityEnvironment; label: string }[] = [
   { id: '0g_transit', label: '0g Transit' },
@@ -61,7 +61,7 @@ export const TopMissionBar: React.FC = () => {
 
   const [showKeyInput, setShowKeyInput] = useState(false);
   const envMeta = ENVIRONMENT_META[environment];
-  const hasKey = hasConfiguredGeminiKey(runtimeApiKey);
+  const hasKey = hasConfiguredAiKey(runtimeApiKey);
 
   const readinessColor =
     readinessScore >= 85
@@ -196,12 +196,12 @@ export const TopMissionBar: React.FC = () => {
             </div>
           </div>
 
-          {/* Optional Runtime Gemini API Key Button */}
+          {/* Optional Runtime Clinical AI API Key Button */}
           <div className="relative">
             <button
               type="button"
               onClick={() => setShowKeyInput((prev) => !prev)}
-              title="Configure Optional Gemini 3.8 Flash API Key (Offline Fallback Always Active)"
+              title="Configure Optional Clinical AI API Key (Offline Fallback Always Active)"
               className={`p-2 rounded-lg border text-xs font-mono flex items-center gap-1 transition-colors ${
                 hasKey
                   ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-300'
@@ -219,7 +219,7 @@ export const TopMissionBar: React.FC = () => {
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-xs font-mono font-semibold text-cyan-300 flex items-center gap-1.5">
                     <Sparkles className="w-3.5 h-3.5" />
-                    Gemini 3.8 Flash API Key
+                    Clinical AI API Key
                   </span>
                   <button
                     type="button"
@@ -230,13 +230,13 @@ export const TopMissionBar: React.FC = () => {
                   </button>
                 </div>
                 <p className="text-[11px] text-slate-400 mb-2">
-                  ARGUS runs 100% offline by default. Enter a Gemini API key to enable live AI guidance &amp; vision triage.
+                  ARGUS runs 100% offline by default. Enter an API key to enable live clinical AI guidance &amp; vision triage.
                 </p>
                 <input
                   type="password"
                   value={runtimeApiKey}
                   onChange={(e) => setRuntimeApiKey(e.target.value)}
-                  placeholder="AIzaSy... (or set VITE_GEMINI_API_KEY)"
+                  placeholder="Enter API key (or set VITE_AI_API_KEY)"
                   className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-slate-700 text-xs font-mono text-slate-100 focus:outline-none focus:border-cyan-400"
                 />
               </div>
@@ -294,7 +294,7 @@ export const TopMissionBar: React.FC = () => {
                   </span>
                   <span className="text-slate-200">{member.name}</span>
                   <span className="hidden md:inline text-[10px] text-slate-400">
-                    ({member.role} • {member.bloodType})
+                    ({member.sex === 'male' ? '♂' : '♀'} • {member.role} • {member.bloodType})
                   </span>
                 </button>
               );

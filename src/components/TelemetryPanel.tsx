@@ -117,7 +117,7 @@ export const TelemetryPanel: React.FC = () => {
       </div>
 
       {/* Vital Sign Cards Grid */}
-      <div className="p-3.5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 border-b border-slate-800/80 bg-slate-950/30">
+      <div className="p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-2 border-b border-slate-800/80 bg-slate-950/30">
         {currentZoneReadings.map((reading) => {
           const mStatus = evaluateMetricStatus(
             reading.metricId,
@@ -137,14 +137,14 @@ export const TelemetryPanel: React.FC = () => {
               key={reading.metricId}
               type="button"
               onClick={() => setSelectedMetricId(reading.metricId)}
-              className={`text-left p-3 rounded-xl border transition-all flex flex-col justify-between ${
+              className={`text-left p-2.5 rounded-xl border transition-all flex flex-col justify-between ${
                 isSelected
                   ? 'bg-slate-900/95 border-cyan-400/70 shadow-[0_0_16px_rgba(34,211,238,0.18)]'
                   : 'bg-slate-900/50 border-slate-800 hover:border-slate-700 hover:bg-slate-900/80'
               }`}
             >
               <div>
-                <div className="flex items-center justify-between gap-1.5 mb-1">
+                <div className="flex items-center justify-between gap-1.5 mb-0.5">
                   <span className="font-mono text-[11px] font-semibold text-slate-300 truncate">
                     {reading.label}
                   </span>
@@ -156,9 +156,9 @@ export const TelemetryPanel: React.FC = () => {
                 </div>
 
                 {/* Value & Unit */}
-                <div className="flex items-baseline gap-1.5 my-1">
+                <div className="flex items-baseline gap-1.5 my-0.5">
                   <span
-                    className="font-mono text-2xl font-bold tracking-tight"
+                    className="font-mono text-xl font-bold tracking-tight"
                     style={{ color: mColor }}
                   >
                     {reading.currentValue}
@@ -170,8 +170,8 @@ export const TelemetryPanel: React.FC = () => {
               </div>
 
               {/* Flight Norm Badge & Delta */}
-              <div className="mt-2 pt-2 border-t border-slate-800/80 flex flex-col gap-1">
-                <span className="inline-block w-fit px-2 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/30 font-mono text-[10px] text-cyan-300">
+              <div className="mt-1.5 pt-1.5 border-t border-slate-800/80 flex flex-col gap-0.5">
+                <span className="inline-block w-fit px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/30 font-mono text-[10px] text-cyan-300 truncate max-w-full">
                   {normBadge}
                 </span>
                 <span className="font-mono text-[10px] text-slate-400 truncate">

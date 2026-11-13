@@ -4,9 +4,9 @@
  *
  * Grid Proportions:
  * - Top Bar: `TopMissionBar.tsx` + Interactive Crew Roster Strip
- * - Left Column (30%): `BioTwinMap.tsx` (3D Holographic Human Bio-Twin)
- * - Center Column (40%): `TelemetryPanel.tsx` (Vital Cards & 14/30d Recharts AreaChart)
- * - Right Column (30%): `FlightSurgeonPanel.tsx` (Autonomous Flight Surgeon & Visual Self-Exam)
+ * - Left Column (25% / 3 of 12 cols): `TelemetryPanel.tsx` (Vital Cards & 14/30d Recharts AreaChart)
+ * - Center Hero Stage (50% / 6 of 12 cols): `BioTwinMap.tsx` (Central 3D Sculpted Male/Female Bio-Twin)
+ * - Right Column (25% / 3 of 12 cols): `FlightSurgeonPanel.tsx` (Autonomous Flight Surgeon & Visual Self-Exam)
  * - Modal: `CrewManagerModal.tsx` (Crew Roster Inspector & Custom Crew Member Creator)
  */
 
@@ -25,19 +25,19 @@ export const App: React.FC = () => {
         <TopMissionBar />
         <CrewManagerModal />
 
-        <main className="flex-1 max-w-[1800px] w-full mx-auto p-3 md:p-4 grid grid-cols-1 lg:grid-cols-10 gap-3.5 items-stretch">
-          {/* Left Column — 30% (3 of 10 cols on desktop) */}
-          <div className="lg:col-span-3 flex flex-col">
-            <BioTwinMap />
-          </div>
-
-          {/* Center Column — 40% (4 of 10 cols on desktop) */}
-          <div className="lg:col-span-4 flex flex-col">
+        <main className="flex-1 max-w-[1920px] w-full mx-auto p-3 md:p-4 grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-stretch">
+          {/* Left Column — 25% (3 of 12 cols on desktop): Longitudinal Telemetry & Drift */}
+          <div className="lg:col-span-3 order-2 lg:order-1 flex flex-col">
             <TelemetryPanel />
           </div>
 
-          {/* Right Column — 30% (3 of 10 cols on desktop) */}
-          <div className="lg:col-span-3 flex flex-col">
+          {/* Center Hero Column — 50% (6 of 12 cols on desktop): 3D Holographic Human Bio-Twin Stage */}
+          <div className="lg:col-span-6 order-1 lg:order-2 flex flex-col">
+            <BioTwinMap />
+          </div>
+
+          {/* Right Column — 25% (3 of 12 cols on desktop): Autonomous Flight Surgeon & Triage */}
+          <div className="lg:col-span-3 order-3 lg:order-3 flex flex-col">
             <FlightSurgeonPanel />
           </div>
         </main>

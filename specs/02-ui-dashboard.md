@@ -10,18 +10,24 @@
   - **Simulate Medical Event** dropdown (`nominal`, `sans_alert`, `high_co2`, `solar_storm`)
   - **Interactive Crew Roster Strip:** Displays all astronauts in the mission roster as selectable HUD pills (showing Callsign, Name, Role, Blood Type, and live Readiness status dot) + **`+ Add / Manage Crew`** button opening `CrewManagerModal.tsx`.
 - **Crew Roster & Custom Astronaut Creator Modal (`CrewManagerModal.tsx`):**
-  - Lists all crew members with their physiological baselines (`restingHrBaselineBpm`, `preFlightOnsdMm`), mission sols logged, blood type, age, role, and medical notes.
-  - **Create Custom Crew Member Form:** Allows creating a new astronaut with full details (Full Name, Callsign, Mission Role, Age, Blood Type, Pre-Flight Resting HR, Pre-Flight ONSD, Mission Sols Logged, Countermeasure Streak, Initial Telemetry Scenario, and Medical / Physiological Notes). Custom crew members are persisted to `localStorage` and immediately receive individualized 30-day Bio-Twin telemetry.
-- **Left Column — 30% (`BioTwinMap.tsx`):**
-  - Active Crew Member Bio-Twin header card showing callsign, age, blood type, mission sols, and medical note summary.
-  - Rotating interactive **3D Holographic Human Bio-Twin** (`OrbitControls` with auto-rotate that pauses on hover/drag, zoom, and camera reset).
-  - **Anatomical Layer Switcher:** Toggle or isolate body layers (`All Layers`, `Dermal / Surface`, `Skeletal / Musculoskeletal`, `Organs / Vascular`) to inspect internal vs. surface systems.
-  - **Clickable 3D Body Parts / Zones:** 5 clickable anatomical regions (`neuro` brain/optic nerve, `cardio` heart/vessels, `musculo` spine/femurs, `immune` lymphatic core/skin, `behavioral` circadian/neural halo) dynamically colored by `TriageStatus` (`#22c55e`, `#eab308`, `#ef4444`) with hover tooltips and quick-select zone pills.
-- **Center Column — 40% (`TelemetryPanel.tsx`):**
+  - Lists all crew members with their biological sex/anatomy (`female` | `male`), physiological baselines (`restingHrBaselineBpm`, `preFlightOnsdMm`), mission sols logged, blood type, age, role, and medical notes.
+  - **Create Custom Crew Member Form:** Allows creating a new astronaut with full details (Full Name, Callsign, Biological Sex / 3D Anatomy, Mission Role, Age, Blood Type, Pre-Flight Resting HR, Pre-Flight ONSD, Mission Sols Logged, Countermeasure Streak, Initial Telemetry Scenario, and Medical / Physiological Notes). Custom crew members are persisted to `localStorage` and immediately receive individualized 30-day Bio-Twin telemetry.
+- **Left Column — 27% (`TelemetryPanel.tsx`):**
   - Selected zone's vital sign cards individualized to the active crew member (current value, unit, delta from pre-flight baseline, flight norm badge, plain-language tooltip/caption, clickable to select the active chart metric)
   - Recharts longitudinal line/area chart (`AreaChart`, `ReferenceArea`, `ResponsiveContainer`) showing 14-day (or 30-day toggle) drift against a shaded `ReferenceArea` nominal range band for the current gravity environment
-- **Right Column — 30% (`FlightSurgeonPanel.tsx`):**
-  - Plain-language *"Spaceflight Hazard Context ([Environment])"* card tailored to the active crew member with optional *"Synthesize with Gemini AI"* button and source badge (`OFFLINE VERIFIED PROTOCOL` vs `GEMINI 3.8 FLASH LIVE`)
+- **Center Hero Column — 46% (`BioTwinMap.tsx` — Star of the Dashboard):**
+  - Central oversized spacecraft medical bay HUD stage (`min-h-[540px]`) featuring the active astronaut's full-body 3D Holographic Bio-Twin.
+  - **Anatomically Sculpted 3D Human Morphology (Male & Female Differentiation):**
+    - Continuous parametric vertex-sculpted cranial/facial mesh, neck (sternocleidomastoid/trapezius), torso (pectoralis major plates & rectus abdominis in `male`; anatomically sculpted mammary contours, narrower ribcage, indented waist, and flared iliac/trochanteric hip curves in `female`), sculpted upper limbs (deltoids, biceps/triceps, forearms, hands with fingers), and sculpted lower limbs (quadriceps, hamstrings, femorotibial Q-angle, patella, gastrocnemius calves, ankles, and feet).
+    - **Sex-Dimorphic Skeletal Layer:** Anatomical cranium & mandible, 24-segment curved vertebral column, clavicles, sternum, 10-pair curved thoracic ribcage, sex-differentiated pelvic girdle (wider subpubic angle and flared iliac wings in `female`; taller, narrower pelvis in `male`), humeri, radius/ulna, femurs, patellae, and tibia/fibula.
+    - **Detailed Visceral & Vascular Layer:** Gyri-sculpted cerebral hemispheres, cerebellum, brainstem, ocular globes with irises & optic nerve sheaths (`neuro`), beating 4-chamber myocardium, aortic arch, vena cava, carotid/femoral arterial-venous tree, trachea, bronchi & multi-lobe breathing lungs (`cardio`), thymus, spleen, liver silhouette, bone marrow cores & interconnected lymphatic vessel/node network (`immune`).
+  - **Interactive Controls:**
+    - `OrbitControls` with auto-rotate (pauses on hover/drag), zoom, and **Camera View Presets** (`Full Body`, `Cranial / SANS`, `Thorax / Core`).
+    - **Anatomy Morphology Switcher (`Female` | `Male`):** Automatically syncs with the active astronaut's `sex` and allows instant 1-click toggling on the HUD to inspect or compare female vs. male 3D anatomical models.
+    - **Anatomical Layer Switcher:** Toggle or isolate body layers (`All Layers`, `Dermal / Surface`, `Skeletal / Musculoskeletal`, `Organs / Vascular`).
+    - **Clickable 3D Body Parts / Zones & Floating HUD Callouts:** 5 clickable anatomical regions (`neuro`, `cardio`, `musculo`, `immune`, `behavioral`) dynamically colored by `TriageStatus` (`#22c55e`, `#eab308`, `#ef4444`) with 3D spatial callouts and bottom 5-zone status matrix.
+- **Right Column — 27% (`FlightSurgeonPanel.tsx`):**
+  - Plain-language *"Spaceflight Hazard Context ([Environment])"* card tailored to the active crew member with optional *"Synthesize with Clinical AI"* button and source badge (`OFFLINE HRP CACHE` vs `LIVE CLINICAL AI`)
   - Numbered **Guided Self-Assessment & Countermeasures** checklist with interactive completion checkboxes, required onboard hardware badge, and estimated duration
   - **Visual Self-Exam Input:** Webcam capture / file uploader + 1-click sample test images (*Nominal Retina*, *SANS Optic Nerve Ultrasound*, *Closed-Cabin Skin Rash*) with instant multimodal triage analysis card
   - **Queue Telemetry Packet for Earth Flight Surgeon** button (including active crew member profile metadata) with confirmation banner, packet preview modal/drawer, and JSON packet download/inspection

@@ -21,7 +21,7 @@
   - Selected zone's vital sign cards individualized to the active crew member (current value, unit, delta from pre-flight baseline, flight norm badge, plain-language tooltip/caption, clickable to select the active chart metric)
   - Recharts longitudinal line/area chart (`AreaChart`, `ReferenceArea`, `ResponsiveContainer`) showing 14-day (or 30-day toggle) drift against a shaded `ReferenceArea` nominal range band for the current gravity environment
 - **Right Column — 30% (`FlightSurgeonPanel.tsx`):**
-  - Plain-language *"Spaceflight Hazard Context ([Environment])"* card tailored to the active crew member with optional *"Synthesize with Gemini AI"* button and source badge (`OFFLINE VERIFIED PROTOCOL` vs `GEMINI 3.8 FLASH LIVE`)
+  - Plain-language *"Spaceflight Hazard Context ([Environment])"* card tailored to the active crew member with optional *"Synthesize with Clinical AI"* button and source badge (`OFFLINE HRP CACHE` vs `LIVE CLINICAL AI`)
   - Numbered **Guided Self-Assessment & Countermeasures** checklist with interactive completion checkboxes, required onboard hardware badge, and estimated duration
   - **Visual Self-Exam Input:** Webcam capture / file uploader + 1-click sample test images (*Nominal Retina*, *SANS Optic Nerve Ultrasound*, *Closed-Cabin Skin Rash*) with instant multimodal triage analysis card
   - **Queue Telemetry Packet for Earth Flight Surgeon** button (including active crew member profile metadata) with confirmation banner, packet preview modal/drawer, and JSON packet download/inspection

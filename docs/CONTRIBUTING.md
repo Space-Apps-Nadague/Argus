@@ -28,7 +28,7 @@ Before making any code change, walk through these four steps:
 ### Deterministic Triage vs. Generative AI
 - **Never** let an LLM decide whether a vital sign is `green`, `yellow`, or `red`.
 - All status colors (`#22c55e` Green, `#eab308` Yellow, `#ef4444` Red) and the `0–100%` **Crew Readiness Score** are computed deterministically by `src/utils/triageEngine.ts` using the exact threshold table in `specs/01-data-schema.md`.
-- The Gemini API layer (`src/services/flightSurgeonAi.ts`) uses `@google/genai` (`client.interactions.create` with `gemini-3.8-flash`) **strictly** for:
+- The Clinical AI layer (`src/services/flightSurgeonAi.ts`) is used **strictly** for:
   1. Synthesizing plain-language explanations for non-physician crew members.
   2. Generating or tailoring step-by-step guided self-exams and countermeasures.
   3. Analyzing visual self-exam images (retinal fundoscopy, optic nerve sheath ultrasound, skin rash imagery).

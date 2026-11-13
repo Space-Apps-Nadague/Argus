@@ -2,7 +2,7 @@
 
 > **Autonomous Crew Bio-Twin & Clinical Decision Support System for Deep-Space Missions**
 
-ARGUS is a single-screen spacecraft HUD designed for astronauts operating under significant one-way Earth communication delays (up to **20 minutes on Mars** and **14+ minutes in deep-space transit**). It pairs **deterministic physiological threshold evaluation** across spaceflight gravity regimes (`0g Transit`, `1/6g Moon`, `3/8g Mars`) with an **interactive 3D Holographic Anatomical Bio-Twin**, **longitudinal 14-to-30-day drift telemetry**, and **multimodal Gemini AI Flight Surgeon guidance** (with 100% deterministic offline fallback).
+ARGUS is a single-screen spacecraft HUD designed for astronauts operating under significant one-way Earth communication delays (up to **20 minutes on Mars** and **14+ minutes in deep-space transit**). It pairs **deterministic physiological threshold evaluation** across spaceflight gravity regimes (`0g Transit`, `1/6g Moon`, `3/8g Mars`) with an **interactive 3D Holographic Anatomical Bio-Twin**, **longitudinal 14-to-30-day drift telemetry**, and **multimodal Clinical AI Flight Surgeon guidance** (with 100% deterministic offline fallback).
 
 ---
 
@@ -17,7 +17,7 @@ This repository strictly follows **Spec-Driven Development** (`AGENTS.md`). Ever
    - [`specs/tasks.md`](./specs/tasks.md) — Active sprint task board, status tracking (`[TODO]`, `[IN PROGRESS]`, `[DONE]`), and file ownership.
 2. **Spec First:** Never introduce new telemetry fields, status thresholds, or component props in code without updating the corresponding file in `/specs` first.
 3. **Claim Your Task:** Mark your task as `[IN PROGRESS]` in `specs/tasks.md` before modifying files, and `[DONE]` once verified by `npm run build` and `npm test`.
-4. **Deterministic Triage + AI Guidance:** Keep `green` / `yellow` / `red` threshold evaluation strictly deterministic in TypeScript (`src/utils/triageEngine.ts`). Use the Gemini API layer (`src/services/flightSurgeonAi.ts`) strictly for plain-language explanations, step-by-step guided self-exams, and visual self-exam triage.
+4. **Deterministic Triage + AI Guidance:** Keep `green` / `yellow` / `red` threshold evaluation strictly deterministic in TypeScript (`src/utils/triageEngine.ts`). Use the Clinical AI layer (`src/services/flightSurgeonAi.ts`) strictly for plain-language explanations, step-by-step guided self-exams, and visual self-exam triage.
 
 See [`docs/CONTRIBUTING.md`](./docs/CONTRIBUTING.md) for the complete contributor guide and architecture handover.
 
@@ -35,14 +35,14 @@ npm install
 npm run dev
 ```
 
-### Optional: Live Multimodal Gemini API Key
-ARGUS works **100% offline out-of-the-box** using NASA HRP-grounded pre-cached clinical protocols. To enable live multimodal synthesis and vision triage with **Gemini 3.8 Flash** (`@google/genai` Interactions API):
+### Optional: Live Multimodal Clinical AI API Key
+ARGUS works **100% offline out-of-the-box** using NASA HRP-grounded pre-cached clinical protocols. To enable live multimodal synthesis and vision triage:
 
 ```bash
 cp .env.example .env
-# Set VITE_GEMINI_API_KEY=your_api_key_here in .env
+# Set VITE_AI_API_KEY=your_api_key_here in .env
 ```
-*(You can also enter or clear a Gemini API key directly from the top HUD bar at runtime.)*
+*(You can also enter or clear a Clinical AI API key directly from the top HUD bar at runtime.)*
 
 ### Verify Build & Deterministic Triage Tests
 ```bash
@@ -59,7 +59,7 @@ npm run build
 | `src/types/argus.ts` | Canonical TypeScript interfaces for zones, vitals, scenarios, AI JSON, and Earth packets | `specs/01-data-schema.md` |
 | `src/utils/triageEngine.ts` | Pure, deterministic `green`/`yellow`/`red` threshold evaluator across `0g_transit`, `1_6g_moon`, `3_8g_mars` + Crew Readiness Score | `specs/01-data-schema.md` (§2–§3) |
 | `src/data/telemetryScenarios.ts` | 30-day longitudinal telemetry datasets, 4 crisis scenarios (`nominal`, `sans_alert`, `high_co2`, `solar_storm`), offline protocols, and SVG medical imaging samples | `specs/01-data-schema.md` (§1–§4) |
-| `src/services/flightSurgeonAi.ts` | `@google/genai` Interactions API (`gemini-3.8-flash`) structured output & multimodal image triage with automatic offline fallback | `specs/00-architecture.md`, `specs/01-data-schema.md` (§4) |
+| `src/services/flightSurgeonAi.ts` | Structured Clinical AI output & multimodal image triage with automatic offline fallback | `specs/00-architecture.md`, `specs/01-data-schema.md` (§4) |
 | `src/context/MissionContext.tsx` | Central mission state (`useReducer`) coordinating environment, scenario, 3D Bio-Twin selection, checklist progress, and queued Earth telemetry packets | `specs/00-architecture.md` |
 | `src/components/TopMissionBar.tsx` | Spacecraft HUD top bar: comm delay badge, Gravity Environment Switcher, Readiness Score, Medical Event Simulator, and interactive Crew Roster Strip | `specs/02-ui-dashboard.md` (§1) |
 | `src/components/CrewManagerModal.tsx` | Crew Roster inspector & Custom Crew Member Bio-Twin creator with individualized physiological baselines (`restingHrBaselineBpm`, `preFlightOnsdMm`) | `specs/01-data-schema.md` (§1), `specs/02-ui-dashboard.md` (§1) |
