@@ -6,8 +6,8 @@
 import React, { useState } from 'react';
 import { Check, ChevronDown, ClipboardCheck, Trash2, UserPlus } from 'lucide-react';
 import { useMission } from '../context/MissionContext';
-import { getCrewAdjustedZones, TELEMETRY_SCENARIOS, ZONE_ORDER } from '../data/telemetryScenarios';
-import { applyCheckIns, checkInStreak } from '../utils/checkIns';
+import { TELEMETRY_SCENARIOS, ZONE_ORDER } from '../data/telemetryScenarios';
+import { checkInStreak } from '../utils/checkIns';
 import { calculateCrewReadinessScore, evaluateAllZones } from '../utils/triageEngine';
 import { readinessStatus } from './TopMissionBar';
 import { Card } from './ui/Card';
@@ -28,6 +28,8 @@ export const CrewTab: React.FC = () => {
     environment,
     checkIns,
     completedStepIds,
+    zonesForCrew,
+    serverBacked,
   } = useMission();
   const [expanded, setExpanded] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
@@ -49,9 +51,9 @@ export const CrewTab: React.FC = () => {
           const isActive = m.id === activeCrewMember.id;
           const sc = isActive ? scenarioId : m.defaultScenarioId;
           const entries = checkIns[m.id] || [];
-          const zones = applyCheckIns(getCrewAdjustedZones(sc, m), entries);
-          const statuses = evaluateAllZones(zones, environment);
-          const readiness = calculateCrewReadinessScore(zones, environment, isActive ? completedStepIds.length : 0);
+          const zones = zonesForCrew(m, sc);
+          const statuses = zones ? evaluateAllZones(zones, environment) : null;
+          const readiness = zones ? calculateCrewReadinessScore(zones, environment, isActive ? completedStepIds.length : 0) : null;
           const streak = checkInStreak(entries);
           const open = expanded === m.id;
 
@@ -71,12 +73,19 @@ export const CrewTab: React.FC = () => {
                     {m.role} · {m.sex === 'male' ? '♂' : '♀'}
                   </p>
                 </div>
-                <div className="text-right">
-                  <p className="font-mono text-xl font-semibold text-hud-text">{readiness}%</p>
-                  <StatusPill status={readinessStatus(readiness)} />
-                </div>
+                {readiness !== null && (
+                  <div className="text-right">
+                    <p className="font-mono text-xl font-semibold text-hud-text">{readiness}%</p>
+                    <StatusPill status={readinessStatus(readiness)} />
+                  </div>
+                )}
               </div>
 
+              {!statuses ? (
+                <p className="rounded-lg border border-hud-line bg-hud-bg/50 px-2 py-1.5 text-xs text-hud-muted">
+                  {serverBacked ? 'Health data: flight surgeon and the astronaut only' : 'No data yet'}
+                </p>
+              ) : (
               <ul className="flex items-center justify-between gap-1 rounded-lg border border-hud-line bg-hud-bg/50 px-2 py-1.5" aria-label="Zone status">
                 {ZONE_ORDER.map((z) => (
                   <li
@@ -92,6 +101,7 @@ export const CrewTab: React.FC = () => {
                   </li>
                 ))}
               </ul>
+              )}
 
               <div className="flex flex-wrap items-center gap-2">
                 {isActive ? (

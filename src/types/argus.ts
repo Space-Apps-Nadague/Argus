@@ -129,7 +129,7 @@ export interface TelemetryHistoryPoint {
   missionDay: number;
   dateLabel: string;
   value: number;
-  source?: 'synthetic' | 'check_in';
+  source?: 'synthetic' | 'check_in' | 'wearable' | 'clinical';
 }
 
 export interface VitalSignReading {

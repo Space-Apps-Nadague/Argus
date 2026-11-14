@@ -49,6 +49,7 @@ export const TopMissionBar: React.FC = () => {
     runtimeApiKey,
     setRuntimeApiKey,
     checkIns,
+    zonesForCrew,
     latestDay,
     spaceLocation,
     spaceLocationId,
@@ -216,7 +217,7 @@ export const TopMissionBar: React.FC = () => {
             {crewRoster.map((member) => {
               const isSelected = member.id === activeCrewMember.id;
               const sc = isSelected ? scenarioId : member.defaultScenarioId;
-              const zones = applyCheckIns(getCrewAdjustedZones(sc, member), checkIns[member.id] || []);
+              const zones = zonesForCrew(member, sc) ?? applyCheckIns(getCrewAdjustedZones(sc, member), checkIns[member.id] || []);
               const st = Object.values(evaluateAllZones(zones, environment));
               const worst: TriageStatus = st.includes('red') ? 'red' : st.includes('yellow') ? 'yellow' : 'green';
               return (

@@ -20,6 +20,7 @@ import {
   VitalSignReading,
 } from '../types/argus';
 import { METRIC_TYPICAL_SD, isMetricId } from './triageEngine';
+import { mean, sampleSd } from '../../shared/analytics/stats';
 
 export const BASELINE_DAYS = 7;
 export const EWMA_ALPHA = 0.3;
@@ -41,14 +42,6 @@ function tCritical(df: number): number {
   return T_95[Math.min(df, T_95.length) - 1];
 }
 
-const mean = (a: number[]): number =>
-  a.length ? a.reduce((s, x) => s + x, 0) / a.length : NaN;
-
-function sampleSd(a: number[]): number {
-  if (a.length < 2) return 0;
-  const m = mean(a);
-  return Math.sqrt(a.reduce((s, x) => s + (x - m) ** 2, 0) / (a.length - 1));
-}
 
 function typicalSd(metricId: string): number {
   return isMetricId(metricId) ? METRIC_TYPICAL_SD[metricId] : 1;

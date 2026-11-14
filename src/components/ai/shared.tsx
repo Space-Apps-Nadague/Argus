@@ -7,6 +7,8 @@ import { Cloud, Cpu, WifiOff } from 'lucide-react';
 import { useMission } from '../../context/MissionContext';
 import type { AiProviderStatus, AiResultMeta, CrewContextRequest } from '../../types/aiApi';
 import { fetchAiStatus } from '../../services/argusApi';
+import { wellbeingApi } from '../../services/dataApi';
+import type { WellbeingCheckIn } from '../../types/aiApi';
 
 /** Crew context sent with every AI request. */
 export function useCrewContextRequest(): CrewContextRequest {
@@ -106,3 +108,47 @@ export const errorText = (err: unknown) =>
   err instanceof Error && /unreachable/i.test(err.message)
     ? 'The AI backend is not running. Start it with `npm run dev:all` (or `npm run dev:local`).'
     : 'The AI request failed. Try again.';
+
+export const WELLBEING_STORAGE_KEY = 'argus_wellbeing_v1';
+
+/**
+ * Wellbeing check-in history for the active crew member. Server mode: `wellbeing_check_ins` table
+ * (specs/05-data-platform.md §3.4); offline demo: this browser.
+ */
+export function useWellbeingHistory(crewId: string): [WellbeingCheckIn[], (entry: WellbeingCheckIn) => Promise<WellbeingCheckIn[]>] {
+  const { serverBacked } = useMission();
+  const [local, setLocal] = usePerCrewList<WellbeingCheckIn>(WELLBEING_STORAGE_KEY, crewId, 60);
+  const [remote, setRemote] = useState<WellbeingCheckIn[]>([]);
+
+  useEffect(() => {
+    if (!serverBacked) return;
+    let alive = true;
+    setRemote([]);
+    wellbeingApi
+      .list(crewId)
+      .then((r) => alive && setRemote(r.checkIns))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [serverBacked, crewId]);
+
+  const add = useCallback(
+    async (entry: WellbeingCheckIn) => {
+      if (serverBacked) {
+        const { id: _id, crewId: _c, missionDay: _d, timestampIso: _t, ...scales } = entry;
+        await wellbeingApi.add(crewId, scales);
+        const { checkIns } = await wellbeingApi.list(crewId);
+        setRemote(checkIns);
+        return checkIns;
+      }
+      const next = [...local.filter((c) => c.missionDay !== entry.missionDay), entry];
+      setLocal(() => next);
+      return next;
+    },
+    [serverBacked, crewId, setLocal, local]
+  );
+
+  return [serverBacked ? remote : local, add];
+}
+

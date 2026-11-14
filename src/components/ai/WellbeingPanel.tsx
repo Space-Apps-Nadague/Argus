@@ -9,9 +9,9 @@ import { useMission } from '../../context/MissionContext';
 import type { AiResultMeta, WellbeingAssessment, WellbeingCheckIn } from '../../types/aiApi';
 import { argusApi } from '../../services/argusApi';
 import { StatusPill } from '../ui/StatusPill';
-import { errorText, ErrorNote, SourceTag, useCrewContextRequest, usePerCrewList } from './shared';
+import { errorText, ErrorNote, SourceTag, useCrewContextRequest, useWellbeingHistory } from './shared';
 
-export const WELLBEING_STORAGE_KEY = 'argus_wellbeing_v1';
+export { WELLBEING_STORAGE_KEY } from './shared';
 
 type Scale = 'mood' | 'stress' | 'energy' | 'sleepQuality' | 'cohesion' | 'motivation';
 
@@ -29,7 +29,7 @@ const TREND_WORD = { improving: 'Improving', stable: 'Stable', worsening: 'Worse
 export const WellbeingPanel: React.FC = () => {
   const { activeCrewMember, latestDay, runtimeApiKey } = useMission();
   const ctx = useCrewContextRequest();
-  const [history, setHistory] = usePerCrewList<WellbeingCheckIn>(WELLBEING_STORAGE_KEY, activeCrewMember.id, 60);
+  const [history, addCheckIn] = useWellbeingHistory(activeCrewMember.id);
   const [values, setValues] = useState<Record<Scale, number>>({ mood: 4, stress: 2, energy: 4, sleepQuality: 4, cohesion: 4, motivation: 4 });
   const [note, setNote] = useState('');
   const [result, setResult] = useState<WellbeingAssessment | null>(null);
@@ -47,11 +47,10 @@ export const WellbeingPanel: React.FC = () => {
       ...values,
       note: note.trim() || undefined,
     };
-    const next = [...history.filter((c) => c.missionDay !== latestDay), entry];
-    setHistory(() => next);
     setBusy(true);
     setError(null);
     try {
+      const next = await addCheckIn(entry);
       const res = await argusApi.wellbeing({ ...ctx, checkIns: next }, runtimeApiKey);
       setResult(res.result);
       setMeta(res.meta);

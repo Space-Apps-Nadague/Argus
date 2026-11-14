@@ -48,7 +48,7 @@ import {
   checkInStreak,
   latestMissionDay,
 } from '../utils/checkIns';
-import { crewApi } from '../services/dataApi';
+import { crewApi, dataApi } from '../services/dataApi';
 import { findMetricLinks } from '../utils/driftAnalytics';
 import { DEFAULT_SPACE_LOCATION, isSpaceLocationId, SPACE_LOCATIONS } from '../data/spaceLocations';
 import {
@@ -474,8 +474,12 @@ function missionReducer(
 
 interface MissionContextValue extends MissionState {
   activeCrewMember: CrewMemberProfile;
-  /** Crew-adjusted zones with check-ins overlaid (single source for all tabs). */
+  /** Crew-adjusted zones with check-ins overlaid (single source for all tabs). From the database in server mode. */
   zones: Record<BodyZoneId, VitalSignReading[]>;
+  /** Where `zones` came from: the ARGUS database, or the synthetic demo series. */
+  zonesSource: 'database' | 'demo';
+  /** Zones for any crew member; null in server mode when this user may not see that astronaut's data. */
+  zonesForCrew: (member: CrewMemberProfile, scenario?: ScenarioId) => Record<BodyZoneId, VitalSignReading[]> | null;
   activeCheckIns: CheckInEntry[];
   checkInStreakDays: number;
   latestDay: number;
@@ -605,13 +609,56 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
     [state.checkIns, activeCrewMember.id]
   );
 
+  // Server mode: zones per astronaut come from `daily_metrics` (spec 05 §8), refreshed every minute.
+  const [serverZones, setServerZones] = useState<Record<string, Record<BodyZoneId, VitalSignReading[]>>>({});
+  const readableCrewIds = useMemo(
+    () => (lockedCrewId ? [lockedCrewId] : state.crewRoster.map((c) => c.id)).join(','),
+    [lockedCrewId, state.crewRoster]
+  );
+  const refreshServerZones = useCallback(
+    async (ids: string[]) => {
+      const results = await Promise.all(
+        ids.map((id) =>
+          dataApi
+            .zones(id)
+            .then((r) => (r.hasData ? ([id, r.zones] as const) : null))
+            .catch(() => null)
+        )
+      );
+      setServerZones((prev) => {
+        const next = { ...prev };
+        for (const r of results) if (r) next[r[0]] = r[1];
+        return next;
+      });
+    },
+    []
+  );
+  useEffect(() => {
+    if (!serverBacked || !readableCrewIds) return;
+    const ids = readableCrewIds.split(',');
+    void refreshServerZones(ids);
+    const timer = setInterval(() => void refreshServerZones(ids), 60_000);
+    return () => clearInterval(timer);
+  }, [serverBacked, readableCrewIds, refreshServerZones]);
+
+  const zonesForCrew = useCallback(
+    (member: CrewMemberProfile, scenario: ScenarioId = member.defaultScenarioId) => {
+      if (serverBacked) return serverZones[member.id] ?? null;
+      return applyCheckIns(getCrewAdjustedZones(scenario, member), state.checkIns[member.id] || []);
+    },
+    [serverBacked, serverZones, state.checkIns]
+  );
+
+  const activeServerZones = serverBacked ? serverZones[activeCrewMember.id] : undefined;
+  const zonesSource: 'database' | 'demo' = activeServerZones ? 'database' : 'demo';
   const adjustedZones = useMemo(
     () =>
+      activeServerZones ??
       applyCheckIns(
         getCrewAdjustedZones(state.scenarioId, activeCrewMember),
         activeCheckIns
       ),
-    [state.scenarioId, activeCrewMember, activeCheckIns]
+    [activeServerZones, state.scenarioId, activeCrewMember, activeCheckIns]
   );
 
   const checkInStreakDays = useMemo(
@@ -732,9 +779,20 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
     dispatch({ type: 'SET_ACTIVE_TAB', payload: tab });
   }, []);
 
-  const addCheckIn = useCallback((entry: CheckInEntry) => {
-    dispatch({ type: 'ADD_CHECK_IN', payload: entry });
-  }, []);
+  const addCheckIn = useCallback(
+    (entry: CheckInEntry) => {
+      if (serverBacked) {
+        // Stored as observations (origin check_in); zones are re-read from the database.
+        dataApi
+          .checkIn(entry.crewId, entry.values as Record<string, number>, entry.note)
+          .then(() => refreshServerZones([entry.crewId]))
+          .catch((err) => console.warn('[ARGUS] could not save check-in', err));
+        return;
+      }
+      dispatch({ type: 'ADD_CHECK_IN', payload: entry });
+    },
+    [serverBacked, refreshServerZones]
+  );
 
   const deleteCheckIn = useCallback(
     (entryId: string) => {
@@ -905,6 +963,8 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
       setActiveTab,
       isCrewLocked: Boolean(lockedCrewId),
       serverBacked,
+      zonesSource,
+      zonesForCrew,
       spaceLocationId,
       spaceLocation,
       setSpaceLocation,
@@ -943,6 +1003,8 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
       setActiveTab,
       lockedCrewId,
       serverBacked,
+      zonesSource,
+      zonesForCrew,
       spaceLocationId,
       spaceLocation,
       setSpaceLocation,

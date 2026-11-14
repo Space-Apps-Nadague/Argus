@@ -11,8 +11,7 @@ import { useMission } from '../../context/MissionContext';
 import type { AiResultMeta, CrewChatMessage, WellbeingCheckIn } from '../../types/aiApi';
 import { streamCrewChat } from '../../services/argusApi';
 import { chatHistoryApi } from '../../services/dataApi';
-import { errorText, ErrorNote, SourceTag, useCrewContextRequest, usePerCrewList } from './shared';
-import { WELLBEING_STORAGE_KEY } from './WellbeingPanel';
+import { errorText, ErrorNote, SourceTag, useCrewContextRequest, usePerCrewList, useWellbeingHistory } from './shared';
 
 export const CHAT_STORAGE_KEY = 'argus_chat_v1';
 
@@ -51,7 +50,7 @@ export const ChatPanel: React.FC = () => {
     }
     setLocalMessages(() => []);
   };
-  const [checkIns] = usePerCrewList<WellbeingCheckIn>(WELLBEING_STORAGE_KEY, activeCrewMember.id);
+  const [checkIns] = useWellbeingHistory(activeCrewMember.id);
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState('');
   const [busy, setBusy] = useState(false);

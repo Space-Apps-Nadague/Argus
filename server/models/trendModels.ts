@@ -1,47 +1,26 @@
 /**
  * Deterministic per-metric trend models (specs/04-ai-backend.md §5). No LLM involved.
- *
- * TODO(Task 27): delegate baseline/drift/forecast to Sprint 7's `src/utils/driftAnalytics.ts`
- * (computeDrift / forecastMetric) and keep only `daysToRed` here.
+ * Statistics come from `shared/analytics` (also used by the HUD's `driftAnalytics.ts`), and the baseline
+ * SD floor is `METRIC_TYPICAL_SD`, the same as the HUD, so server and HUD agree (spec 05 §5).
  */
 
 import type { BodyZoneId, GravityEnvironment, VitalSignReading } from '../../src/types/argus';
 import type { MetricTrend, TrendDirection, TrendLevel } from '../../src/types/aiApi';
-import { evaluateMetricStatus, getMetricThreshold } from '../../src/utils/triageEngine';
+import { EWMA_ALPHA, linearRegression, mean, sampleSd } from '../../shared/analytics';
+import { evaluateMetricStatus, getMetricThreshold, isMetricId, METRIC_TYPICAL_SD } from '../../src/utils/triageEngine';
+
+export { linearRegression };
 
 export const BASELINE_DAYS = 7;
-export const EWMA_ALPHA = 0.3;
 export const SLOPE_WINDOW = 10;
 export const MAX_DAYS_TO_RED = 60;
 
-const mean = (a: number[]) => (a.length ? a.reduce((s, x) => s + x, 0) / a.length : NaN);
-
-function sampleSd(a: number[]): number {
-  if (a.length < 2) return 0;
-  const m = mean(a);
-  return Math.sqrt(a.reduce((s, x) => s + (x - m) ** 2, 0) / (a.length - 1));
-}
 
 const round = (v: number, digits = 3) => {
   const f = 10 ** digits;
   return Math.round(v * f) / f;
 };
 
-/** Ordinary least squares slope & intercept. */
-export function linearRegression(xs: number[], ys: number[]): { slope: number; intercept: number } | null {
-  if (xs.length < 3) return null;
-  const xm = mean(xs);
-  const ym = mean(ys);
-  let sxx = 0;
-  let sxy = 0;
-  xs.forEach((x, i) => {
-    sxx += (x - xm) ** 2;
-    sxy += (x - xm) * (ys[i] - ym);
-  });
-  if (sxx === 0) return null;
-  const slope = sxy / sxx;
-  return { slope, intercept: ym - slope * xm };
-}
 
 export function trendLevel(ewmaZ: number): TrendLevel {
   const a = Math.abs(ewmaZ);
@@ -75,7 +54,7 @@ export function analyzeMetricTrend(
 
   const baselinePts = values.slice(0, BASELINE_DAYS);
   const baselineMean = baselinePts.length ? mean(baselinePts) : reading.currentValue;
-  const sdFloor = Math.max((t.nominalMax - t.nominalMin) / 8, 1e-6);
+  const sdFloor = isMetricId(reading.metricId) ? METRIC_TYPICAL_SD[reading.metricId] : Math.max((t.nominalMax - t.nominalMin) / 8, 1e-6);
   const sd = Math.max(sampleSd(baselinePts), sdFloor);
 
   const zSeries = values.length ? values.map((v) => (v - baselineMean) / sd) : [0];

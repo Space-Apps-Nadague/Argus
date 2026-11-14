@@ -2,8 +2,8 @@
  * ARGUS data-platform client (specs/05-data-platform.md §8). Session cookie auth; same origin via the Vite proxy.
  */
 
-import type { CrewChatMessage } from '../types/aiApi';
-import type { CrewMemberProfile, UserAccount, UserRole } from '../types/argus';
+import type { CrewChatMessage, WellbeingCheckIn } from '../types/aiApi';
+import type { BodyZoneId, CrewMemberProfile, UserAccount, UserRole, VitalSignReading } from '../types/argus';
 import { API_BASE } from './argusApi';
 
 export class DataApiError extends Error {
@@ -80,5 +80,35 @@ export const chatHistoryApi = {
     apiJson<{ conversationId: string | null; messages: CrewChatMessage[] }>(`/api/astronauts/${encodeURIComponent(crewId)}/conversations/latest`),
   startNew: (crewId: string) =>
     apiJson<{ conversationId: string }>(`/api/astronauts/${encodeURIComponent(crewId)}/conversations`, { body: {} }),
+};
+
+export interface AnalyticsResponse {
+  computedAt: string | null;
+  current: Array<{
+    metricId: string;
+    day: string;
+    value: number;
+    preflight: { mean: number; sd: number; n: number } | null;
+    normal: { median: number; p05: number; p95: number; mean: number; n: number } | null;
+    zVsPreflight: number | null;
+  }>;
+  circadian: Array<{ metricId: string; hour: number; median: number; p05: number; p95: number; n: number }>;
+  anomalies: Array<{ metricId: string; detector: 'robust_z' | 'ewma' | 'cusum'; severity: 'watch' | 'drifting'; score: number; tsStart: string; tsEnd: string; detail: unknown }>;
+}
+
+export const dataApi = {
+  zones: (crewId: string) =>
+    apiJson<{ zones: Record<BodyZoneId, VitalSignReading[]>; hasData: boolean; missionDay: number }>(
+      `/api/astronauts/${encodeURIComponent(crewId)}/zones`
+    ),
+  analytics: (crewId: string) => apiJson<AnalyticsResponse>(`/api/astronauts/${encodeURIComponent(crewId)}/analytics`),
+  checkIn: (crewId: string, values: Record<string, number>, note?: string) =>
+    apiJson(`/api/astronauts/${encodeURIComponent(crewId)}/check-ins`, { body: { values, note } }),
+};
+
+export const wellbeingApi = {
+  list: (crewId: string) => apiJson<{ checkIns: WellbeingCheckIn[] }>(`/api/astronauts/${encodeURIComponent(crewId)}/wellbeing`),
+  add: (crewId: string, scales: Omit<WellbeingCheckIn, 'id' | 'crewId' | 'missionDay' | 'timestampIso'>) =>
+    apiJson<{ id: string }>(`/api/astronauts/${encodeURIComponent(crewId)}/wellbeing`, { body: scales }),
 };
 
