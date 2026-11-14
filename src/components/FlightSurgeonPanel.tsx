@@ -228,7 +228,7 @@ export const FlightSurgeonPanel: React.FC = () => {
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
       {/* LEFT: context + symptoms + checklist */}
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4 min-w-0">
         <Card
           icon={<ShieldAlert className="h-4 w-4" />}
           title="Situation"
@@ -412,12 +412,12 @@ export const FlightSurgeonPanel: React.FC = () => {
       </div>
 
       {/* RIGHT: visual exam + Earth packet */}
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4 min-w-0">
         <Card
           icon={<Camera className="h-4 w-4" />}
           title="Visual self-exam"
           actions={
-            <div className="flex items-center gap-1.5">
+            <div className="flex flex-wrap items-center gap-1.5">
               {isCameraActive ? (
                 <button
                   type="button"

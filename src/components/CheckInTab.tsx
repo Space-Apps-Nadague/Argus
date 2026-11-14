@@ -71,7 +71,7 @@ export const CheckInTab: React.FC = () => {
 
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-      <form onSubmit={submit} className="xl:col-span-2 space-y-4" noValidate aria-labelledby="checkin-title">
+      <form onSubmit={submit} className="xl:col-span-2 space-y-4 min-w-0" noValidate aria-labelledby="checkin-title">
         {/* Header */}
         <div className="hud-card flex flex-wrap items-center justify-between gap-3 px-4 py-3">
           <h2 id="checkin-title" className="flex items-center gap-2 font-display text-[13px] font-semibold tracking-wide text-hud-text">
@@ -140,9 +140,9 @@ export const CheckInTab: React.FC = () => {
         )}
 
         {/* Fields by zone */}
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 min-w-0">
           {ZONE_ORDER.map((z) => (
-            <fieldset key={z} className="hud-card px-4 pb-3 pt-2">
+            <fieldset key={z} className="hud-card px-4 pb-3 pt-2 min-w-0">
               <legend className="sr-only">{ZONE_SHORT_NAME[z]}</legend>
               <div className="mb-1 flex items-center gap-2 py-1.5 text-sm font-medium text-hud-text" aria-hidden="true">
                 <ZoneIcon zone={z} className="h-4 w-4 text-hud-accent" />
@@ -168,7 +168,7 @@ export const CheckInTab: React.FC = () => {
                             Allowed {range.min}–{range.max} {r.unit}
                           </span>
                         </InfoTip>
-                        <div className="relative w-32">
+                        <div className="relative w-32 shrink-0">
                           <input
                             id={inputId}
                             inputMode="decimal"
@@ -196,7 +196,7 @@ export const CheckInTab: React.FC = () => {
             </fieldset>
           ))}
 
-          <div className="hud-card flex flex-col gap-3 p-4">
+          <div className="hud-card flex flex-col gap-3 p-4 min-w-0">
             <label htmlFor="ci-note" className="text-sm font-medium text-hud-text">
               Note <span className="font-normal text-hud-muted">(optional)</span>
             </label>
@@ -217,7 +217,8 @@ export const CheckInTab: React.FC = () => {
       </form>
 
       {/* History */}
-      <Card title="Recent" bodyClassName="px-4 pb-4">
+      <div className="min-w-0">
+        <Card title="Recent" bodyClassName="px-4 pb-4">
         {recent.length ? (
           <ul className="space-y-2">
             {recent.map((e) => (
@@ -242,6 +243,7 @@ export const CheckInTab: React.FC = () => {
           <p className="text-sm text-hud-muted">No check-ins yet. Log today’s readings to start your streak.</p>
         )}
       </Card>
+      </div>
     </div>
   );
 };

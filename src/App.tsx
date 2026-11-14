@@ -37,7 +37,7 @@ const ActivePanel: React.FC = () => {
         const Panel = PANELS[id];
         const active = id === activeTab;
         return (
-          <div key={id} role="tabpanel" id={panelId(id)} aria-labelledby={tabId(id)} hidden={!active} tabIndex={0} className="outline-none">
+          <div key={id} role="tabpanel" id={panelId(id)} aria-labelledby={tabId(id)} hidden={!active} tabIndex={0} className="outline-none min-w-0">
             {active && <Panel />}
           </div>
         );
@@ -52,7 +52,7 @@ export const App: React.FC = () => (
       <TopMissionBar />
       <TabBar />
       <CrewManagerModal />
-      <main className="mx-auto w-full max-w-[1800px] p-3 md:p-4">
+      <main className="mx-auto w-full max-w-[1800px] p-3 md:p-4 min-w-0">
         <ScheduledRoutineBanner />
         <ActivePanel />
       </main>
