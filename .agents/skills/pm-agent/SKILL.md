@@ -69,18 +69,19 @@ One short sentence explaining the hackathon/astronaut impact.
 - [ ] Short, concrete task 3
 ```
 
-Create or edit the GitHub issue via:
+Create or edit the GitHub issue via (always label as `human-review` or `agent-task`):
 ```bash
 node .agents/skills/pm-agent/scripts/gh-pm-issue.mjs create \
   --title "[PM Agent] [P0] Short action title" \
+  --labels "agent-task" \
   --body @.agents/skills/pm-agent/issues/<slug>.md
 ```
 
 ### Step 4: Sync to GitHub Projects v2 Kanban Board
-Whenever you open a GitHub issue (or find an unlinked open issue), sync it onto the GitHub Projects v2 Kanban board:
+Whenever you open a GitHub issue (or find an unlinked open issue), sync it onto the GitHub Projects v2 Kanban board using urgency columns (`backlog` = not urgent / `P2`, `todo` = regular urgency / `P1`, `urgent` = `P0`):
 
 ```bash
 node .agents/skills/pm-agent/scripts/gh-pm-project.mjs sync-issue \
   --issue-number <issue_number> \
-  --status todo
+  --status urgent
 ```
