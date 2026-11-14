@@ -2,7 +2,7 @@
 
 > **Autonomous Crew Bio-Twin & Clinical Decision Support System for Deep-Space Missions**
 
-ARGUS is a single-screen spacecraft HUD designed for astronauts operating under significant one-way Earth communication delays (**14+ minutes in deep-space transit**). It pairs **deterministic physiological threshold evaluation** for `0g` microgravity (`0g_transit`) with an **interactive 3D Holographic Anatomical Bio-Twin**, **longitudinal 14-to-30-day drift telemetry**, and **multimodal Clinical AI Flight Surgeon guidance** (with 100% deterministic offline fallback).
+ARGUS is a tabbed spacecraft HUD (Bio-Twin · Trends · Check-in · Flight Surgeon · Crew) designed for astronauts operating under significant one-way Earth communication delays (**14+ minutes in deep-space transit**). It pairs **deterministic physiological threshold evaluation** for `0g` microgravity (`0g_transit`) with an **interactive 3D Holographic Anatomical Bio-Twin**, **longitudinal 14-to-30-day drift telemetry**, and **multimodal Clinical AI Flight Surgeon guidance** (with 100% deterministic offline fallback).
 
 ---
 
@@ -15,6 +15,7 @@ This repository strictly follows **Spec-Driven Development** (`AGENTS.md`). Ever
    - [`specs/01-data-schema.md`](./specs/01-data-schema.md) — Domain models, `0g` microgravity vital thresholds, and AI JSON schemas.
    - [`specs/02-ui-dashboard.md`](./specs/02-ui-dashboard.md) — Single-screen HUD grid, 3D Bio-Twin layers/zones, and interactive clinical workflows.
    - [`specs/03-requirements.md`](./specs/03-requirements.md) — Mission health monitoring challenge requirements, considerations, and traceability matrix.
+   - [`specs/04-ai-backend.md`](./specs/04-ai-backend.md) — AI backend: local/free provider chain, endpoints, and deterministic models.
 2. **Spec First:** Never introduce new telemetry fields, status thresholds, or component props in code without updating the corresponding file in `/specs` first.
 3. **Claim Your Task:** Tasks live in [GitHub Issues](https://github.com/Space-Apps-Nadague/Argus/issues) and on the GitHub Projects kanban. Assign yourself and move the card to `In Progress` before modifying files; close it from your PR (`Closes #<n>`) once `npm run build` and `npm test` pass.
 4. **Deterministic Triage + AI Guidance:** Keep `green` / `yellow` / `red` threshold evaluation strictly deterministic in TypeScript (`src/utils/triageEngine.ts`). Use the Clinical AI layer (`src/services/flightSurgeonAi.ts`) strictly for plain-language explanations, step-by-step guided self-exams, and visual self-exam triage.
@@ -35,14 +36,15 @@ npm install
 npm run dev
 ```
 
-### Optional: Live Multimodal Clinical AI API Key
-ARGUS works **100% offline out-of-the-box** using NASA HRP-grounded pre-cached clinical protocols. To enable live multimodal synthesis and vision triage:
+### Optional: Live AI (free — local model or free cloud tier)
+ARGUS works **100% offline out-of-the-box** using NASA HRP-grounded pre-cached clinical protocols. Live AI runs on the ARGUS backend (`server/`), so no key ever reaches the browser:
 
 ```bash
-cp .env.example .env
-# Set VITE_AI_API_KEY=your_api_key_here in .env
+cp .env.example .env   # pick AI_PROVIDERS and set AI_LOCAL_MODEL and/or a free key
+npm run ai:local       # optional: check that Ollama and the model are ready
+npm run dev:all        # Vite + AI backend (or `npm run dev:local` to force the local model)
 ```
-*(You can also enter or clear a Clinical AI API key directly from the top HUD bar at runtime.)*
+Providers: local Ollama / LM Studio, OpenRouter free models, Gemini free tier, Groq, or any OpenAI-compatible endpoint. See [`specs/04-ai-backend.md`](./specs/04-ai-backend.md).
 
 ### Verify Build & Deterministic Triage Tests
 ```bash
@@ -62,7 +64,21 @@ npm run build
 | `src/services/flightSurgeonAi.ts` | Structured Clinical AI output & multimodal image triage with automatic offline fallback | `specs/00-architecture.md`, `specs/01-data-schema.md` (§4) |
 | `src/context/MissionContext.tsx` | Central mission state (`useReducer`) coordinating environment, scenario, 3D Bio-Twin selection, checklist progress, and queued Earth telemetry packets | `specs/00-architecture.md` |
 | `src/components/TopMissionBar.tsx` | Spacecraft HUD top bar: comm delay badge, Readiness Score, Medical Event Simulator, and interactive Crew Roster Strip | `specs/02-ui-dashboard.md` (§1) |
-| `src/components/CrewManagerModal.tsx` | Crew Roster inspector & Custom Crew Member Bio-Twin creator with individualized physiological baselines (`restingHrBaselineBpm`, `preFlightOnsdMm`) | `specs/01-data-schema.md` (§1), `specs/02-ui-dashboard.md` (§1) |
+| `src/components/CrewManagerModal.tsx` | "Add crew member" dialog with individualized physiological baselines (`restingHrBaselineBpm`, `preFlightOnsdMm`) | `specs/01-data-schema.md` (§1), `specs/02-ui-dashboard.md` (§2.5) |
 | `src/components/BioTwinMap.tsx` | Interactive rotating **3D Holographic Human Bio-Twin** (`@react-three/fiber` + `@react-three/drei`) with layer switcher (`All`, `Dermal`, `Skeletal`, `Organs`) & 5 clickable anatomical regions | `specs/02-ui-dashboard.md` (§1) |
-| `src/components/TelemetryPanel.tsx` | Selected zone vital cards + 14/30-day Recharts `AreaChart` with shaded `ReferenceArea` nominal range band | `specs/02-ui-dashboard.md` (§1) |
-| `src/components/FlightSurgeonPanel.tsx` | Spaceflight hazard context card, numbered self-exam checklist, webcam/file/sample visual self-exam input, and Earth Flight Surgeon packet queue | `specs/02-ui-dashboard.md` (§1) |
+| `src/utils/driftAnalytics.ts` | Personal-baseline drift (σ, EWMA), 3-day forecast with 90% interval, evidence-backed metric links ("Why") | `specs/01-data-schema.md` (§5) |
+| `src/utils/checkIns.ts` | Daily check-in validation, overlay onto telemetry, logging streak | `specs/01-data-schema.md` (§6) |
+| `src/components/TabBar.tsx` | Accessible 5-tab navigation (arrow keys, badges, persisted tab) | `specs/02-ui-dashboard.md` (§1) |
+| `src/components/BioTwinTab.tsx` | Bio-Twin tab: 3D stage + selected-zone vital tiles with drift chips | `specs/02-ui-dashboard.md` (§2.1) |
+| `src/components/TrendsTab.tsx` | Trends tab: chart with nominal/baseline/forecast bands, drift card, "Why" links | `specs/02-ui-dashboard.md` (§2.2) |
+| `src/components/CheckInTab.tsx` | Check-in tab: manual readings, inline range validation, status-change summary | `specs/02-ui-dashboard.md` (§2.3) |
+| `src/components/CrewTab.tsx` | Crew tab: roster cards with zone status, readiness, streak, details | `specs/02-ui-dashboard.md` (§2.5) |
+| `src/components/ui/`, `InfoTip.tsx` | Shared primitives (`Card`, `StatTile`, `StatusPill`, `ZoneIcon`) and ⓘ popover for low-text UI | `specs/02-ui-dashboard.md` (§3) |
+| `src/components/FlightSurgeonPanel.tsx` | Flight Surgeon tab: situation card, guided steps, visual self-exam, Earth packet queue (guidance follows live check-in status) | `specs/02-ui-dashboard.md` (§2.4) |
+| `.agents/skills/` | Vendor-neutral agent skills for UI work (`frontend-design`, `design-system`, `ux-copy`, `accessibility-review`, `design-critique`) | `AGENTS.md` (§5) |
+
+---
+
+## 4. Roadmap
+
+- **ARGUS Companion (AI chat):** a chat drawer with a deterministic offline "brain", optional live Clinical AI, and voice in/out, ported from the `ARGOS_The_Thousand_Eyes.html` prototype. Specified in `specs/02-ui-dashboard.md` §5 and `specs/01-data-schema.md` §7, tracked in issue [#7](https://github.com/Space-Apps-Nadague/Argus/issues/7).

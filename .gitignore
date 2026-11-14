@@ -6,3 +6,10 @@ dist-ssr
 .env
 .DS_Store
 coverage
+
+# Tool-specific agent folders are local-only (worktrees, settings, caches).
+# Shared, vendor-neutral agent material lives in .agents/ and IS tracked.
+.claude/
+.cursor/
+.codex/
+.gemini/
