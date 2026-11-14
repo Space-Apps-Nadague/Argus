@@ -2,13 +2,10 @@
 
 ## 1. Core Domain Enumerations & Identifiers
 
-### Gravity Environments (`GravityEnvironment`)
+### Operating Environment (`GravityEnvironment`)
+ARGUS currently assumes a single `0g_transit` microgravity environment until future gravity inputs are added:
 - `'0g_transit'` — Deep-Space Microgravity Transit (`0g Transit`, Comm Delay: `14m 22s ONE-WAY`)
   - Primary NASA HRP Hazards: Cephalad fluid shift, Spaceflight-Associated Neuro-ocular Syndrome (SANS), bone mineral density loss, aerobic deconditioning, closed-loop $\text{CO}_2$ buildup.
-- `'1_6g_moon'` — Lunar Surface Operations (`1/6g Moon`, Comm Delay: `1.3s ONE-WAY`)
-  - Primary NASA HRP Hazards: Lunar regolith inhalation/dermatitis, EVA suit musculoskeletal strain, vestibular adaptation to partial gravity, solar particle events.
-- `'3_8g_mars'` — Martian Surface Habitat (`3/8g Mars`, Comm Delay: `18m 40s ONE-WAY`)
-  - Primary NASA HRP Hazards: Orthostatic intolerance post-transit, perchlorate/dust toxicity, circadian desynchrony (24h 39m Martian sol), autonomous medical isolation.
 
 ### Anatomical Bio-Twin Zones (`BodyZoneId`)
 1. `'neuro'` — **Neuro-Ocular & CNS** (Brain, Optic Nerve Sheath, Cerebral Perfusion)
@@ -69,9 +66,9 @@ export interface CrewMemberProfile {
 
 ---
 
-## 2. Vital Sign Definitions & Gravity-Adjusted Thresholds
+## 2. Vital Sign Definitions & 0g Thresholds
 
-Each zone tracks 2–3 primary metrics (`VitalMetric`). Deterministic triage (`src/utils/triageEngine.ts`) evaluates each metric against environment-adjusted thresholds:
+Each zone tracks 2–3 primary metrics (`VitalMetric`). Deterministic triage (`src/utils/triageEngine.ts`) evaluates each metric against `0g_transit` microgravity thresholds:
 
 ```typescript
 export interface ThresholdRange {
@@ -86,22 +83,22 @@ export interface ThresholdRange {
 - Value outside `[yellowMin, yellowMax]` $\rightarrow$ `'red'`
 - Zone `TriageStatus` is the worst status among its constituent metrics (`red > yellow > green`).
 
-### Zone Metric Catalog & Thresholds by Gravity Mode
+### Zone Metric Catalog & `0g_transit` Thresholds
 
-| Zone | Metric ID | Label | Unit | `0g_transit` Nominal (Yellow) | `1_6g_moon` Nominal (Yellow) | `3_8g_mars` Nominal (Yellow) |
-|---|---|---|---|---|---|---|
-| `neuro` | `onsd` | Optic Nerve Sheath Diam. | `mm` | `4.5–5.5` (`4.2–5.9`) | `4.4–5.3` (`4.1–5.7`) | `4.3–5.2` (`4.0–5.6`) |
-| `neuro` | `iop` | Intraocular Pressure | `mmHg` | `11–18` (`9–21`) | `10–17` (`9–20`) | `10–17` (`9–19`) |
-| `neuro` | `cabin_co2` | Inspired $\text{ppCO}_2$ | `mmHg` | `1.5–3.5` (`1.0–4.5`) | `1.5–3.5` (`1.0–4.5`) | `1.5–3.8` (`1.0–4.8`) |
-| `cardio` | `resting_hr` | Resting Heart Rate | `bpm` | `52–74` (`46–86`) | `55–78` (`48–88`) | `58–82` (`50–92`) |
-| `cardio` | `hrv_rmssd` | Heart Rate Variability | `ms` | `42–85` (`30–95`) | `40–82` (`28–95`) | `38–80` (`26–95`) |
-| `cardio` | `spo2` | Arterial $\text{SpO}_2$ | `%` | `96–100` (`93–100`) | `95–100` (`92–100`) | `95–100` (`92–100`) |
-| `musculo` | `bmd_delta` | Femoral BMD Monthly $\Delta$ | `%` | `-0.8–0.2` (`-1.3–0.5`) | `-0.5–0.2` (`-1.0–0.5`) | `-0.4–0.3` (`-0.8–0.5`) |
-| `musculo` | `ared_load` | Daily ARED Resistance Load | `kN·reps` | `18–30` (`12–35`) | `15–28` (`10–35`) | `14–26` (`10–35`) |
-| `immune` | `rad_dose` | 24h Radiation Dose Rate | `mSv/d` | `0.4–1.2` (`0.0–2.5`) | `0.3–1.0` (`0.0–2.2`) | `0.2–0.8` (`0.0–2.0`) |
-| `immune` | `wbc_lymph` | Lymphocyte Count | `k/µL` | `1.5–3.5` (`1.2–4.0`) | `1.5–3.5` (`1.2–4.0`) | `1.5–3.5` (`1.2–4.0`) |
-| `behavioral` | `sleep_eff` | Circadian Sleep Efficiency | `%` | `82–96` (`72–100`) | `82–96` (`72–100`) | `80–95` (`70–100`) |
-| `behavioral` | `pvt_lapses` | Psychomotor Vigilance Lapses | `lapses` | `0–2` (`0–4`) | `0–2` (`0–4`) | `0–3` (`0–5`) |
+| Zone | Metric ID | Label | Unit | `0g_transit` Nominal (Yellow) |
+|---|---|---|---|---|
+| `neuro` | `onsd` | Optic Nerve Sheath Diam. | `mm` | `4.5–5.5` (`4.2–5.9`) |
+| `neuro` | `iop` | Intraocular Pressure | `mmHg` | `11–18` (`9–21`) |
+| `neuro` | `cabin_co2` | Inspired $\text{ppCO}_2$ | `mmHg` | `1.5–3.5` (`1.0–4.5`) |
+| `cardio` | `resting_hr` | Resting Heart Rate | `bpm` | `52–74` (`46–86`) |
+| `cardio` | `hrv_rmssd` | Heart Rate Variability | `ms` | `42–85` (`30–95`) |
+| `cardio` | `spo2` | Arterial $\text{SpO}_2$ | `%` | `96–100` (`93–100`) |
+| `musculo` | `bmd_delta` | Femoral BMD Monthly $\Delta$ | `%` | `-0.8–0.2` (`-1.3–0.5`) |
+| `musculo` | `ared_load` | Daily ARED Resistance Load | `kN·reps` | `18–30` (`12–35`) |
+| `immune` | `rad_dose` | 24h Radiation Dose Rate | `mSv/d` | `0.4–1.2` (`0.0–2.5`) |
+| `immune` | `wbc_lymph` | Lymphocyte Count | `k/µL` | `1.5–3.5` (`1.2–4.0`) |
+| `behavioral` | `sleep_eff` | Circadian Sleep Efficiency | `%` | `82–96` (`72–100`) |
+| `behavioral` | `pvt_lapses` | Psychomotor Vigilance Lapses | `lapses` | `0–2` (`0–4`) |
 
 ---
 

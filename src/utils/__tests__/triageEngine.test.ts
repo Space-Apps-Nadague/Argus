@@ -17,16 +17,11 @@ import {
 } from '../anatomicalGeometry';
 
 describe('ARGUS Deterministic Triage Engine (specs/01-data-schema.md)', () => {
-  it('evaluates ONSD thresholds accurately across gravity environments', () => {
-    // 5.4 mm is nominal in 0g_transit (4.5-5.5), but yellow in 1_6g_moon (nominal 4.4-5.3) and 3_8g_mars (nominal 4.3-5.2)
+  it('evaluates ONSD thresholds accurately in 0g_transit microgravity', () => {
+    // 5.4 mm is nominal in 0g_transit (4.5-5.5), 5.7 mm is yellow (4.2-5.9), 6.42 mm (SANS alert) is red
     expect(evaluateMetricStatus('onsd', 5.4, '0g_transit')).toBe('green');
-    expect(evaluateMetricStatus('onsd', 5.4, '1_6g_moon')).toBe('yellow');
-    expect(evaluateMetricStatus('onsd', 5.4, '3_8g_mars')).toBe('yellow');
-
-    // 6.42 mm (SANS alert) is red across all gravity modes
+    expect(evaluateMetricStatus('onsd', 5.7, '0g_transit')).toBe('yellow');
     expect(evaluateMetricStatus('onsd', 6.42, '0g_transit')).toBe('red');
-    expect(evaluateMetricStatus('onsd', 6.42, '1_6g_moon')).toBe('red');
-    expect(evaluateMetricStatus('onsd', 6.42, '3_8g_mars')).toBe('red');
   });
 
   it('evaluates all 5 zones as green in the nominal scenario under 0g_transit', () => {

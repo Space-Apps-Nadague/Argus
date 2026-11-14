@@ -124,3 +124,25 @@
   - `.env.example`
   - `README.md`
   - `docs/CONTRIBUTING.md`
+
+---
+
+## Sprint 4: 0g Microgravity Baseline Simplification
+
+### Task 11: Remove Multi-Gravity Modes & Standardize on 0g Microgravity Baseline
+- **Status:** `[DONE]`
+- **Spec References:** `specs/00-architecture.md`, `specs/01-data-schema.md` (§1–§2), `specs/02-ui-dashboard.md` (§1)
+- **Files Owned:**
+  - `specs/00-architecture.md`
+  - `specs/01-data-schema.md`
+  - `specs/02-ui-dashboard.md`
+  - `specs/tasks.md`
+  - `src/types/argus.ts`
+  - `src/utils/triageEngine.ts`
+  - `src/data/telemetryScenarios.ts`
+  - `src/services/flightSurgeonAi.ts`
+  - `src/context/MissionContext.tsx`
+  - `src/components/TopMissionBar.tsx`
+  - `src/utils/__tests__/triageEngine.test.ts`
+  - `README.md`
+  - `docs/CONTRIBUTING.md`

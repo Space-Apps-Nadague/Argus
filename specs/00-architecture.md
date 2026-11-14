@@ -20,11 +20,11 @@
   - `specs/tasks.md` — Active sprint backlog, task statuses, and file ownership
 - `src/types/argus.ts` — Canonical TypeScript interfaces matching `specs/01-data-schema.md`
 - `src/data/telemetryScenarios.ts` — Default 4-astronaut crew roster (`DEFAULT_CREW_ROSTER`), individualized 30-day telemetry generator, crisis scenarios (`nominal`, `sans_alert`, `high_co2`, `solar_storm`), pre-cached Flight Surgeon guidance, and visual self-exam samples
-- `src/utils/triageEngine.ts` — Deterministic Green/Yellow/Red threshold evaluator across gravity modes (`0g_transit`, `1_6g_moon`, `3_8g_mars`) and Crew Readiness Score calculator
+- `src/utils/triageEngine.ts` — Deterministic Green/Yellow/Red threshold evaluator for `0g_transit` microgravity and Crew Readiness Score calculator
 - `src/utils/anatomicalGeometry.ts` — Parametric 3D anatomical mesh generators (`THREE.BufferGeometry`) for sex-differentiated (`female` | `male`) sculpted human head/neck, torso, limbs, skeletal ribcage/pelvis, and internal organs/vascular tracts
 - `src/services/flightSurgeonAi.ts` — Multimodal Flight Surgeon AI service with automatic offline fallback
-- `src/context/MissionContext.tsx` — Unified React Context & reducer managing crew roster, active crew member, custom crew creation, environment, active scenario, selected zone, anatomical layer, checklist completion, visual triage, and queued Earth packets
-- `src/components/TopMissionBar.tsx` — ARGUS HUD header, Crew Roster Switcher & "+ Add Crew" trigger, Earth comm delay badge, Environment Switcher (`0g`, `1/6g`, `3/8g`), Crew Readiness Score, Demo Scenario Trigger
+- `src/context/MissionContext.tsx` — Unified React Context & reducer managing crew roster, active crew member, custom crew creation, 0g transit environment state, active scenario, selected zone, anatomical layer, checklist completion, visual triage, and queued Earth packets
+- `src/components/TopMissionBar.tsx` — ARGUS HUD header, Crew Roster Switcher & "+ Add Crew" trigger, Earth comm delay badge, Crew Readiness Score, Demo Scenario Trigger
 - `src/components/CrewManagerModal.tsx` — Interactive modal to inspect all crew members in the roster, switch active crew Bio-Twin, and create custom crew members with full physiological & mission details
 - `src/components/BioTwinMap.tsx` — Interactive rotating 3D anatomical Bio-Twin with layer toggles (`all`, `dermal`, `skeletal`, `organs`) & clickable 5-zone body parts
 - `src/components/TelemetryPanel.tsx` — Vital cards + 14-to-30-day Recharts trend graphs with shaded `ReferenceArea` nominal ranges

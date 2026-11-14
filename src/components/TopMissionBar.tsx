@@ -8,7 +8,6 @@ import {
   Activity,
   AlertTriangle,
   Flame,
-  Globe,
   KeyRound,
   Radio,
   ShieldCheck,
@@ -17,7 +16,7 @@ import {
   Users,
 } from 'lucide-react';
 import { useMission } from '../context/MissionContext';
-import { GravityEnvironment, ScenarioId } from '../types/argus';
+import { ScenarioId } from '../types/argus';
 import {
   getCrewAdjustedZones,
   TELEMETRY_SCENARIOS,
@@ -28,12 +27,6 @@ import {
   STATUS_COLORS,
 } from '../utils/triageEngine';
 import { hasConfiguredAiKey } from '../services/flightSurgeonAi';
-
-const ENVIRONMENTS: { id: GravityEnvironment; label: string }[] = [
-  { id: '0g_transit', label: '0g Transit' },
-  { id: '1_6g_moon', label: '1/6g Moon' },
-  { id: '3_8g_mars', label: '3/8g Mars' },
-];
 
 const SCENARIO_ORDER: ScenarioId[] = [
   'nominal',
@@ -49,7 +42,6 @@ export const TopMissionBar: React.FC = () => {
     selectCrewMember,
     setCrewModalOpen,
     environment,
-    setEnvironment,
     scenarioId,
     setScenario,
     readinessScore,
@@ -102,31 +94,6 @@ export const TopMissionBar: React.FC = () => {
               </span>
             </p>
           </div>
-        </div>
-
-        {/* Center: Environment Context Switcher */}
-        <div className="flex items-center gap-1.5 bg-slate-900/90 p-1 rounded-lg border border-slate-800">
-          <span className="text-[11px] font-mono uppercase tracking-wider text-slate-400 px-2 flex items-center gap-1">
-            <Globe className="w-3.5 h-3.5 text-cyan-400" />
-            Gravity:
-          </span>
-          {ENVIRONMENTS.map((env) => {
-            const isActive = environment === env.id;
-            return (
-              <button
-                key={env.id}
-                type="button"
-                onClick={() => setEnvironment(env.id)}
-                className={`px-3 py-1.5 rounded-md text-xs font-mono font-medium transition-all ${
-                  isActive
-                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/50 shadow-[0_0_12px_rgba(34,211,238,0.2)]'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-transparent'
-                }`}
-              >
-                {env.label}
-              </button>
-            );
-          })}
         </div>
 
         {/* Right: Crew Readiness Score + Simulate Medical Event Dropdown */}
