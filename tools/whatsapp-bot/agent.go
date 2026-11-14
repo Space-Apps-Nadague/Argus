@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -70,8 +71,28 @@ func (a *agentRouter) listIssues(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to list issues: %w (%s)", err, truncate(out, 400))
 	}
-	if strings.TrimSpace(out) == "" {
-		return "No open issues found.", nil
+	var parsed struct {
+		Total  int `json:"total"`
+		Issues []struct {
+			Number int      `json:"number"`
+			Title  string   `json:"title"`
+			Labels []string `json:"labels"`
+		} `json:"issues"`
+	}
+	if json.Unmarshal([]byte(out), &parsed) == nil {
+		if len(parsed.Issues) == 0 {
+			return "No open GitHub issues.", nil
+		}
+		var sb strings.Builder
+		fmt.Fprintf(&sb, "*Open GitHub Issues (%d):*\n", parsed.Total)
+		for _, iss := range parsed.Issues {
+			lbl := ""
+			if len(iss.Labels) > 0 {
+				lbl = fmt.Sprintf(" _(%s)_", strings.Join(iss.Labels, ", "))
+			}
+			fmt.Fprintf(&sb, "• *#%d* %s%s\n", iss.Number, iss.Title, lbl)
+		}
+		return truncate(sb.String(), maxWhatsAppReplyLen), nil
 	}
 	return "*Open GitHub Issues:*\n" + truncate(out, maxWhatsAppReplyLen-30), nil
 }
@@ -81,8 +102,24 @@ func (a *agentRouter) listSWETasks(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to list SWE tasks: %w (%s)", err, truncate(out, 400))
 	}
-	if strings.TrimSpace(out) == "" {
-		return "No actionable SWE tasks found.", nil
+	var parsed struct {
+		ActionableCount int `json:"actionableCount"`
+		ActionableTasks []struct {
+			Number int      `json:"number"`
+			Title  string   `json:"title"`
+			Labels []string `json:"labels"`
+		} `json:"actionableTasks"`
+	}
+	if json.Unmarshal([]byte(out), &parsed) == nil {
+		if len(parsed.ActionableTasks) == 0 {
+			return "No actionable SWE agent tasks.", nil
+		}
+		var sb strings.Builder
+		fmt.Fprintf(&sb, "*Actionable SWE Tasks (%d):*\n", parsed.ActionableCount)
+		for _, t := range parsed.ActionableTasks {
+			fmt.Fprintf(&sb, "• *#%d* %s\n", t.Number, t.Title)
+		}
+		return truncate(sb.String(), maxWhatsAppReplyLen), nil
 	}
 	return "*SWE Agent Tasks:*\n" + truncate(out, maxWhatsAppReplyLen-30), nil
 }
