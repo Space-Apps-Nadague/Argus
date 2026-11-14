@@ -1,19 +1,23 @@
 #!/usr/bin/env node
 /**
- * ARGUS Autonomous Software Engineer (SWE) Agent — GitHub PR & Task CLI Utility
+ * ARGUS Autonomous Software Engineer (SWE) Agent — GitHub PR, Worktree & Task CLI Utility
  *
  * Authenticates using GITHUB_TOKEN / GH_PROJECT_TOKEN / GH_TOKEN or git's configured
- * credential helper and manages agent-assigned issues (`agent-task`) and Pull Requests
- * while explicitly identifying as the ARGUS SWE Agent (`[SWE Agent]`).
+ * credential helper and manages agent-assigned issues (`agent-task`), isolated git
+ * worktrees (`.worktrees/issue-<n>`), and Pull Requests while explicitly identifying
+ * as the ARGUS SWE Agent (`[SWE Agent]`).
  *
  * Usage:
  *   node .agents/skills/swe-agent/scripts/gh-swe-pr.mjs list-tasks [--issue <number>]
+ *   node .agents/skills/swe-agent/scripts/gh-swe-pr.mjs view-task <issue_number>
+ *   node .agents/skills/swe-agent/scripts/gh-swe-pr.mjs prepare-worktree --issue <n> [--slug <slug>]
+ *   node .agents/skills/swe-agent/scripts/gh-swe-pr.mjs cleanup-worktree --issue <n>
  *   node .agents/skills/swe-agent/scripts/gh-swe-pr.mjs list-prs [--state open|closed|all]
  *   node .agents/skills/swe-agent/scripts/gh-swe-pr.mjs create-pr --issue <n> --head <branch> [--base main] --title "<title>" --body "<md_or_@file>" [--labels "l1,l2"]
  *   node .agents/skills/swe-agent/scripts/gh-swe-pr.mjs comment-issue <issue_number> --body "<md_or_@file>"
  */
 
-import { execSync } from 'node:child_process';
+import { execFileSync, execSync } from 'node:child_process';
 import fs from 'node:fs';
 import https from 'node:https';
 import os from 'node:os';
@@ -23,6 +27,7 @@ import { fileURLToPath } from 'node:url';
 const DEFAULT_REPO = 'Space-Apps-Nadague/Argus';
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(SCRIPT_DIR, '../../../..');
+const WORKTREES_ROOT = path.resolve(REPO_ROOT, '.worktrees');
 
 export function loadDotEnvFiles() {
   const candidates = [
@@ -209,6 +214,18 @@ function resolveTextArg(val) {
   return val.replace(/\\n/g, '\n');
 }
 
+function slugifyTitle(title) {
+  return (
+    String(title || 'task')
+      .replace(/^\[(?:PM|SWE)(?:\s+Agent)?\]\s*/i, '')
+      .replace(/^\[P[012]\]\s*/i, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 42) || 'task'
+  );
+}
+
 function extractPriorityRank(issue) {
   const combined = `${issue.title || ''}\n${issue.body || ''}`;
   if (/\[P0\]|\bPriority:\*\*\s*`?P0`?/i.test(combined)) return 0;
@@ -218,20 +235,27 @@ function extractPriorityRank(issue) {
 
 function findLinkedPrForIssue(issueNumber, openPrs) {
   const num = Number(issueNumber);
-  const issuePatterns = [
-    new RegExp(`(?:closes|fixes|resolves)\\s+#${num}\\b`, 'i'),
-    new RegExp(`\\bswe/issue-${num}(?:\\b|-)`, 'i'),
-    new RegExp(`#${num}\\b`),
-  ];
+  const bodyOrTitleClosePattern = new RegExp(
+    `(?:closes|close|fixes|fix|resolves|resolve)\\s+#${num}\\b`,
+    'i'
+  );
+  const branchPattern = new RegExp(`(?:^|/)(?:swe/|issue-)${num}(?:\\b|-)`, 'i');
+  const titleIssuePattern = new RegExp(`#${num}\\b`, 'i');
 
   for (const pr of openPrs) {
     const headRef = pr.head?.ref || '';
-    const text = `${pr.title || ''}\n${pr.body || ''}\n${headRef}`;
-    if (issuePatterns.some((re) => re.test(text))) {
+    const title = pr.title || '';
+    const body = pr.body || '';
+    if (
+      bodyOrTitleClosePattern.test(`${title}\n${body}`) ||
+      branchPattern.test(headRef) ||
+      titleIssuePattern.test(title)
+    ) {
       return {
         number: pr.number,
         title: pr.title,
         headRef,
+        updated_at: pr.updated_at,
         html_url: pr.html_url,
       };
     }
@@ -243,6 +267,126 @@ async function main() {
   loadDotEnvFiles();
   const args = parseArgs(process.argv.slice(2));
   const command = args._[0] || 'list-tasks';
+
+  // Local worktree commands do not require GitHub API calls unless fetching title
+  if (command === 'prepare-worktree') {
+    const issueNumber = Number(args.issue || args._[1]);
+    if (!issueNumber || Number.isNaN(issueNumber)) {
+      throw new Error(
+        'Usage: gh-swe-pr.mjs prepare-worktree --issue <n> [--slug <slug>]'
+      );
+    }
+
+    let slug = args.slug ? slugifyTitle(args.slug) : '';
+    if (!slug) {
+      try {
+        const repo = getRepoSlug();
+        const tokens = getGitHubTokens();
+        const issue = await githubRequestWithFallback(
+          'GET',
+          `/repos/${repo}/issues/${issueNumber}`,
+          tokens
+        );
+        slug = slugifyTitle(issue.title);
+      } catch {
+        slug = 'task';
+      }
+    }
+
+    const branchName = `swe/issue-${issueNumber}-${slug}`;
+    const worktreePath = path.resolve(WORKTREES_ROOT, `issue-${issueNumber}`);
+    fs.mkdirSync(WORKTREES_ROOT, { recursive: true });
+
+    // Clean up any existing worktree at this path first
+    if (fs.existsSync(worktreePath)) {
+      try {
+        execFileSync('git', ['worktree', 'remove', '--force', worktreePath], {
+          cwd: REPO_ROOT,
+          stdio: ['ignore', 'pipe', 'pipe'],
+        });
+      } catch {
+        fs.rmSync(worktreePath, { recursive: true, force: true });
+      }
+    }
+    execFileSync('git', ['worktree', 'prune'], {
+      cwd: REPO_ROOT,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+
+    // Fetch latest origin/main if network is reachable
+    let baseRef = 'main';
+    try {
+      execFileSync('git', ['fetch', 'origin', 'main'], {
+        cwd: REPO_ROOT,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      baseRef = 'origin/main';
+    } catch {
+      // Fallback to local main
+    }
+
+    execFileSync('git', ['worktree', 'add', '-B', branchName, worktreePath, baseRef], {
+      cwd: REPO_ROOT,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+
+    // Symlink node_modules so vitest & tsc run immediately inside the worktree
+    const rootNodeModules = path.resolve(REPO_ROOT, 'node_modules');
+    const wtNodeModules = path.resolve(worktreePath, 'node_modules');
+    if (fs.existsSync(rootNodeModules) && !fs.existsSync(wtNodeModules)) {
+      fs.symlinkSync(rootNodeModules, wtNodeModules, 'dir');
+    }
+
+    console.log(
+      JSON.stringify(
+        {
+          ok: true,
+          issueNumber,
+          branchName,
+          baseRef,
+          worktreePath,
+        },
+        null,
+        2
+      )
+    );
+    return;
+  }
+
+  if (command === 'cleanup-worktree') {
+    const issueNumber = Number(args.issue || args._[1]);
+    if (!issueNumber || Number.isNaN(issueNumber)) {
+      throw new Error('Usage: gh-swe-pr.mjs cleanup-worktree --issue <n>');
+    }
+    const worktreePath = path.resolve(WORKTREES_ROOT, `issue-${issueNumber}`);
+    const wtNodeModules = path.resolve(worktreePath, 'node_modules');
+    try {
+      if (fs.existsSync(wtNodeModules) && fs.lstatSync(wtNodeModules).isSymbolicLink()) {
+        fs.unlinkSync(wtNodeModules);
+      }
+    } catch {
+      // Ignore symlink unlink errors
+    }
+    if (fs.existsSync(worktreePath)) {
+      try {
+        execFileSync('git', ['worktree', 'remove', '--force', worktreePath], {
+          cwd: REPO_ROOT,
+          stdio: ['ignore', 'pipe', 'pipe'],
+        });
+      } catch {
+        fs.rmSync(worktreePath, { recursive: true, force: true });
+      }
+    }
+    execFileSync('git', ['worktree', 'prune'], {
+      cwd: REPO_ROOT,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    console.log(
+      JSON.stringify({ ok: true, cleaned: true, issueNumber, worktreePath }, null, 2)
+    );
+    return;
+  }
+
   const repo = getRepoSlug();
   const tokens = getGitHubTokens();
 
@@ -277,6 +421,7 @@ async function main() {
           priorityRank: extractPriorityRank(issue),
           isAgentTask,
           linkedPr,
+          comments: issue.comments,
           created_at: issue.created_at,
           updated_at: issue.updated_at,
           html_url: issue.html_url,
@@ -297,6 +442,7 @@ async function main() {
       });
 
     const actionableTasks = filtered.filter((i) => !i.linkedPr);
+    const inProgressTasks = filtered.filter((i) => Boolean(i.linkedPr));
 
     console.log(
       JSON.stringify(
@@ -306,7 +452,86 @@ async function main() {
           totalAgentTasks: filtered.length,
           actionableCount: actionableTasks.length,
           actionableTasks,
+          inProgressCount: inProgressTasks.length,
+          inProgressTasks,
           allAgentTasks: filtered,
+        },
+        null,
+        2
+      )
+    );
+    return;
+  }
+
+  if (command === 'view-task') {
+    const number = Number(args._[1] || args.issue);
+    if (!number) throw new Error('Usage: gh-swe-pr.mjs view-task <issue_number>');
+    const [issue, issueComments, openPrs] = await Promise.all([
+      githubRequestWithFallback('GET', `/repos/${repo}/issues/${number}`, tokens),
+      githubRequestWithFallback('GET', `/repos/${repo}/issues/${number}/comments`, tokens),
+      githubRequestWithFallback('GET', `/repos/${repo}/pulls?state=open&per_page=100`, tokens),
+    ]);
+
+    const linkedPrSummary = findLinkedPrForIssue(number, openPrs);
+    let prDetails = null;
+    if (linkedPrSummary) {
+      const [prFull, prReviewComments, prIssueComments] = await Promise.all([
+        githubRequestWithFallback(
+          'GET',
+          `/repos/${repo}/pulls/${linkedPrSummary.number}`,
+          tokens
+        ),
+        githubRequestWithFallback(
+          'GET',
+          `/repos/${repo}/pulls/${linkedPrSummary.number}/comments`,
+          tokens
+        ),
+        githubRequestWithFallback(
+          'GET',
+          `/repos/${repo}/issues/${linkedPrSummary.number}/comments`,
+          tokens
+        ),
+      ]);
+      prDetails = {
+        number: prFull.number,
+        title: prFull.title,
+        state: prFull.state,
+        mergeable: prFull.mergeable,
+        mergeable_state: prFull.mergeable_state,
+        headRef: prFull.head?.ref,
+        html_url: prFull.html_url,
+        reviewComments: prReviewComments.map((c) => ({
+          id: c.id,
+          user: c.user?.login,
+          path: c.path,
+          created_at: c.created_at,
+          body: c.body,
+        })),
+        conversationComments: prIssueComments.map((c) => ({
+          id: c.id,
+          user: c.user?.login,
+          created_at: c.created_at,
+          body: c.body,
+        })),
+      };
+    }
+
+    console.log(
+      JSON.stringify(
+        {
+          number: issue.number,
+          state: issue.state,
+          title: issue.title,
+          labels: (issue.labels || []).map((l) => (typeof l === 'string' ? l : l.name)),
+          html_url: issue.html_url,
+          body: issue.body,
+          comments: issueComments.map((c) => ({
+            id: c.id,
+            user: c.user?.login,
+            created_at: c.created_at,
+            body: c.body,
+          })),
+          linkedPr: prDetails,
         },
         null,
         2
@@ -466,7 +691,7 @@ async function main() {
   }
 
   throw new Error(
-    `Unknown subcommand "${command}". Use: list-tasks, list-prs, create-pr, or comment-issue.`
+    `Unknown subcommand "${command}". Use: list-tasks, view-task, prepare-worktree, cleanup-worktree, list-prs, create-pr, or comment-issue.`
   );
 }
 
