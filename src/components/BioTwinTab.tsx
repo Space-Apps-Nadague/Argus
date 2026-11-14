@@ -46,6 +46,16 @@ export const BioTwinTab: React.FC = () => {
           }
           actions={
             <>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('trends');
+                }}
+                className="hud-focus rounded border border-hud-accent/40 bg-hud-accent/10 px-2 py-1 text-xs font-mono text-hud-accent hover:bg-hud-accent/20 transition-colors"
+                title="Log Vital Reading for this zone"
+              >
+                + Log Vital
+              </button>
               <StatusPill status={zoneStatus} size="md" />
               <InfoTip label={`About ${zone.name}`} align="right">
                 <strong className="block text-hud-text">{zone.name}</strong>

@@ -248,6 +248,17 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
             'Blood oxygen saturation measured via optical bio-monitor.',
           history: build30DaySeries(98.5, 98.4, 1, 0.2),
         },
+        {
+          metricId: 'systolic_bp',
+          label: 'Systolic Blood Pressure',
+          unit: 'mmHg',
+          currentValue: 118,
+          deltaFromBaseline: 'Autonomic Vascular Tone Stable',
+          flightNormLabel: '0g Norm: 100–130 mmHg',
+          plainDescription:
+            'Brachial systolic blood pressure. Reflects arterial compliance and cephalad vascular tone.',
+          history: build30DaySeries(120, 118, 0, 1.2),
+        },
       ],
       musculo: [
         {
@@ -271,6 +282,17 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
           plainDescription:
             'Total resistive exercise impulse logged on the Advanced Resistive Exercise Device.',
           history: build30DaySeries(22.5, 24.2, 1, 1.1),
+        },
+        {
+          metricId: 'blood_glucose',
+          label: 'Blood Glucose',
+          unit: 'mg/dL',
+          currentValue: 92,
+          deltaFromBaseline: 'Euglycemic Post-ARED',
+          flightNormLabel: '0g Norm: 70–110 mg/dL',
+          plainDescription:
+            'Fasting blood glucose concentration. Tracks metabolic insulin sensitivity in unloaded muscle.',
+          history: build30DaySeries(89, 92, 0, 1.5),
         },
       ],
       immune: [
@@ -296,6 +318,17 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
             'Point-of-care fingerstick white blood cell lymphocyte concentration.',
           history: build30DaySeries(2.42, 2.35, 2, 0.06),
         },
+        {
+          metricId: 'core_temp',
+          label: 'Core Body Temperature',
+          unit: '°C',
+          currentValue: 37.1,
+          deltaFromBaseline: 'Normothermic Circadian Setpoint',
+          flightNormLabel: '0g Norm: 36.5–37.5 °C',
+          plainDescription:
+            'Deep core body temperature. Evaluates thermoregulation and persistent spaceflight micro-inflammation.',
+          history: build30DaySeries(36.9, 37.1, 1, 0.05),
+        },
       ],
       behavioral: [
         {
@@ -319,6 +352,28 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
           plainDescription:
             'Attention delays (>500ms) during 3-minute morning reaction test.',
           history: build30DaySeries(1, 1, 0, 0.4),
+        },
+        {
+          metricId: 'daily_sleep_hours',
+          label: 'Daily Sleep Duration',
+          unit: 'hours',
+          currentValue: 7.4,
+          deltaFromBaseline: 'Restorative Sleep Cycle',
+          flightNormLabel: '0g Norm: 7.0–9.0 hours',
+          plainDescription:
+            'Total daily consolidated sleep duration logged via smart actigraphy.',
+          history: build30DaySeries(7.2, 7.4, 1, 0.2),
+        },
+        {
+          metricId: 'mood_index',
+          label: 'Behavioral Mood Index',
+          unit: '/10',
+          currentValue: 8.5,
+          deltaFromBaseline: 'High Mission Morale',
+          flightNormLabel: '0g Norm: 7.0–10.0 /10',
+          plainDescription:
+            'Standardized psychological self-assessment index of mood, morale, and cognitive stress.',
+          history: build30DaySeries(8.1, 8.5, 1, 0.2),
         },
       ],
     },
@@ -400,6 +455,17 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
           plainDescription: 'Arterial oxygen saturation remains within normal bounds.',
           history: build30DaySeries(98.4, 97.8, 1, 0.2),
         },
+        {
+          metricId: 'systolic_bp',
+          label: 'Systolic Blood Pressure',
+          unit: 'mmHg',
+          currentValue: 134,
+          deltaFromBaseline: '+14 mmHg Cephalad Vascular Congestion',
+          flightNormLabel: '0g Norm: 100–130 mmHg',
+          plainDescription:
+            'Elevated brachial systolic pressure associated with cephalad fluid redistribution and jugular engorgement.',
+          history: build30DaySeries(120, 134, 0, 1.2, 19),
+        },
       ],
       musculo: [
         {
@@ -421,6 +487,17 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
           flightNormLabel: '0g Norm: 18–30 kN·reps',
           plainDescription: 'Resistive load moderated to avoid transient intracranial pressure spikes.',
           history: build30DaySeries(24.0, 21.0, 1, 0.8),
+        },
+        {
+          metricId: 'blood_glucose',
+          label: 'Blood Glucose',
+          unit: 'mg/dL',
+          currentValue: 96,
+          deltaFromBaseline: 'Fasting Glucose Stable',
+          flightNormLabel: '0g Norm: 70–110 mg/dL',
+          plainDescription:
+            'Metabolic glucose levels within spaceflight expectations.',
+          history: build30DaySeries(90, 96, 0, 1.4),
         },
       ],
       immune: [
@@ -444,6 +521,17 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
           plainDescription: 'White blood cell count within normal range.',
           history: build30DaySeries(2.4, 2.28, 2, 0.05),
         },
+        {
+          metricId: 'core_temp',
+          label: 'Core Body Temperature',
+          unit: '°C',
+          currentValue: 37.2,
+          deltaFromBaseline: 'Mild Circadian Shift',
+          flightNormLabel: '0g Norm: 36.5–37.5 °C',
+          plainDescription:
+            'Deep core body temperature within normal range.',
+          history: build30DaySeries(36.9, 37.2, 1, 0.05),
+        },
       ],
       behavioral: [
         {
@@ -465,6 +553,28 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
           flightNormLabel: '0g Norm: 0–2 lapses',
           plainDescription: 'Mild increase in visual reaction lapses linked to hyperopic focus shift.',
           history: build30DaySeries(1, 3, 0, 0.3, 20),
+        },
+        {
+          metricId: 'daily_sleep_hours',
+          label: 'Daily Sleep Duration',
+          unit: 'hours',
+          currentValue: 6.3,
+          deltaFromBaseline: '-1.1h SANS Headache Disruptions',
+          flightNormLabel: '0g Norm: 7.0–9.0 hours',
+          plainDescription:
+            'Curtailment of total sleep duration caused by cephalad pressure and nocturnal throbbing headache.',
+          history: build30DaySeries(7.3, 6.3, 1, 0.2, 18),
+        },
+        {
+          metricId: 'mood_index',
+          label: 'Behavioral Mood Index',
+          unit: '/10',
+          currentValue: 6.0,
+          deltaFromBaseline: '-2.2 pts Visual Concern',
+          flightNormLabel: '0g Norm: 7.0–10.0 /10',
+          plainDescription:
+            'Elevated crew anxiety and discomfort related to SANS visual acuity shift.',
+          history: build30DaySeries(8.2, 6.0, 1, 0.2, 18),
         },
       ],
     },
@@ -544,6 +654,17 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
           plainDescription: 'Mild drop in peripheral oxygen saturation amidst cabin gas imbalance.',
           history: build30DaySeries(98.4, 94.2, 1, 0.25, 22),
         },
+        {
+          metricId: 'systolic_bp',
+          label: 'Systolic Blood Pressure',
+          unit: 'mmHg',
+          currentValue: 138,
+          deltaFromBaseline: '+18 mmHg Sympathetic Hypercapnic Surge',
+          flightNormLabel: '0g Norm: 100–130 mmHg',
+          plainDescription:
+            'Hypercapnia-driven sympathetic vasoconstriction and elevated systemic blood pressure.',
+          history: build30DaySeries(122, 138, 0, 1.5, 21),
+        },
       ],
       musculo: [
         {
@@ -566,6 +687,17 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
           plainDescription: 'Exercise volume curtailed due to exertional shortness of breath in high CO₂.',
           history: build30DaySeries(24.0, 14.5, 1, 1.0, 22),
         },
+        {
+          metricId: 'blood_glucose',
+          label: 'Blood Glucose',
+          unit: 'mg/dL',
+          currentValue: 104,
+          deltaFromBaseline: 'Mild Sympathetic Glycemia',
+          flightNormLabel: '0g Norm: 70–110 mg/dL',
+          plainDescription:
+            'Slight elevation in fasting glucose secondary to systemic hypercapnic stress response.',
+          history: build30DaySeries(90, 104, 0, 1.3, 22),
+        },
       ],
       immune: [
         {
@@ -587,6 +719,17 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
           flightNormLabel: '0g Norm: 1.5–3.5 k/µL',
           plainDescription: 'Immune cell counts within normal limits.',
           history: build30DaySeries(2.35, 2.15, 2, 0.05),
+        },
+        {
+          metricId: 'core_temp',
+          label: 'Core Body Temperature',
+          unit: '°C',
+          currentValue: 37.4,
+          deltaFromBaseline: 'Hypercapnic Cutaneous Vasodilation',
+          flightNormLabel: '0g Norm: 36.5–37.5 °C',
+          plainDescription:
+            'Core temperature slightly elevated under increased work of breathing.',
+          history: build30DaySeries(36.9, 37.4, 1, 0.05, 22),
         },
       ],
       behavioral: [
@@ -611,6 +754,28 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
           plainDescription:
             'Critical rise in reaction lapses; crew at elevated risk for procedural errors during EVA/maintenance.',
           history: build30DaySeries(1, 6, 0, 0.4, 21),
+        },
+        {
+          metricId: 'daily_sleep_hours',
+          label: 'Daily Sleep Duration',
+          unit: 'hours',
+          currentValue: 5.4,
+          deltaFromBaseline: '-2.0h Nocturnal CO₂ Awakenings (RED)',
+          flightNormLabel: '0g Norm: 7.0–9.0 hours',
+          plainDescription:
+            'Critical sleep disruption and recurrent arousals driven by high ambient carbon dioxide.',
+          history: build30DaySeries(7.3, 5.4, 1, 0.25, 21),
+        },
+        {
+          metricId: 'mood_index',
+          label: 'Behavioral Mood Index',
+          unit: '/10',
+          currentValue: 4.5,
+          deltaFromBaseline: '-3.8 pts Severe Irritability & Fog (RED)',
+          flightNormLabel: '0g Norm: 7.0–10.0 /10',
+          plainDescription:
+            'Pronounced executive cognitive slowing, lethargy, and affective irritability from elevated ppCO₂.',
+          history: build30DaySeries(8.1, 4.5, 1, 0.25, 21),
         },
       ],
     },
@@ -646,6 +811,17 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
           plainDescription:
             'Radiation-sensitive lymphocyte drop below 1.2 k/µL threshold, indicating acute hematopoietic stress.',
           history: build30DaySeries(2.38, 1.05, 2, 0.06, 24),
+        },
+        {
+          metricId: 'core_temp',
+          label: 'Core Body Temperature',
+          unit: '°C',
+          currentValue: 37.9,
+          deltaFromBaseline: '+1.0 °C Radiation Cytokine Pyrexia',
+          flightNormLabel: '0g Norm: 36.5–37.5 °C',
+          plainDescription:
+            'Mild systemic pyrexia secondary to acute solar proton exposure and radiation inflammatory cascade.',
+          history: build30DaySeries(36.8, 37.9, 1, 0.08, 24),
         },
       ],
       neuro: [
@@ -713,6 +889,17 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
           plainDescription: 'Blood oxygenation remains normal.',
           history: build30DaySeries(98.4, 97.6, 1, 0.2),
         },
+        {
+          metricId: 'systolic_bp',
+          label: 'Systolic Blood Pressure',
+          unit: 'mmHg',
+          currentValue: 132,
+          deltaFromBaseline: '+12 mmHg Shelter Confinement Stress',
+          flightNormLabel: '0g Norm: 100–130 mmHg',
+          plainDescription:
+            'Transient sympathetic elevation during radiation storm shelter lockdown.',
+          history: build30DaySeries(120, 132, 0, 1.2, 24),
+        },
       ],
       musculo: [
         {
@@ -737,6 +924,17 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
             'Main ARED bay is in less-shielded module; crew restricted to compact resistive bands.',
           history: build30DaySeries(24.0, 13.2, 1, 1.2, 24),
         },
+        {
+          metricId: 'blood_glucose',
+          label: 'Blood Glucose',
+          unit: 'mg/dL',
+          currentValue: 102,
+          deltaFromBaseline: 'Stress Counter-Regulatory Glycemia',
+          flightNormLabel: '0g Norm: 70–110 mg/dL',
+          plainDescription:
+            'Mild metabolic counter-regulatory hormone release during emergency shelter protocol.',
+          history: build30DaySeries(91, 102, 0, 1.2, 24),
+        },
       ],
       behavioral: [
         {
@@ -758,6 +956,28 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
           flightNormLabel: '0g Norm: 0–2 lapses',
           plainDescription: 'Mild vigilance degradation after 48h storm shelter watch.',
           history: build30DaySeries(1, 3, 0, 0.3, 24),
+        },
+        {
+          metricId: 'daily_sleep_hours',
+          label: 'Daily Sleep Duration',
+          unit: 'hours',
+          currentValue: 5.8,
+          deltaFromBaseline: '-1.6h Cramped Shelter Sleeping',
+          flightNormLabel: '0g Norm: 7.0–9.0 hours',
+          plainDescription:
+            'Sleep curtailed by cramped water-wall storm shelter quarters and high vigilance alarm monitoring.',
+          history: build30DaySeries(7.2, 5.8, 1, 0.25, 24),
+        },
+        {
+          metricId: 'mood_index',
+          label: 'Behavioral Mood Index',
+          unit: '/10',
+          currentValue: 5.2,
+          deltaFromBaseline: '-2.9 pts Solar Alarm Anxiety',
+          flightNormLabel: '0g Norm: 7.0–10.0 /10',
+          plainDescription:
+            'Acute confinement stress and elevated anxiety during prolonged solar storm alert.',
+          history: build30DaySeries(8.1, 5.2, 1, 0.2, 24),
         },
       ],
     },
