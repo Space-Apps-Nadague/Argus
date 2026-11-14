@@ -16,7 +16,7 @@
 ```
 
 - **Top Bar (`TopMissionBar.tsx`) — slim, low-text:**
-  - Brand `ARGUS` (display font) + small `Crew Bio-Twin`. The long subtitle `Astronaut Readiness Guidance & Unified Surveillance` moves into the brand `title` tooltip.
+  - Brand `ARGUS` (display font) + expanded abbreviation `Astronaut Readiness Guidance & Unified Surveillance` + small `Crew Bio-Twin`.
   - Comm delay badge (`14m 22s ONE-WAY`).
   - **Crew Readiness Score** `0–100%` with status color + daily countermeasure streak.
   - **Simulate Medical Event** dropdown (`nominal`, `sans_alert`, `high_co2`, `solar_storm`).
