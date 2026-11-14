@@ -1,8 +1,8 @@
 /**
  * Hosted bootstrap (specs/05-data-platform.md §2). The production database is private to the App Service
  * network, so the app fills it itself:
- * - first start on an empty database: seed (sources, catalog, crew, kits, admin, demo logins),
- *   30 days of simulated wearable history, and NASA reference data (best effort);
+ * - on start: seed an empty database (sources, catalog, crew, kits, admin, demo logins); give every astronaut
+ *   without simulated history 30 days of it (resumable after restarts); load NASA reference data if missing;
  * - every ARGUS_SIMULATE_TOPUP_MIN minutes (default 15, 0 = off): extend the simulated history to "now"
  *   so the demo never goes stale.
  * Enabled with ARGUS_BOOTSTRAP_ON_START=1. Passwords come only from app settings.
@@ -10,7 +10,7 @@
 
 import { count } from 'drizzle-orm';
 import type { Db } from '../db/client';
-import { astronauts, observations } from '../db/schema';
+import { astronauts, refRadiationDoseRates } from '../db/schema';
 import { seedDatabase } from '../db/seed';
 import { backfillSimulated } from '../ingest/backfill';
 
@@ -30,10 +30,11 @@ export async function bootstrapIfEmpty(db: Db): Promise<void> {
     // Keep the catalog and sources current after deploys (idempotent, no passwords changed).
     await seedDatabase(db, { log: () => {} });
   }
-  const [{ n: obs }] = await db.select({ n: count() }).from(observations);
-  if (obs === 0) {
-    log('no observations: generating 30 days of simulated wearable history');
-    await backfillSimulated(db, { days: 30, script: 'server/jobs/bootstrap.ts', log });
+  // Resumable: each astronaut without simulated history gets it, so a restart mid-fill continues where it stopped.
+  const filled = await backfillSimulated(db, { days: 30, onlyMissing: true, script: 'server/jobs/bootstrap.ts', log });
+  if (filled) log(`simulated history added: ${filled} readings`);
+  const [{ n: refRows }] = await db.select({ n: count() }).from(refRadiationDoseRates);
+  if (refRows === 0) {
     try {
       const { loadReferenceCsvs } = await import('../ingest/reference');
       log(`NASA reference CSVs: ${JSON.stringify(await loadReferenceCsvs(db))}`);
