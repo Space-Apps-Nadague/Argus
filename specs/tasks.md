@@ -225,3 +225,17 @@
   - `.agents/skills/pm-agent/scripts/run-pm-audit.mjs`
   - `.agents/skills/pm-agent/SKILL.md`
   - `specs/tasks.md`
+
+---
+
+## Sprint 7: Autonomous Software Engineer (SWE) Agent & Dynamic Gemini 4 Model Routing
+
+### Task 19: Local Antigravity (`agy`) SWE Agent Skill & GitHub PR CLI
+- **Status:** `[DONE]`
+- **Spec References:** `specs/00-architecture.md`, `specs/03-requirements.md`
+- **Files Owned:**
+  - `.agents/skills/swe-agent/SKILL.md`
+  - `.agents/skills/swe-agent/scripts/gh-swe-pr.mjs`
+  - `.env.example`
+  - `specs/00-architecture.md`
+  - `specs/tasks.md`

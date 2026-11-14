@@ -209,12 +209,6 @@ async function fetchProjectMetadata(owner, projectNumber, token) {
                   optionId
                 }
               }
-              priorityValue: fieldValueByName(name: "Priority") {
-                ... on ProjectV2ItemFieldSingleSelectValue {
-                  name
-                  optionId
-                }
-              }
               content {
                 ... on Issue {
                   id
@@ -249,12 +243,6 @@ async function fetchProjectMetadata(owner, projectNumber, token) {
             nodes {
               id
               fieldValueByName(name: "Status") {
-                ... on ProjectV2ItemFieldSingleSelectValue {
-                  name
-                  optionId
-                }
-              }
-              priorityValue: fieldValueByName(name: "Priority") {
                 ... on ProjectV2ItemFieldSingleSelectValue {
                   name
                   optionId
@@ -361,6 +349,9 @@ async function main() {
 
   if (command === 'list') {
     const project = await fetchProjectMetadata(projectOwner, projectNumber, token);
+    const hasPriorityField = (project.fields?.nodes || []).some(
+      (f) => f?.name?.toLowerCase() === 'priority' && Array.isArray(f.options) && f.options.length > 0
+    );
     const items = (project.items?.nodes || [])
       .filter((item) => item.content?.number)
       .map((item) => ({
@@ -381,6 +372,7 @@ async function main() {
           projectOwner,
           title: project.title,
           url: project.url,
+          hasPriorityField,
           totalItems: items.length,
           items,
         },

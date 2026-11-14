@@ -25,7 +25,6 @@ import { GoogleGenAI } from '@google/genai';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const SKILL_DIR = path.resolve(SCRIPT_DIR, '..');
-const ISSUES_DIR = path.resolve(SKILL_DIR, 'issues');
 const REPO_ROOT = path.resolve(SKILL_DIR, '../../..');
 const GH_SCRIPT = path.resolve(SCRIPT_DIR, 'gh-pm-issue.mjs');
 const PROJECT_SCRIPT = path.resolve(SCRIPT_DIR, 'gh-pm-project.mjs');
@@ -183,7 +182,7 @@ async function generateAuditPlan(apiKey, prompt) {
             },
             newKanbanColumn: {
               type: 'string',
-              enum: ['backlog', 'todo', 'urgent'],
+              enum: ['backlog', 'todo', 'urgent', 'in progress'],
             },
             comment: { type: 'string' },
           },
@@ -328,6 +327,10 @@ async function main() {
     cwd: REPO_ROOT,
     encoding: 'utf8',
   }).trim();
+  const latestCodeCommitIso = execSync('git log -1 --format=%cI -- src/ specs/', {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+  }).trim();
 
   // Step 2: Reconcile any unlinked open GitHub issues onto the GitHub Projects v2 board
   const projectBackfilled = [];
@@ -366,19 +369,35 @@ async function main() {
   // Step 3: Build codebase & spec snapshot for the LLM audit
   const codebaseSnapshot = [
     '=== specs/03-requirements.md ===',
-    readRepoFileExcerpt('specs/03-requirements.md', 8000),
+    readRepoFileExcerpt('specs/03-requirements.md', 10000),
+    '=== specs/01-data-schema.md ===',
+    readRepoFileExcerpt('specs/01-data-schema.md', 10000),
+    '=== specs/02-ui-dashboard.md ===',
+    readRepoFileExcerpt('specs/02-ui-dashboard.md', 8000),
     '=== specs/tasks.md ===',
-    readRepoFileExcerpt('specs/tasks.md', 6000),
+    readRepoFileExcerpt('specs/tasks.md', 10000),
     '=== src/types/argus.ts ===',
-    readRepoFileExcerpt('src/types/argus.ts', 5000),
+    readRepoFileExcerpt('src/types/argus.ts', 8000),
+    '=== src/utils/triageEngine.ts ===',
+    readRepoFileExcerpt('src/utils/triageEngine.ts', 8000),
+    '=== src/data/telemetryScenarios.ts (head) ===',
+    readRepoFileExcerpt('src/data/telemetryScenarios.ts', 8000),
+    '=== src/services/flightSurgeonAi.ts ===',
+    readRepoFileExcerpt('src/services/flightSurgeonAi.ts', 15000),
     '=== src/context/MissionContext.tsx ===',
-    readRepoFileExcerpt('src/context/MissionContext.tsx', 6000),
+    readRepoFileExcerpt('src/context/MissionContext.tsx', 25000),
+    '=== src/App.tsx ===',
+    readRepoFileExcerpt('src/App.tsx', 5000),
     '=== src/components/TopMissionBar.tsx ===',
-    readRepoFileExcerpt('src/components/TopMissionBar.tsx', 5000),
+    readRepoFileExcerpt('src/components/TopMissionBar.tsx', 15000),
     '=== src/components/TelemetryPanel.tsx ===',
-    readRepoFileExcerpt('src/components/TelemetryPanel.tsx', 5000),
+    readRepoFileExcerpt('src/components/TelemetryPanel.tsx', 15000),
     '=== src/components/FlightSurgeonPanel.tsx ===',
-    readRepoFileExcerpt('src/components/FlightSurgeonPanel.tsx', 5000),
+    readRepoFileExcerpt('src/components/FlightSurgeonPanel.tsx', 22000),
+    '=== src/components/BioTwinMap.tsx ===',
+    readRepoFileExcerpt('src/components/BioTwinMap.tsx', 12000),
+    '=== src/components/CrewManagerModal.tsx ===',
+    readRepoFileExcerpt('src/components/CrewManagerModal.tsx', 10000),
   ].join('\n\n');
 
   const prompt = `You are the Autonomous Product Manager (PM) Agent for ARGUS (Astronaut Readiness Guidance & Unified Surveillance, repository ${ghState.repo}).
@@ -389,7 +408,7 @@ Your Core Mandate:
 3. Keep every issue short and scannable in under 10 seconds (1-sentence "Why it matters", 1-2 short bullets in "PM Critique" citing exact src/ files, and 2-3 short concrete checkbox tasks).
 4. Never duplicate any existing open or recently closed issue.
 
-Recent Git Commits (latest commit timestamp: ${latestCommitIso}):
+Recent Git Commits (latest commit: ${latestCommitIso}; latest src/ or specs/ commit: ${latestCodeCommitIso || 'none'}):
 ${recentCommits}
 
 Currently Open GitHub Issues (${openIssues.length}):
@@ -408,7 +427,7 @@ Instructions:
 1. Check every currently OPEN GitHub issue above. ONLY include an issue in "issuesToClose" if you can verify in the Codebase Snapshot that its requested feature/tasks are now genuinely implemented in src/. Do NOT close an issue if it is still unimplemented.
 2. Review all remaining OPEN issues in "issuesToUpdate":
    - If an issue is missing a "human-review" or "agent-task" label, missing a category label ("ui-ux", "clinical-ai", "telemetry-data", "infra-ci"), or has the wrong label, priority (P0/P1/P2), Project Priority field, or Kanban column ("urgent"/"todo"/"backlog"), include it in "issuesToUpdate" with the corrected values.
-   - Use "comment" to post a concise status update, progress note from recent commits, or a ping (e.g., "@YaronL16" for "human-review" blockers or stale P0s) ONLY when meaningful (leave "comment" as "" if nothing new needs to be said).
+   - Use "comment" to post a concise status update, progress note from recent src/ or specs/ commits, or a ping (e.g., "@YaronL16" for "human-review" blockers or stale P0s) ONLY when meaningful. Do NOT write a comment merely to announce applying/fixing labels or moving Kanban columns—leave "comment" as "" for metadata-only syncs or when src/ and specs/ have not changed.
 3. Propose at most ${maxNewLimit} high-impact new issues in "issuesToCreate" for gaps in REQ-01 through REQ-10 that are NOT already covered by an existing open issue. If existing open issues already cover the top priorities, return an empty array [] for "issuesToCreate".
 4. For each new issue:
    - Set "assigneeType" to "human-review" if it requires a human product/UX/clinical/credential decision or manual review, or "agent-task" if it is a concrete coding/spec/UI task ready for an AI coding agent to implement.
@@ -491,13 +510,18 @@ Instructions:
     const nextTitle = `[PM Agent] [${upd.newPriority}] ${cleanBodyTitle}`;
     const titleChanged = nextTitle !== existing.title;
 
-    const targetKanban = upd.newKanbanColumn || inferKanbanColumn(upd.newPriority);
     const existingProjectItem = projectItemByIssue.get(upd.number);
     const currentKanban = (existingProjectItem?.status || '').toLowerCase();
+    const isAlreadyInProgress =
+      currentKanban.includes('in progress') || currentKanban.includes('doing');
+    const targetKanban = isAlreadyInProgress
+      ? 'in progress'
+      : upd.newKanbanColumn || inferKanbanColumn(upd.newPriority);
     const kanbanChanged = !currentKanban || !currentKanban.includes(targetKanban);
     const currentProjectPriority = (existingProjectItem?.priority || '').toUpperCase();
     const projectPriorityChanged =
-      !currentProjectPriority || currentProjectPriority !== upd.newPriority.toUpperCase();
+      Boolean(projectState?.hasPriorityField) &&
+      (!currentProjectPriority || currentProjectPriority !== upd.newPriority.toUpperCase());
 
     const commentText = String(upd.comment || '').trim();
     const updatedRecently =
@@ -578,7 +602,8 @@ Instructions:
   );
   const noNewCommitsSinceLastIssue =
     newestOpenIssueIso &&
-    new Date(latestCommitIso).getTime() <= new Date(newestOpenIssueIso).getTime();
+    latestCodeCommitIso &&
+    new Date(latestCodeCommitIso).getTime() <= new Date(newestOpenIssueIso).getTime();
 
   let allowedNewCount = Math.max(
     0,
@@ -589,7 +614,6 @@ Instructions:
   }
 
   const createdResults = [];
-  fs.mkdirSync(ISSUES_DIR, { recursive: true });
 
   for (const item of (plan.issuesToCreate || []).slice(0, allowedNewCount)) {
     const safeSlug =
@@ -597,9 +621,7 @@ Instructions:
         .toLowerCase()
         .replace(/[^a-z0-9-]+/g, '-')
         .replace(/^-+|-+$/g, '') || 'pm-issue';
-    const issueFilePath = path.resolve(ISSUES_DIR, `${safeSlug}.md`);
     const bodyMarkdown = formatIssueMarkdown(item);
-    fs.writeFileSync(issueFilePath, bodyMarkdown, 'utf8');
 
     const cleanActionTitle = String(item.title)
       .replace(/^\[PM(?:\s+Agent)?\]\s*/i, '')
@@ -620,21 +642,31 @@ Instructions:
         labels: issueLabels,
         kanbanStatus,
         priority: item.priority,
-        issueFilePath,
         bodyMarkdown,
       });
       continue;
     }
 
-    const createRes = runJsonScript(GH_SCRIPT, [
-      'create',
-      '--title',
-      fullTitle,
-      '--labels',
-      issueLabels.join(','),
-      '--body',
-      `@${issueFilePath}`,
-    ]);
+    const issueFilePath = path.join(os.tmpdir(), `argus-pm-${safeSlug}-${Date.now()}.md`);
+    fs.writeFileSync(issueFilePath, bodyMarkdown, 'utf8');
+    let createRes;
+    try {
+      createRes = runJsonScript(GH_SCRIPT, [
+        'create',
+        '--title',
+        fullTitle,
+        '--labels',
+        issueLabels.join(','),
+        '--body',
+        `@${issueFilePath}`,
+      ]);
+    } finally {
+      try {
+        fs.unlinkSync(issueFilePath);
+      } catch {
+        // ignore temp cleanup failure
+      }
+    }
     createdResults.push(createRes);
 
     if (createRes.created && createRes.number && projectConfigured) {
