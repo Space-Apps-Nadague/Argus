@@ -60,7 +60,7 @@ describe('AI routes (offline)', () => {
     const res = await post('/api/ai/diagnostics', { scenarioId: 'sans_alert', crewMember });
     const body = (await res.json()) as DiagnosticsResponse;
     expect(body.meta.source).toBe('offline_verified_cache');
-    expect(body.result.trends.length).toBe(12);
+    expect(body.result.trends.length).toBe(17);
     expect(body.result.hypotheses[0].id).toBe('sans');
     expect(body.result.earthConsultUrgency).toBe('immediate_emergency_packet');
     expect(body.result.disclaimer).toMatch(/not a diagnosis/i);
