@@ -198,3 +198,12 @@
   - `.env.example`
   - `specs/00-architecture.md`
   - `specs/tasks.md`
+
+### Task 16: Issue Triage Labels (`human-review` / `agent-task`) & Urgency Kanban Columns (`Backlog` / `Todo` / `Urgent`)
+- **Status:** `[DONE]`
+- **Spec References:** `specs/00-architecture.md`, `specs/03-requirements.md`
+- **Files Owned:**
+  - `.agents/skills/pm-agent/scripts/gh-pm-project.mjs`
+  - `.agents/skills/pm-agent/scripts/run-pm-audit.mjs`
+  - `.agents/skills/pm-agent/SKILL.md`
+  - `specs/tasks.md`
