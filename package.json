@@ -14,7 +14,8 @@
     "build": "tsc -b && vite build",
     "typecheck:server": "tsc -p server/tsconfig.json",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "check:sources": "tsx scripts/check-sources.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.8",

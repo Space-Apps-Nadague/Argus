@@ -10,12 +10,21 @@
 - **Data Visualization:** Recharts (`AreaChart`, `ReferenceArea`, `ResponsiveContainer`, `Tooltip`, `XAxis`, `YAxis`) for 14-to-30-day vital trends
 - **Icons:** `lucide-react`
 - **AI Layer:** Multimodal Clinical AI service returning structured JSON (`FlightSurgeonGuidance` & `VisualExamAnalysis`) served by the ARGUS AI backend (`server/`, `specs/04-ai-backend.md`: local or free cloud models, key never in the browser) + deterministic pre-cached offline fallback when no model or backend is reachable
-- **State Management:** React Context / `useReducer` (`MissionContext.tsx`) seeded with a multi-astronaut crew roster (persisted in `localStorage`), individualized 30-day synthetic telemetry, instant crisis overrides, per-crew daily check-ins (persisted in `localStorage`) overlaid on the synthetic series, and the active HUD tab
+- **State Management:** React Context / `useReducer` (`MissionContext.tsx`). When the API is reachable, the crew roster, telemetry zones, check-ins and chat history come from the server (`specs/05-data-platform.md`). When it is not, the HUD runs the synthetic in-browser data as an "Offline demo". Only UI conveniences (active tab) stay in `localStorage`.
+- **Database:** PostgreSQL 17 (Azure Flexible Server for the team, Docker locally) through Drizzle ORM (`server/db/`). It holds users and sessions, the roster, wearable observations, analytics, triage events, the AI chat link and NASA reference data. See `specs/05-data-platform.md`.
+- **Analysis:** live analytics in TypeScript/SQL (`shared/analytics/`, `server/jobs/`); NASA dataset analysis in Python (`analysis/`, managed by `uv`).
 - **Analytics:** Pure deterministic TypeScript (`driftAnalytics.ts`) for personal-baseline drift (σ), short-range forecasts with 90% prediction intervals, and evidence-backed metric links. Informational only: it never changes a triage status.
 - **Layout:** Slim top mission bar + 5-tab HUD (`Bio-Twin`, `Trends`, `Check-in`, `Flight Surgeon`, `Crew`). See `specs/02-ui-dashboard.md`.
 - **Agent Skills:** Vendor-neutral design/UX skills in `.agents/skills/` (open Agent Skills `SKILL.md` format), referenced from `AGENTS.md`.
 
 ## Directory Structure
+- `server/db/` — Drizzle schema (`schema.ts`), client, generated SQL migrations, seed (`specs/05-data-platform.md` §3)
+- `server/auth/` — argon2id passwords, sessions, role and access checks (§6)
+- `server/ingest/`, `server/jobs/` — wearable ingest normalization and the analytics refresh job (§4–§5)
+- `shared/analytics/` — baselines, anomaly detectors and drift maths shared by the server and the HUD (§5)
+- `scripts/simulate-wearables.ts` — assumed sensor kit simulator (§4); `scripts/check-sources.ts` — source attribution check (AGENTS.md §7)
+- `analysis/` — Python pipelines and notebooks for NASA reference data (§7); `data/reference/` — curated CSVs with `source_id`
+- `docs/DATABASE.md` — connecting to the shared database, migrations, seeding
 - `.agents/skills/` — Vendor-neutral agent skills (`frontend-design`, `design-system`, `accessibility-review`, `ux-copy`, `design-critique`) used for all UI work
 - `ARGOS_The_Thousand_Eyes.html` — Reference prototype (vanilla JS) whose ideas were ported in Sprint 7; not part of the build
 - `specs/` — Canonical Specification Documents (Single Source of Truth)

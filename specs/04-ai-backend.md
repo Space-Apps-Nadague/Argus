@@ -6,6 +6,7 @@ A small Node/TypeScript server (`server/`) hosts every AI feature so that:
 - **Nothing costs money**: any OpenAI-compatible endpoint works — a local model (Ollama / LM Studio), OpenRouter free models, the Gemini free tier, Groq's free tier, or a custom/hosted agent endpoint.
 - **Deterministic first**: triage status, trend models, wellbeing risk and crisis detection are plain TypeScript. The LLM only explains, ranks, personalizes and converses (AGENTS.md §2.4).
 - **Always works offline**: every endpoint returns a deterministic `offline_verified_cache` result when no provider answers.
+- **Data-backed** (`specs/05-data-platform.md`): when `DATABASE_URL` is set, AI routes require a session, check the user may read `crewId`, build the crew snapshot from the database (real observations and check-ins), and `/api/ai/chat` stores every message with the provider, model and context snapshot (§3.5). Prompts are pseudonymized: legal name and medical notes go only to the `local` provider.
 
 ## 2. Stack & Layout
 - Hono + `@hono/node-server`, run with `tsx`; `openai` SDK pointed at any OpenAI-compatible `baseURL`; `zod` validates all request bodies and LLM JSON.

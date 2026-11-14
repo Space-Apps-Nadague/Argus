@@ -1,0 +1,209 @@
+# Spec 05: ARGUS Data Platform (Database, Users, Wearables, Analytics, NASA Data)
+
+## 1. Purpose & Principles
+ARGUS stores crew health data in a shared **PostgreSQL** database instead of each browser's `localStorage`.
+
+- **One system of record.** Accounts, the crew roster, every reading, analytics results and AI chat messages live in Postgres. The browser keeps only UI conveniences (active tab).
+- **Server-side trust.** Login, roles and access checks run on the server (`server/`). The browser is never trusted with another person's data.
+- **Deterministic first** (AGENTS.md §2.4). Triage status comes only from `src/utils/triageEngine.ts` thresholds. Baselines and anomalies are informational. The LLM explains numbers that code computed; it never computes them.
+- **Provenance everywhere.** Every row that came from outside or was derived records where it came from: `source_id` (an ID from `SOURCES.md`), `ingest_run_id` and `pipeline_version`.
+- **Privacy by design.** Health data references a pseudonymous astronaut id and callsign. Legal name and medical notes live in a separate table that only flight surgeons can read. Cloud LLMs never receive them.
+- **Mission framing.** On a real deep-space mission (up to 20 min one-way delay), this database runs **on board** as the system of record and Earth receives a delayed mirror. For the hackathon a single shared Azure instance plays both roles.
+
+## 2. Hosting & Environments
+
+| Environment | Database | Who uses it |
+|---|---|---|
+| Local dev | `docker compose up -d postgres` (`pgvector/pgvector:0.8.0-pg17`) | each developer, with throwaway data |
+| Shared team | Azure Database for PostgreSQL Flexible Server, B1MS, PostgreSQL 17, free tier [SRC-061] | the whole team and the demo |
+
+- Connection is `DATABASE_URL` in `.env`, which is server-only. Never prefix it with `VITE_`. Azure requires `sslmode=require`.
+- Extensions: `citext` (case-insensitive usernames) and `pgcrypto` (`gen_random_uuid`). `vector` is enabled but unused until RAG is added [SRC-062].
+- Schema changes go **only** through Drizzle migrations (`server/db/migrations/`, `npm run db:migrate`). Nobody edits the Azure schema by hand.
+- Team access: one firewall rule per teammate IP, plus DB roles `argus_app` (the server) and `argus_analyst` (read-only, for notebooks). See `docs/DATABASE.md`.
+
+## 3. Schema
+Defined in `server/db/schema.ts` (Drizzle). All timestamps are `timestamptz`, stored in UTC.
+
+- Astronaut ids are text (`crew-<slug>` for the seeded roster, `crew-<random>` for new ones) so existing `CrewMemberProfile.id` values keep working.
+- Other ids are UUIDs.
+
+### 3.1 Identity & access
+| Table | Columns (key ones) | Notes |
+|---|---|---|
+| `users` | `id` uuid, `username` citext unique, `role` (`admin` \| `astronaut` \| `flight_surgeon`), `astronaut_id` → `astronauts` (unique, required for `astronaut`), `password_hash` (argon2id), `created_at`, `disabled_at`, `failed_logins`, `locked_until` | One login per astronaut. Admins and flight surgeons may also link an astronaut profile, for example the crew medical officer. |
+| `sessions` | `id` uuid, `user_id`, `token_hash` (SHA-256 of the cookie token), `created_at`, `expires_at`, `ip`, `user_agent` | Revocable server-side sessions. Logout deletes the row. |
+| `audit_log` | `id` bigserial, `ts`, `actor_user_id`, `action`, `target_type`, `target_id`, `detail` jsonb, `ip` | Append-only. Written on login (success and failure), logout, admin actions, roster changes and medical-data reads. |
+
+### 3.2 Crew & missions
+| Table | Columns | Notes |
+|---|---|---|
+| `missions` | `id`, `name`, `location_id` (`SpaceLocationId`), `start_at`, `gravity_env` | Mission day = `floor((ts − start_at) / 1 day) + 1`. Mission day is derived from real time, not stored. |
+| `astronauts` | `id` text, `mission_id`, `callsign`, `sex`, `birth_year`, `blood_type`, `crew_role`, `resting_hr_baseline_bpm`, `pre_flight_onsd_mm`, `default_scenario_id`, `countermeasure_streak_sols`, `ai_consent` (bool, default true), `is_demo`, `created_at`, `archived_at` | Pseudonymous profile. Safe to show any signed-in user and to send to an LLM. |
+| `astronaut_private` | `astronaut_id` (PK, FK), `legal_name`, `medical_notes` | Readable by flight surgeons and by the astronaut themself. Never sent to cloud LLMs. |
+
+Deleting an astronaut sets `archived_at` (a soft delete), which hides them and keeps their history. An admin **purge** hard-deletes the astronaut and cascades to all their rows (§6 data rights).
+
+### 3.3 Catalog, devices & sources
+| Table | Columns | Notes |
+|---|---|---|
+| `data_sources` | `id` (`SRC-xxx`), `title`, `url`, `kind`, `access` | Mirrors `SOURCES.md`; seeded from it. |
+| `metrics` | `id`, `label`, `unit` (canonical), `zone` (`BodyZoneId`, nullable), `kind` (`passive` \| `clinical` \| `self_report` \| `environment` \| `derived`), `plausible_min`, `plausible_max`, `source_id` | §4.2 lists every metric. Units are canonical; the UI only formats them. |
+| `devices` | `id` uuid, `astronaut_id`, `kind` (§4.1), `model`, `serial`, `token_hash`, `source_id`, `created_at`, `retired_at` | `token_hash` authenticates the ingest API. |
+| `ingest_runs` | `id` uuid, `source_id`, `kind` (`wearable_batch` \| `simulator_backfill` \| `nasa_dataset` \| `check_in` \| `import`), `script`, `checksum`, `row_count`, `status`, `started_at`, `finished_at`, `detail` jsonb | One row per batch or load. |
+
+### 3.4 Data layers (medallion)
+| Layer | Table | Contents |
+|---|---|---|
+| Bronze | `raw_readings` (`id` bigserial, `device_id`, `received_at`, `payload` jsonb, `ingest_run_id`) | Exactly what the device sent. Append-only and never edited. |
+| Silver | `observations` (`astronaut_id`, `metric_id`, `ts`, `value` double, `device_id`, `quality` (`ok` \| `artifact` \| `out_of_range`), `origin` (`wearable` \| `check_in` \| `clinical` \| `simulated`), `ingest_run_id`) | PK `(astronaut_id, metric_id, ts)`. BRIN index on `ts`. Values are in canonical units. |
+| Silver | `wellbeing_check_ins` (`id`, `astronaut_id`, `ts`, `mood`, `stress`, `energy`, `sleep_quality`, `cohesion`, `motivation`, `note`) | Six 1–5 scales (`WellbeingCheckIn`). |
+| Silver | `environment_readings` (`mission_id`, `metric_id`, `ts`, `value`, `source_id`) | Habitat data such as cabin CO₂. Per mission, not per astronaut. |
+| Gold | `daily_metrics` (`astronaut_id`, `metric_id`, `day` date, `value`, `n`, `method`, `pipeline_version`, `computed_at`) | The per-day value of each of the 12 triage metrics, derived from observations as described in §5.1. Feeds the HUD series and triage. |
+| Gold | `baselines` (`astronaut_id`, `metric_id`, `kind` (`preflight` \| `rolling_14d` \| `hour_of_day`), `hour` nullable, `n`, `mean`, `sd`, `median`, `mad`, `p05`, `p95`, `window_start`, `window_end`, `pipeline_version`, `computed_at`) | §5.2 |
+| Gold | `anomalies` (`id`, `astronaut_id`, `metric_id`, `ts_start`, `ts_end`, `detector` (`robust_z` \| `ewma` \| `cusum`), `score`, `severity` (`watch` \| `drifting`), `detail` jsonb, `pipeline_version`, `computed_at`) | Informational only. Never changes triage. |
+| Gold | `triage_events` (`id`, `astronaut_id`, `ts`, `zone`, `status`, `previous_status`, `metrics` jsonb, `engine_version`) | Written when a zone's deterministic status changes. |
+| Reference | `ref_thresholds`, `ref_radiation_dose_rates`, `ref_osdr_studies` | Curated NASA reference data (§7). Every row has `source_id` and `ingest_run_id`. |
+
+### 3.5 AI chat link
+Stores what was said to the AI, which astronaut it was about, and the data the AI saw. That is all: no RAG, embeddings or chat analytics yet.
+
+| Table | Columns |
+|---|---|
+| `conversations` | `id` uuid, `astronaut_id`, `started_by` (user), `started_at` |
+| `messages` | `id` uuid, `conversation_id`, `ts`, `role` (`user` \| `assistant`), `author_user_id` (null for assistant), `content`, `provider`, `model`, `source` (`ai` \| `offline_verified_cache`), `context_snapshot` jsonb (the zone statuses, flagged metrics and wellbeing summary sent with the prompt), `triage_event_id` (nullable: latest triage event at that time), `crisis_flag` bool |
+
+## 4. Passive Data: Assumed Sensor Kit
+No public dataset has per-astronaut, minute-level vitals. NASA LSDA and LSAH data are request-only or restricted [SRC-005, SRC-006]. **ARGUS therefore assumes every astronaut wears the kit below.** Each device class has flown on the ISS, Artemis II or a commercial mission. Data is simulated at the published cadences until real devices are connected.
+
+### 4.1 Devices (`devices.kind`)
+| Kind | Flown precedent | Streams | Cadence stored |
+|---|---|---|---|
+| `smart_shirt` | CSA Bio-Monitor / Astroskin on ISS [SRC-020, SRC-022] | `heart_rate`, `resp_rate`, `spo2`, `skin_temp`, `activity` | 1 Hz on the device [SRC-021], uploaded as **1-minute means**. Raw ECG (250 Hz) stays on the device to save bandwidth. |
+| `bp_cuff` | Astroskin blood-pressure function [SRC-020] | `bp_sys`, `bp_dia` | Every 30 min while awake |
+| `wrist_actigraph` | Actiwatch Spectrum (Standard Measures) [SRC-009, SRC-023]; ARCHeR on Artemis II [SRC-024] | `activity`, `sleep_state`, nightly `sleep_eff` | 30 s epochs on the device, uploaded as 1-min values plus a nightly summary |
+| `ring` | Oura on Ax-4 [SRC-029] | nightly `hrv_rmssd`, nightly `resting_hr` | Once per night |
+| `core_temp_patch` | ESA Double Sensor (Circadian Rhythms) [SRC-025] | `core_temp` | Every 1 min |
+| `dosimeter` | ISS Crew Active Dosimeter [SRC-026] | `dose_rate` (µGy/h) | Every 1 min. The daily `rad_dose` (mSv/d) is derived from it. |
+
+Active inputs, which are not passive, come through the same ingest API with `origin = check_in`:
+- the twice-daily wellbeing survey;
+- the PVT cognition test (`pvt_lapses`) [SRC-009];
+- clinical exams (`onsd`, `iop`, `bmd_delta`, `wbc_lymph`) with `origin = clinical`.
+
+### 4.2 Metric catalog
+The 12 triage metrics from spec 01 §2 keep their ids, units and thresholds. New metrics:
+
+| Metric id | Unit | Kind | Plausible range | Feeds |
+|---|---|---|---|---|
+| `heart_rate` | bpm | passive | 25–220 | `resting_hr` (lowest 5-min mean during sleep) |
+| `resp_rate` | breaths/min | passive | 4–60 | AI context |
+| `skin_temp` | °C | passive | 25–42 | AI context |
+| `core_temp` | °C | passive | 34–41.5 | circadian baseline |
+| `activity` | g (vector magnitude) | passive | 0–8 | sleep detection, exercise context |
+| `sleep_state` | 0 = awake, 1 = asleep | passive | 0–1 | `sleep_eff` |
+| `bp_sys` / `bp_dia` | mmHg | passive | 60–250 / 30–150 | AI context |
+| `dose_rate` | µGy/h | passive | 0–10000 | `rad_dose` (daily sum, 1 mGy ≈ 1 mSv for display) |
+
+## 5. Analytics
+Shared TypeScript lives in `shared/analytics/` and is used by both the server and the HUD. It replaces the duplicated maths in `src/utils/driftAnalytics.ts` and `server/models/trendModels.ts`.
+
+### 5.1 Daily rollup (`daily_metrics`)
+`server/jobs/analytics.ts` recomputes the rollup after each ingest batch and every 5 minutes.
+
+| Metric | Daily value |
+|---|---|
+| `resting_hr` | Ring nightly value if present, otherwise the lowest 5-minute mean of `heart_rate` while asleep |
+| `spo2` | Median of minute values with `quality = ok` |
+| `rad_dose` | Sum of `dose_rate` × minutes, converted to mSv/d |
+| `sleep_eff` | Night summary if present, otherwise `asleep minutes / in-bed minutes × 100` |
+| `hrv_rmssd` | Nightly value |
+| Clinical and check-in metrics | Latest value that day |
+
+Days are UTC calendar days, labelled as mission days (`MD-n`) from `missions.start_at`.
+
+### 5.2 Baselines (`baselines`)
+Computed per astronaut × metric.
+
+| Kind | Method |
+|---|---|
+| `preflight` | First 7 mission days, frozen once mission day 8 exists. Mean and SD, with SD floored at `METRIC_TYPICAL_SD`. This is the reference for drift. |
+| `rolling_14d` | The last 14 days of daily values: median, MAD, mean, SD, p05 and p95. This is the "your normal" band in the HUD. |
+| `hour_of_day` | `heart_rate` and `core_temp` minute data over 14 days, grouped by UTC hour: mean and SD. This is the circadian reference, so the 03:00 heart rate is compared with that person's own 03:00. |
+
+### 5.3 Anomaly detectors (`anomalies`)
+These are informational only: an anomaly never changes a triage status.
+
+| Detector | Data | Rule | Source |
+|---|---|---|---|
+| `robust_z` | Minute data against `hour_of_day` | `|x − median| / (1.4826 · MAD) ≥ 3.5` for **at least 10 consecutive minutes**. The persistence rule suppresses wearable artifacts. | [SRC-063] |
+| `ewma` | Daily values against `preflight` | EWMA of z (α 0.3): ≥ 1σ = `watch`, ≥ 2σ = `drifting` | [SRC-064] |
+| `cusum` | Daily values against `preflight` | One-sided CUSUM with k = 0.5σ and h = 4σ, for sustained small shifts such as SpO₂ creeping down | [SRC-064] |
+
+`quality` flags set at ingest:
+- `out_of_range`: outside `metrics.plausible_min/max`;
+- `artifact`: a jump of more than 40% from the previous minute in `heart_rate` or `spo2`.
+
+Both flags exclude the value from analytics. Raw data is never deleted.
+
+### 5.4 AI usage of analytics
+`/api/ai/diagnostics`, `/recommendations` and `/chat` receive a JSON block of computed numbers: current value, baseline, z, detector and window. The prompt tells the LLM to explain those numbers and never invent new ones. Every AI output keeps the "decision support, not a diagnosis" framing.
+
+## 6. Users, Roles & Privacy
+| Capability | `astronaut` | `flight_surgeon` | `admin` |
+|---|---|---|---|
+| See own profile, vitals, analytics, chat | ✓ | ✓ | only if linked to an astronaut |
+| See other astronauts' vitals, analytics, chat | — | ✓ | — |
+| See `astronaut_private` (legal name, medical notes) | own | ✓ | — |
+| Add / edit / archive astronauts | — | ✓ | ✓ |
+| Manage accounts (create, reset password, disable, delete) | — | — | ✓ |
+| Purge an astronaut's data (hard delete) | — | — | ✓ (audited) |
+| Export own data (JSON) | ✓ | ✓ (any) | — |
+
+- **Passwords:** argon2id (m = 19 MiB, t = 2, p = 1) [SRC-060], at least 10 characters.
+- **Lockout:** 15 minutes after 5 failed logins on an account. There is also a per-IP rate limit of 20 login attempts per minute.
+- **Sessions:** a 32-byte random token in the `argus_session` cookie (`HttpOnly`, `SameSite=Lax`, `Secure` outside localhost, 12 h). Only its SHA-256 is stored. Mutating requests must have an `Origin` header in `ARGUS_CORS_ORIGINS`.
+- **First run:** `npm run db:seed` creates the admin from `ARGUS_BOOTSTRAP_ADMIN_USERNAME/PASSWORD`. Demo accounts are created only when `ARGUS_DEMO_PASSWORD` is set: one per default crew member (username = callsign, lower-case) plus `surgeon`.
+- **LLM privacy:**
+  - Prompts carry the callsign, age band, sex, blood type and computed metrics.
+  - `legal_name` and `medical_notes` are added only when the provider is `local`.
+  - If `ai_consent = false`, AI endpoints serve the offline deterministic result for that astronaut.
+- **Offline demo:** if the HUD can't reach the API, it runs on the synthetic in-browser data and shows an "Offline demo" badge. This follows the AGENTS.md rule that every feature must work offline.
+
+## 7. NASA Reference Data & Analysis
+Medallion applies here too:
+1. Downloads land in `data/raw/<SRC-id>/`, which is gitignored and whose checksums are recorded in `ingest_runs`.
+2. Curated small tables live in `data/reference/*.csv`, committed, every row carrying `source_id`.
+3. Pipelines load them into the `ref_*` tables.
+
+| Dataset | Access | Pipeline | Table |
+|---|---|---|---|
+| NASA OSDR API, Inspiration4 studies OSD-569…575 [SRC-046, SRC-047] | open, no key | `analysis/pipelines/ingest_osdr.py` | `ref_osdr_studies` |
+| Mission dose rates from MSL RAD papers and DOSIS ISS [SRC-042..045] | open | `analysis/pipelines/load_reference.py` | `ref_radiation_dose_rates` |
+| NASA-STD-3001 limits and OCHMO radiation limits [SRC-007, SRC-008] | open | `analysis/pipelines/load_reference.py` | `ref_thresholds` |
+| LSDA / LSAH / CIPHER per-astronaut data [SRC-005, SRC-006] | request-only or restricted | — | Not ingested; this is why §4 is simulated |
+
+### Best-practice rules
+- Raw is immutable. Derived data is always reproducible from raw plus a script at a known `pipeline_version`.
+- Notebooks (`analysis/notebooks/`) are for exploration. Logic that the app relies on is promoted into `analysis/pipelines/` or `shared/analytics/`. A notebook is never the source of truth.
+- Notebooks connect as `argus_analyst` (read-only). Only pipelines write, and every load creates an `ingest_runs` row.
+- Traditional statistics (pandas, scipy, statsmodels, DuckDB) produce every number. AI is used only to summarize or explain computed tables, and any hypotheses it raises are labelled as hypotheses. Every AI-written insight records its model and provider.
+
+## 8. API
+All routes are under `/api`. Every route except `health`, `auth/login` and `ingest` requires a session.
+
+| Method & path | Who | Purpose |
+|---|---|---|
+| `POST /auth/login`, `POST /auth/logout`, `GET /auth/me` | anyone | Sessions. `me` returns the user and `setupNeeded`. |
+| `POST /auth/setup` | anyone, only while no users exist | Creates the first admin |
+| `GET/POST /admin/users`, `PATCH/DELETE /admin/users/:id` | admin | Account management |
+| `GET /astronauts`, `POST /astronauts`, `PATCH /astronauts/:id`, `DELETE /astronauts/:id` | read: all signed-in users (pseudonymous fields); write: admin, flight surgeon | Roster |
+| `GET /astronauts/:id/private` | flight surgeon, self | Legal name and medical notes |
+| `GET /astronauts/:id/zones?scenario=` | self, flight surgeon | `Record<BodyZoneId, VitalSignReading[]>` built from `daily_metrics`, with the same shape the HUD already uses |
+| `GET /astronauts/:id/series?metric&from&to&bucket=minute\|hour\|day` | self, flight surgeon | Raw or bucketed observations |
+| `GET /astronauts/:id/analytics` | self, flight surgeon | Baselines, current vs normal, recent anomalies |
+| `POST /astronauts/:id/check-ins`, `POST /astronauts/:id/wellbeing` | self, flight surgeon | Manual readings, stored as observations with `origin = check_in` |
+| `GET /astronauts/:id/conversations/latest` | self, flight surgeon | Chat history |
+| `GET /astronauts/:id/export` | self, flight surgeon | JSON export |
+| `POST /ingest/readings` | a device (`Authorization: Bearer <device token>`) | Batched readings (§4) |
+| `POST /ai/*` | signed-in user who may read the astronaut | Existing AI endpoints (spec 04). `crewId` is checked against the session. |

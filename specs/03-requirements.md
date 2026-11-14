@@ -80,3 +80,10 @@ The following capabilities are recommended considerations to strengthen crew eng
 | `REQ-08` | Periodic mission routine measurement & action prompts | **Planned / Future** (Countermeasure checklist exists; scheduled/periodic routine prompts can be added) | `specs/02-ui-dashboard.md` |
 | `REQ-09` | Gamification system for health task engagement | **Partial** (Crew Readiness Score `0–100%` and `countermeasureStreakSols` tracked; badges/milestones/challenges can expand this) | `specs/01-data-schema.md` (§1, §3), `src/components/TopMissionBar.tsx` |
 | `REQ-10` | NASA HRP & partner agency grounding | **Implemented** (Mapped to 5 HRP hazards & cataloged in `SOURCES.md`) | `SOURCES.md`, `specs/01-data-schema.md` |
+| `REQ-10` | Durable, shared storage of crew health data (not per-browser) | **In progress** (PostgreSQL on Azure + Docker; `feature/data-platform`) | `specs/05-data-platform.md` §2–§3 |
+| `REQ-11` | Per-user accounts and roles with server-side access control (astronaut / flight surgeon / admin) | **In progress** | `specs/05-data-platform.md` §6 |
+| `REQ-12` | Passive data collection from wearables (assumed ISS-style sensor kit) | **In progress** (simulator + ingest API) | `specs/05-data-platform.md` §4 |
+| `REQ-13` | Personal baselines, averages and anomaly detection per astronaut | **In progress** | `specs/05-data-platform.md` §5 |
+| `REQ-14` | Privacy: pseudonymized health data, no names or medical notes to cloud LLMs, audit log, data export | **In progress** | `specs/05-data-platform.md` §1, §6 |
+| `REQ-15` | Traceable sources for every external fact and dataset | **Implemented** (`SOURCES.md` IDs, `npm run check:sources`) | `AGENTS.md` §7 |
+

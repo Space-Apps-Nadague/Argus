@@ -112,6 +112,9 @@ export interface ThresholdRange {
 | `behavioral` | `sleep_eff` | Circadian Sleep Efficiency | `%` | `82–96` (`72–100`) |
 | `behavioral` | `pvt_lapses` | Psychomotor Vigilance Lapses | `lapses` | `0–2` (`0–4`) |
 
+### Passive Wearable Metrics (non-triage)
+Minute-level streams from the assumed sensor kit (`specs/05-data-platform.md` §4.2): `heart_rate` (bpm), `resp_rate` (breaths/min), `skin_temp` (°C), `core_temp` (°C), `activity` (g), `sleep_state` (0/1), `bp_sys`/`bp_dia` (mmHg), `dose_rate` (µGy/h). They have no triage thresholds of their own. They feed the daily values of `resting_hr`, `spo2`, `sleep_eff` and `rad_dose` (§5.1 of spec 05) and the AI context. Timestamps are real UTC `timestamptz`; `missionDay` is derived from the mission start.
+
 ### Typical Day-to-Day Variability (`METRIC_TYPICAL_SD`) & Check-In Input Ranges (`METRIC_INPUT_RANGES`)
 Both tables live in `src/utils/triageEngine.ts` next to `METRIC_THRESHOLDS`. Neither table affects triage status.
 - `METRIC_TYPICAL_SD` is the minimum standard deviation used for personal-baseline drift (§5), so a very flat baseline week does not turn tiny changes into huge σ values.
@@ -335,24 +338,23 @@ export interface SpaceLocation {
 - Sent to the AI backend as optional `locationId` on every request; the server adds the location line to prompts.
 - Triage still uses the `0g_transit` thresholds for every location (location-specific thresholds are future work).
 
-## 9. User Accounts (`UserAccount`, `src/auth/authStore.ts`)
+## 9. User Accounts (`UserAccount`, server-side)
+Accounts live in the database (`users`, `sessions`; `specs/05-data-platform.md` §3.1, §6). The browser never stores password hashes.
 
 ```typescript
-export type UserRole = 'admin' | 'crew';
+export type UserRole = 'admin' | 'astronaut' | 'flight_surgeon';
 
 export interface UserAccount {
   id: string;
   username: string;            // unique, case-insensitive, 3–32 chars
   role: UserRole;
-  crewId?: string;             // required for 'crew'
-  passwordHash: string;        // PBKDF2-SHA256, 100k iterations, hex
-  salt: string;                // 16 random bytes, hex
+  crewId?: string;             // astronaut id; required for 'astronaut'
   createdAtIso: string;
+  disabled?: boolean;
 }
 ```
-- `localStorage` `argus_users_v1` → `UserAccount[]`; session id in `sessionStorage` `argus_session_v1`.
-- Passwords: at least 6 characters. No default accounts: the first run creates the admin.
-- Deleting a crew member also deletes accounts linked to it.
+- Passwords: argon2id on the server, at least 10 characters. The first run creates the admin (`POST /api/auth/setup`, or `npm run db:seed`).
+- Archiving a crew member keeps their accounts and history; an admin purge deletes both.
 
 ## 10. Emergency Protocols (`EmergencyProtocol`, `src/data/emergencyProtocols.ts`)
 
