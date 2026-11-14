@@ -32,14 +32,14 @@ ARGUS currently assumes a single `0g_transit` microgravity environment until fut
 - `'solar_storm'` — **SPE Radiation Storm Alert**: Acute solar particle event raising cumulative dose rate (`immune` red, lymphocyte drop `1.05 k/µL`, skin erythema risk) and stress response (`cardio` / `behavioral` yellow).
 
 ### Metric Identifiers (`MetricId`)
-The 12 canonical metric IDs tracked across the 5 zones (see §2 catalog):
+The 17 canonical metric IDs tracked across the 5 zones (see §2 catalog):
 ```typescript
 export type MetricId =
   | 'onsd' | 'iop' | 'cabin_co2'
-  | 'resting_hr' | 'hrv_rmssd' | 'spo2'
-  | 'bmd_delta' | 'ared_load'
-  | 'rad_dose' | 'wbc_lymph'
-  | 'sleep_eff' | 'pvt_lapses';
+  | 'resting_hr' | 'hrv_rmssd' | 'spo2' | 'systolic_bp'
+  | 'bmd_delta' | 'ared_load' | 'blood_glucose'
+  | 'rad_dose' | 'wbc_lymph' | 'core_temp'
+  | 'sleep_eff' | 'pvt_lapses' | 'daily_sleep_hours' | 'mood_index';
 ```
 `VitalSignReading.metricId` stays typed as `string` for backward compatibility; new code uses `MetricId`.
 
@@ -105,12 +105,17 @@ export interface ThresholdRange {
 | `cardio` | `resting_hr` | Resting Heart Rate | `bpm` | `52–74` (`46–86`) |
 | `cardio` | `hrv_rmssd` | Heart Rate Variability | `ms` | `42–85` (`30–95`) |
 | `cardio` | `spo2` | Arterial $\text{SpO}_2$ | `%` | `96–100` (`93–100`) |
+| `cardio` | `systolic_bp` | Systolic Blood Pressure | `mmHg` | `100–130` (`90–140`) |
 | `musculo` | `bmd_delta` | Femoral BMD Monthly $\Delta$ | `%` | `-0.8–0.2` (`-1.3–0.5`) |
 | `musculo` | `ared_load` | Daily ARED Resistance Load | `kN·reps` | `18–30` (`12–35`) |
+| `musculo` | `blood_glucose` | Blood Glucose | `mg/dL` | `70–110` (`60–140`) |
 | `immune` | `rad_dose` | 24h Radiation Dose Rate | `mSv/d` | `0.4–1.2` (`0.0–2.5`) |
 | `immune` | `wbc_lymph` | Lymphocyte Count | `k/µL` | `1.5–3.5` (`1.2–4.0`) |
+| `immune` | `core_temp` | Core Body Temperature | `°C` | `36.5–37.5` (`36.0–38.0`) |
 | `behavioral` | `sleep_eff` | Circadian Sleep Efficiency | `%` | `82–96` (`72–100`) |
 | `behavioral` | `pvt_lapses` | Psychomotor Vigilance Lapses | `lapses` | `0–2` (`0–4`) |
+| `behavioral` | `daily_sleep_hours` | Daily Sleep Duration | `hours` | `7.0–9.0` (`6.0–10.0`) |
+| `behavioral` | `mood_index` | Behavioral Mood Index | `/10` | `7.0–10.0` (`5.0–10.0`) |
 
 ### Typical Day-to-Day Variability (`METRIC_TYPICAL_SD`) & Check-In Input Ranges (`METRIC_INPUT_RANGES`)
 Both tables live in `src/utils/triageEngine.ts` next to `METRIC_THRESHOLDS`. Neither table affects triage status.
@@ -125,12 +130,17 @@ Both tables live in `src/utils/triageEngine.ts` next to `METRIC_THRESHOLDS`. Nei
 | `resting_hr` | `3` | `30` | `180` | On waking, before moving: wearable or 30 s pulse count × 2. |
 | `hrv_rmssd` | `6` | `5` | `250` | Overnight RMSSD from your wearable. |
 | `spo2` | `0.7` | `70` | `100` | Finger oximeter, warm hand, still for 30 s. |
+| `systolic_bp` | `4` | `60` | `240` | Automated arm cuff at heart level, seated/rested 5 min. |
 | `bmd_delta` | `0.15` | `-5` | `3` | Monthly QCT/DXA-equivalent scan result vs previous scan (%). |
 | `ared_load` | `2.5` | `0` | `60` | Total from the ARED/resistance device log for today. |
+| `blood_glucose` | `5` | `40` | `400` | Fasting or pre-meal glucometer fingerstick capillary test. |
 | `rad_dose` | `0.15` | `0` | `50` | Personal dosimeter: last 24 h reading. |
 | `wbc_lymph` | `0.2` | `0.1` | `10` | Point-of-care blood analyzer, finger-prick sample. |
+| `core_temp` | `0.15` | `34.0` | `42.0` | Tympanic or double-sensor forehead heat-flux thermometer. |
 | `sleep_eff` | `3` | `0` | `100` | Wearable sleep efficiency for last night (%). |
 | `pvt_lapses` | `0.8` | `0` | `50` | 3-minute Psychomotor Vigilance Test on the crew tablet. |
+| `daily_sleep_hours` | `0.5` | `0` | `24` | Actigraphy sleep duration log or smart sleep-band summary. |
+| `mood_index` | `0.5` | `1` | `10` | Daily behavioral self-assessment visual analog scale (1=Lowest, 10=Optimal). |
 
 ---
 
@@ -305,6 +315,8 @@ export interface CheckInEntry {
   Live AI guidance (`source: 'live_ai'`) is never replaced.
 - **Streak:** `checkInStreak(entries)` = number of consecutive mission days with ≥ 1 entry, ending at the most recent logged day.
 - **Persistence:** `localStorage` key `argus_checkins_v1` → `Record<crewId, CheckInEntry[]>`. Deleting a crew member deletes their check-ins.
+- **Quick Interactive Vital Logging (`logVitalReading`, `src/components/TelemetryPanel.tsx`):**
+  In addition to multi-metric batch check-ins on `CheckInTab`, astronauts can log individual vital readings live via `logVitalReading(zoneId, metricKey, value)`. This action immediately updates the active crew member's latest day (`MD-30`) reading, re-evaluates deterministic Green/Yellow/Red triage (`evaluateMetricStatus` & `evaluateZoneStatus`), recalculates the Crew Readiness Score (`calculateCrewReadinessScore`), updates the 3D Bio-Twin status color, and triggers Flight Surgeon AI guidance synthesis for that zone.
 
 ---
 

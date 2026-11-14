@@ -20,12 +20,17 @@ export type MetricId =
   | 'resting_hr'
   | 'hrv_rmssd'
   | 'spo2'
+  | 'systolic_bp'
   | 'bmd_delta'
   | 'ared_load'
+  | 'blood_glucose'
   | 'rad_dose'
   | 'wbc_lymph'
+  | 'core_temp'
   | 'sleep_eff'
-  | 'pvt_lapses';
+  | 'pvt_lapses'
+  | 'daily_sleep_hours'
+  | 'mood_index';
 
 export type HudTabId = 'biotwin' | 'trends' | 'checkin' | 'surgeon' | 'crew';
 
