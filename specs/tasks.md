@@ -176,13 +176,24 @@
   - `specs/tasks.md`
 
 ### Task 14: GitHub Actions Autonomous PM Bot Workflow & Headless Audit Runner
-- **Status:** `[IN PROGRESS]`
+- **Status:** `[DONE]`
 - **Spec References:** `specs/00-architecture.md`, `specs/03-requirements.md`
 - **Files Owned:**
   - `.github/workflows/pm-agent.yml`
   - `.agents/skills/pm-agent/scripts/run-pm-audit.mjs`
   - `.agents/skills/pm-agent/scripts/gh-pm-issue.mjs`
-  - `.agents/skills/pm-agent/scripts/miro-pm-board.mjs`
+  - `.agents/skills/pm-agent/SKILL.md`
+  - `.env.example`
+  - `specs/00-architecture.md`
+  - `specs/tasks.md`
+
+### Task 15: Swap Miro Kanban Sync for GitHub Projects v2 Integration
+- **Status:** `[DONE]`
+- **Spec References:** `specs/00-architecture.md`, `specs/03-requirements.md`
+- **Files Owned:**
+  - `.agents/skills/pm-agent/scripts/gh-pm-project.mjs`
+  - `.agents/skills/pm-agent/scripts/run-pm-audit.mjs`
+  - `.github/workflows/pm-agent.yml`
   - `.agents/skills/pm-agent/SKILL.md`
   - `.env.example`
   - `specs/00-architecture.md`

@@ -10,8 +10,8 @@ on:
       - '.agents/skills/pm-agent/**'
       - '.github/workflows/pm-agent.yml'
   schedule:
-    # Runs every 6 hours during the hackathon
-    - cron: '0 */6 * * *'
+    # Runs every 15 minutes during the hackathon
+    - cron: '*/15 * * * *'
   workflow_dispatch:
     inputs:
       dry_run:
@@ -35,7 +35,7 @@ concurrency:
 
 jobs:
   pm-audit:
-    name: Audit Specs, GitHub Issues & Miro Kanban
+    name: Audit Specs, GitHub Issues & Projects Kanban
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -61,8 +61,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          MIRO_ACCESS_TOKEN: ${{ secrets.MIRO_ACCESS_TOKEN }}
-          MIRO_BOARD_ID: ${{ secrets.MIRO_BOARD_ID }}
+          GH_PROJECT_TOKEN: ${{ secrets.GH_PROJECT_TOKEN }}
+          PM_PROJECT_NUMBER: ${{ vars.PM_PROJECT_NUMBER || secrets.PM_PROJECT_NUMBER }}
+          PM_PROJECT_OWNER: ${{ vars.PM_PROJECT_OWNER || secrets.PM_PROJECT_OWNER }}
           PM_DRY_RUN: ${{ inputs.dry_run || 'false' }}
         run: |
           node .agents/skills/pm-agent/scripts/run-pm-audit.mjs --max-new "${{ inputs.max_new || '2' }}"
