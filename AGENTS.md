@@ -29,3 +29,8 @@ Vendor-neutral skills in the open Agent Skills `SKILL.md` format. Read a skill's
 - **`ux-copy`**: use for every label, button, tooltip, error and empty state. Keep the HUD low-text and put explanations in `InfoTip`.
 - **`accessibility-review`**: run before marking any UI task `[DONE]` (WCAG 2.2 AA: contrast, keyboard, focus, non-color status cues). Fix critical and major findings first.
 - **`design-critique`**: run on the rendered app after UI changes to prioritize fixes.
+
+## 6. Agent Folders & Git Conventions
+- **`.agents/` is the only tracked agent folder.** Shared, vendor-neutral agent material (skills, prompts, playbooks) goes here so every AI tool and human uses the same files.
+- **Tool-specific folders are local-only and gitignored:** `.claude/`, `.cursor/`, `.codex/`, `.gemini/`. Never commit them, and never put shared conventions in them. Don't add tool-specific instruction files (e.g. `CLAUDE.md`); `AGENTS.md` is the single entry point.
+- **Isolated work goes in git worktrees.** A tool may create worktrees inside its ignored local folder (e.g. `.claude/worktrees/<name>`) or in a sibling folder outside the repo. Branch from the commit that contains the latest work, and claim the task in `specs/tasks.md` as usual.
