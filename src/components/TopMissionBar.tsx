@@ -106,18 +106,12 @@ export const TopMissionBar: React.FC = () => {
             </select>
           </label>
           <span
-            title={formatCommDelay(spaceLocation) === 'none' ? 'On-site medical consultation' : 'One-way signal delay to Earth'}
+            title="One-way signal delay to Earth"
             className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 font-mono text-[11px] text-amber-300"
           >
             <Radio className="h-3.5 w-3.5" aria-hidden="true" />
-            {formatCommDelay(spaceLocation) === 'none' ? (
-              <span>On-Site</span>
-            ) : (
-              <>
-                {formatCommDelay(spaceLocation)}
-                <span className="font-sans text-amber-200/80">to Earth</span>
-              </>
-            )}
+            {formatCommDelay(spaceLocation)}
+            <span className="font-sans text-amber-200/80">to Earth</span>
           </span>
         </div>
 

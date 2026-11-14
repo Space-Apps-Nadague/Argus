@@ -34,7 +34,7 @@ describe('comm delay', () => {
     expect(formatCommDelay(SPACE_LOCATIONS.mars_surface, NOW)).toMatch(/^\d+m \d{2}s$/);
     expect(formatCommDelay(SPACE_LOCATIONS.lunar_surface, NOW)).toMatch(/^1\.\d{2} s$/);
     expect(formatCommDelay(SPACE_LOCATIONS.leo, NOW)).toBe('240 ms');
-    expect(formatCommDelay(SPACE_LOCATIONS.earth_pre, NOW)).toBe('none');
+    expect(formatCommDelay(SPACE_LOCATIONS.earth_pre, NOW)).toBe('0.000 s');
   });
   it('marks Mars transit as an upper bound', () => {
     expect(commDelayAt(SPACE_LOCATIONS.mars_transit, NOW).upTo).toBe(true);

@@ -100,7 +100,7 @@ export const SPACE_LOCATION_ORDER: SpaceLocationId[] = [
   'earth_post',
 ];
 
-/** Matches the `0g_transit` threshold table and the 14m 22s delay in ENVIRONMENT_META. */
+/** Matches the `0g_transit` threshold table in ENVIRONMENT_META. */
 export const DEFAULT_SPACE_LOCATION: SpaceLocationId = 'mars_transit';
 
 /**
@@ -166,7 +166,7 @@ function formatDelaySeconds(sec: number): string {
 /** Human-readable live one-way comm delay, e.g. "none", "240 ms", "1.28 s", "12m 47s", "up to 12m 47s". */
 export function formatCommDelay(loc: SpaceLocation, date: Date = new Date()): string {
   const d = commDelayAt(loc, date);
-  if (d.seconds === 0) return 'none';
+  if (d.seconds === 0) return '0.000 s';
   return `${d.upTo ? 'up to ' : ''}${formatDelaySeconds(d.seconds)}`;
 }
 
@@ -213,4 +213,18 @@ export function locationClockLine(loc: SpaceLocation, date: Date): string | null
     default:
       return null;
   }
+}
+
+/** Representative location for each gravity environment (used where only the environment is known). */
+const ENVIRONMENT_REFERENCE_LOCATION: Record<GravityEnvironment, SpaceLocationId> = {
+  earth_1g: 'earth_pre',
+  iss_leo: 'leo',
+  lunar_base: 'lunar_surface',
+  '0g_transit': 'mars_transit',
+  mars_base: 'mars_surface',
+};
+
+/** Live one-way light time for an environment, e.g. `10m 58s`, `1.35 s`, `0.000 s`. */
+export function commDelayForEnvironment(env: GravityEnvironment, date: Date = new Date()): string {
+  return formatCommDelay(SPACE_LOCATIONS[ENVIRONMENT_REFERENCE_LOCATION[env] ?? 'mars_transit'], date);
 }

@@ -7,6 +7,7 @@
  * Never delegate threshold classification to an LLM.
  */
 
+import { commDelayForEnvironment } from '../data/spaceLocations';
 import {
   BodyZoneId,
   GravityEnvironment,
@@ -36,7 +37,7 @@ export const ENVIRONMENT_META: Record<
     label: string;
     shortLabel: string;
     gravityG: string;
-    commDelay: string;
+    readonly commDelay: string;
     missionPhase: string;
     hazardOverview: string;
   }
@@ -45,7 +46,9 @@ export const ENVIRONMENT_META: Record<
     label: 'ISS Low Earth Orbit',
     shortLabel: 'ISS (LEO)',
     gravityG: '0.00g',
-    commDelay: 'Real-time ONE-WAY',
+    get commDelay() {
+      return `${commDelayForEnvironment('iss_leo')} ONE-WAY`;
+    },
     missionPhase: 'EXPEDITION 72 // LEO STATION OPS',
     hazardOverview:
       'Microgravity produces cephalad fluid shifts without terrestrial hydrostatic pressure; partial geomagnetic shielding reduces radiation, with real-time ground tele-medical support.',
@@ -54,7 +57,9 @@ export const ENVIRONMENT_META: Record<
     label: 'Artemis Lunar Base (1/6g)',
     shortLabel: 'Lunar Base',
     gravityG: '0.16g',
-    commDelay: '1.3s ONE-WAY',
+    get commDelay() {
+      return `${commDelayForEnvironment('lunar_base')} ONE-WAY`;
+    },
     missionPhase: 'ARTEMIS BASE CAMP // SHACKLETON RIM',
     hazardOverview:
       'Partial lunar gravity (1/6g) reduces cephalad venous pooling and preserves partial skeletal load; abrasive surface regolith and high SPE radiation present operational challenges.',
@@ -63,7 +68,9 @@ export const ENVIRONMENT_META: Record<
     label: '0g Deep-Space Transit',
     shortLabel: '0g Transit',
     gravityG: '0.00g',
-    commDelay: '14m 22s ONE-WAY',
+    get commDelay() {
+      return `${commDelayForEnvironment('0g_transit')} ONE-WAY`;
+    },
     missionPhase: 'TRANS-MARS CRUISE // SOL 142',
     hazardOverview:
       'Microgravity induces cephalad fluid shift toward the head, increasing intracranial & optic nerve sheath pressure (SANS), accelerating bone mineral loss, and requiring closed-loop CO₂ scrubbing.',
@@ -72,7 +79,9 @@ export const ENVIRONMENT_META: Record<
     label: 'Mars Surface Base (3/8g)',
     shortLabel: 'Mars Base',
     gravityG: '0.38g',
-    commDelay: '18m 10s ONE-WAY',
+    get commDelay() {
+      return `${commDelayForEnvironment('mars_base')} ONE-WAY`;
+    },
     missionPhase: 'JEZERO CRATER HABITAT // SOL 204',
     hazardOverview:
       'Partial Martian gravity (3/8g) mitigates SANS risk and provides axial loading; substantial comm latency requires autonomous crew health surveillance and delayed tele-consultation.',
@@ -81,7 +90,9 @@ export const ENVIRONMENT_META: Record<
     label: 'Earth Surface (1.00g)',
     shortLabel: 'Earth (1.00g)',
     gravityG: '1.00g',
-    commDelay: 'On-Site',
+    get commDelay() {
+      return `${commDelayForEnvironment('earth_1g')} ONE-WAY`;
+    },
     missionPhase: 'PRE/POST-FLIGHT BASELINE // TERRESTRIAL',
     hazardOverview:
       'Terrestrial 1.00g gravity provides normal hydrostatic pressure gradients and musculoskeletal loading, eliminating cephalad fluid shifts and microgravity bone deconditioning.',

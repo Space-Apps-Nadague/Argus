@@ -17,6 +17,7 @@ import {
   VitalSignReading,
   VisualExamSample,
 } from '../types/argus';
+import { commDelayForEnvironment } from './spaceLocations';
 import { evaluateZoneStatus } from '../utils/triageEngine';
 import { matchOfflineSymptomGuidance } from '../utils/symptomFallback';
 
@@ -1079,13 +1080,13 @@ export function getOfflineFlightSurgeonGuidance(
 
   const envContextMap: Record<GravityEnvironment, string> = {
     '0g_transit':
-      'In 0g Deep-Space Transit (14m 22s one-way Earth comm delay), complete weightlessness drives ~2 liters of venous fluid headward while unloading skeletal structures.',
+      `In 0g Deep-Space Transit (${commDelayForEnvironment('0g_transit')} one-way Earth comm delay), complete weightlessness drives ~2 liters of venous fluid headward while unloading skeletal structures.`,
     'iss_leo':
       'Aboard the ISS in Low Earth Orbit (real-time comm link to Mission Control), microgravity produces cephalad fluid shifts while Earth magnetosphere offers partial radiation shielding.',
     'lunar_base':
-      'At the Artemis Lunar Base (1/6g partial gravity, 1.3s one-way Earth comm delay), partial weight-bearing mitigates fluid shift while lunar regolith and surface radiation pose unique operational hazards.',
+      `At the Artemis Lunar Base (1/6g partial gravity, ${commDelayForEnvironment('lunar_base')} one-way Earth comm delay), partial weight-bearing mitigates fluid shift while lunar regolith and surface radiation pose unique operational hazards.`,
     'mars_base':
-      'At Mars Surface Base (3/8g partial gravity, 18m 10s one-way Earth comm delay), substantial communications latency necessitates autonomous crew clinical protocols.',
+      `At Mars Surface Base (3/8g partial gravity, ${commDelayForEnvironment('mars_base')} one-way Earth comm delay), substantial communications latency necessitates autonomous crew clinical protocols.`,
     'earth_1g':
       'On Earth (1.00g terrestrial gravity, on-site real-time medical support), full hydrostatic pressure gradients and standard clinical baselines apply for pre-flight qualification and post-flight rehabilitation.',
   };

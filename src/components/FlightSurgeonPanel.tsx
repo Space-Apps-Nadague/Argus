@@ -29,6 +29,7 @@ import {
 import { useMission } from '../context/MissionContext';
 import { VISUAL_EXAM_SAMPLES } from '../data/telemetryScenarios';
 import { ENVIRONMENT_META } from '../utils/triageEngine';
+import { formatCommDelay } from '../data/spaceLocations';
 import { InfoTip } from './InfoTip';
 import { Card } from './ui/Card';
 import { StatusPill } from './ui/StatusPill';
@@ -68,6 +69,7 @@ export const FlightSurgeonPanel: React.FC = () => {
     crewSymptoms,
     setCrewSymptoms,
     consultFlightSurgeon,
+    spaceLocation,
   } = useMission();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -573,7 +575,7 @@ export const FlightSurgeonPanel: React.FC = () => {
             <InfoTip label={environment === 'earth_1g' ? 'About clinical consults' : 'About Earth packets'} align="right">
               {environment === 'earth_1g'
                 ? 'Bundles readiness, zone status, completed steps, the latest visual exam, recent check-ins, and editable crew clinical notes for the on-site flight surgeon.'
-                : `Bundles readiness, zone status, completed steps, the latest visual exam, recent check-ins, and editable crew clinical notes for the ground flight surgeon. One-way delay: ${envMeta.commDelay.replace(' ONE-WAY', '')}.`}
+                : `Bundles readiness, zone status, completed steps, the latest visual exam, recent check-ins, and editable crew clinical notes for the ground flight surgeon. One-way delay: ${formatCommDelay(spaceLocation)}.`}
             </InfoTip>
           }
           bodyClassName="px-4 pb-4 space-y-3"

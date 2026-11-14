@@ -51,6 +51,8 @@ export interface CompanionBrainContext {
   streakDays?: number;
   metricLinks?: MetricLink[];
   guidance?: FlightSurgeonGuidance;
+  /** Live one-way light time to Earth, e.g. `10m 58s`. Falls back to the environment default. */
+  commDelay?: string;
 }
 
 export interface CompanionReplyResult {
@@ -392,6 +394,7 @@ export function generateOfflineCompanionReply(
   const name = context.crewMember?.name ?? callsign;
   const intent = determineCompanionIntent(text);
   const envMeta = ENVIRONMENT_META[context.environment];
+  const commDelay = context.commDelay ?? envMeta.commDelay.replace(' ONE-WAY', '');
   const isHebrew = HEB_REGEX.test(text);
   const hebNote = isHebrew
     ? '\n\n*(Recognized Hebrew terms; replies provided in English per mission flight protocol.)*'
@@ -410,7 +413,7 @@ export function generateOfflineCompanionReply(
       reply += `IMMEDIATE ACTION PROTOCOL:\n`;
       reply += `1. Inform the Crew Medical Officer or Flight Commander right now.\n`;
       reply += `2. A private high-priority tele-mental health packet has been flagged for ground support.\n`;
-      reply += `3. One-way signal delay to Earth is currently ${envMeta.commDelay.replace(' ONE-WAY', '')}. Stay with a crewmate while the channel establishes.\n`;
+      reply += `3. One-way signal delay to Earth is currently ${commDelay}. Stay with a crewmate while the channel establishes.\n`;
       reply += `4. I am staying online with you right here.`;
     } else {
       reply += `IMMEDIATE MEDICAL ACTION REQUIRED:\n`;
@@ -418,7 +421,7 @@ export function generateOfflineCompanionReply(
       reply += `2. **Alert your nearest crewmate or the Crew Medical Officer** right now.\n`;
       reply += `3. **Check primary vitals**: attach the pulse oximeter (SpO₂ & heart rate) and measure blood pressure.\n`;
       reply += `4. **Verify habitat atmosphere**: check cabin O₂ and CO₂ partial pressures.\n`;
-      reply += `5. **Dispatch Emergency Packet**: Ground comm delay is ${envMeta.commDelay.replace(' ONE-WAY', '')}. Queue an Emergency Telemetry Packet immediately so Earth Flight Surgeons receive complete waveforms.\n\n`;
+      reply += `5. **Dispatch Emergency Packet**: Ground comm delay is ${commDelay}. Queue an Emergency Telemetry Packet immediately so Earth Flight Surgeons receive complete waveforms.\n\n`;
       reply += `*ARGUS is an autonomous decision-support tool, not a physician. Do not delay notifying your crew.*`;
     }
 
@@ -626,7 +629,7 @@ export function generateOfflineCompanionReply(
     let reply = `Good sol, ${callsign}. Here is your readiness and biological status summary:\n\n`;
     reply += `• **Readiness Score**: **${score}%** (${score >= 85 ? 'NOMINAL' : score >= 70 ? 'CAUTION' : 'ALERT'})\n`;
     reply += `• **Location**: ${envMeta.label} (${envMeta.gravityG})\n`;
-    reply += `• **Earth Comm Delay**: ${envMeta.commDelay.replace(' ONE-WAY', '')} one-way\n`;
+    reply += `• **Earth Comm Delay**: ${commDelay} one-way\n`;
     if (context.streakDays !== undefined) {
       reply += `• **Check-in Streak**: ${context.streakDays} sol${context.streakDays === 1 ? '' : 's'}\n`;
     }
@@ -690,7 +693,7 @@ export function generateOfflineCompanionReply(
   // 9. FALLBACK CATCH-ALL
   // ──────────────────────────────────────────────────────────────────────────
   let fallbackReply = `Understood, ${callsign}. I did not match that to a specific clinical protocol, but here is your current stance:\n\n`;
-  fallbackReply += `• Readiness stands at **${context.readinessScore}%** in ${envMeta.shortLabel} (${envMeta.commDelay.replace(' ONE-WAY', '')} to Earth).\n`;
+  fallbackReply += `• Readiness stands at **${context.readinessScore}%** in ${envMeta.shortLabel} (${commDelay} to Earth).\n`;
 
   const yellowOrRed = (Object.keys(context.zoneStatuses) as BodyZoneId[]).find(
     (z) => context.zoneStatuses[z] !== 'green'
