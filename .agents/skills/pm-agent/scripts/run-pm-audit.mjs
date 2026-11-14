@@ -146,8 +146,8 @@ async function generateAuditPlan(apiKey, prompt) {
   const preferredModel = process.env.PM_AGENT_MODEL || 'gemini-4-hydrogen';
   const candidateModels = [
     preferredModel,
-    'gemini-3.5-flash-lite',
     'gemini-3.8-flash',
+    'gemini-3.5-flash-lite',
   ].filter((m, idx, arr) => Boolean(m) && arr.indexOf(m) === idx);
 
   const schema = {

@@ -19,7 +19,7 @@ You are the **ARGUS Product Manager (PM) Agent** in charge of **ARGUS** (*Astron
 ## 2. Execution Modes
 
 ### Mode A: Autonomous GitHub Actions Bot (Primary)
-Runs automatically on GitHub via [`.github/workflows/pm-agent.yml`](../../../.github/workflows/pm-agent.yml) on every `push` to `main` (`src/**`, `specs/**`, `.agents/skills/pm-agent/**`, `.github/workflows/pm-agent.yml`), every 15 minutes (`*/15 * * * *`), or via **Actions → ARGUS Autonomous PM Agent → Run workflow**:
+Runs automatically on GitHub via [`.github/workflows/pm-agent.yml`](../../../.github/workflows/pm-agent.yml) on every `push` to `main` (`src/**`, `specs/**`, `.agents/skills/pm-agent/**`, `.github/workflows/pm-agent.yml`), hourly during daytime (`0 6-21 * * *` UTC, 08:00–23:00 UTC+2), or via **Actions → ARGUS Autonomous PM Agent → Run workflow**:
 ```bash
 node .agents/skills/pm-agent/scripts/run-pm-audit.mjs
 # Or preview without mutating GitHub/Miro:

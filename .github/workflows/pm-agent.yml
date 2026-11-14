@@ -10,8 +10,8 @@ on:
       - '.agents/skills/pm-agent/**'
       - '.github/workflows/pm-agent.yml'
   schedule:
-    # Runs every 15 minutes during the hackathon
-    - cron: '*/15 * * * *'
+    # Runs hourly during daytime (08:00–23:00 UTC+2 / 06:00–21:00 UTC), skipping night hours
+    - cron: '0 6-21 * * *'
   workflow_dispatch:
     inputs:
       dry_run:
