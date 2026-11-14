@@ -207,3 +207,12 @@
   - `.agents/skills/pm-agent/scripts/run-pm-audit.mjs`
   - `.agents/skills/pm-agent/SKILL.md`
   - `specs/tasks.md`
+
+### Task 17: Active Open Issue Lifecycle Management (Comment, Ping, Re-Label & Re-Prioritize)
+- **Status:** `[DONE]`
+- **Spec References:** `specs/00-architecture.md`, `specs/03-requirements.md`
+- **Files Owned:**
+  - `.agents/skills/pm-agent/scripts/gh-pm-issue.mjs`
+  - `.agents/skills/pm-agent/scripts/run-pm-audit.mjs`
+  - `.agents/skills/pm-agent/SKILL.md`
+  - `specs/tasks.md`
