@@ -15,10 +15,13 @@ import {
   AnatomicalLayer,
   BiologicalSex,
   BodyZoneId,
+  CheckInEntry,
   CrewMemberProfile,
   EarthTelemetryPacket,
   FlightSurgeonGuidance,
   GravityEnvironment,
+  HudTabId,
+  MetricLink,
   ScenarioId,
   TriageStatus,
   VitalSignReading,
@@ -37,11 +40,74 @@ import {
   evaluateAllZones,
 } from '../utils/triageEngine';
 import {
+  applyCheckIns,
+  CHECKINS_STORAGE_KEY,
+  checkInStreak,
+  latestMissionDay,
+} from '../utils/checkIns';
+import { findMetricLinks } from '../utils/driftAnalytics';
+import {
   analyzeVisualSelfExam,
   synthesizeFlightSurgeonGuidance,
 } from '../services/flightSurgeonAi';
 
 const CREW_STORAGE_KEY = 'argus_crew_roster_v1';
+const GUIDANCE_SCENARIO_ORDER: ScenarioId[] = ['nominal', 'sans_alert', 'high_co2', 'solar_storm'];
+
+/**
+ * Keeps Flight Surgeon guidance consistent with the live (check-in overlaid) zone status.
+ * specs/01-data-schema.md §6 "Flight Surgeon guidance follows live status".
+ */
+export function resolveLiveGuidance(
+  guidance: FlightSurgeonGuidance,
+  liveStatus: TriageStatus,
+  environment: GravityEnvironment,
+  crewMember: CrewMemberProfile
+): FlightSurgeonGuidance {
+  if (guidance.source === 'live_ai' || guidance.triageStatus === liveStatus) return guidance;
+  for (const sc of GUIDANCE_SCENARIO_ORDER) {
+    const g = getOfflineFlightSurgeonGuidance(sc, guidance.zoneId, environment, crewMember);
+    if (g.triageStatus === liveStatus) return { ...g, scenarioId: guidance.scenarioId };
+  }
+  return {
+    ...guidance,
+    triageStatus: liveStatus,
+    earthConsultUrgency:
+      liveStatus === 'red'
+        ? 'immediate_emergency_packet'
+        : liveStatus === 'yellow'
+        ? 'priority_packet'
+        : guidance.earthConsultUrgency,
+    headline: `Check-in out of range — ${guidance.headline}`,
+  };
+}
+const TAB_STORAGE_KEY = 'argus_active_tab_v1';
+const HUD_TABS: HudTabId[] = ['biotwin', 'trends', 'checkin', 'surgeon', 'crew'];
+
+function loadInitialTab(): HudTabId {
+  try {
+    const raw = localStorage.getItem(TAB_STORAGE_KEY) as HudTabId | null;
+    if (raw && HUD_TABS.includes(raw)) return raw;
+  } catch {
+    // Ignore storage errors in restricted environments
+  }
+  return 'biotwin';
+}
+
+function loadInitialCheckIns(): Record<string, CheckInEntry[]> {
+  try {
+    const raw = localStorage.getItem(CHECKINS_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, CheckInEntry[]>;
+      }
+    }
+  } catch {
+    // Ignore storage errors in restricted environments
+  }
+  return {};
+}
 
 function loadInitialCrewRoster(): CrewMemberProfile[] {
   try {
@@ -85,6 +151,8 @@ interface MissionState {
   isAnalyzingVisual: boolean;
   queuedPackets: EarthTelemetryPacket[];
   runtimeApiKey: string;
+  activeTab: HudTabId;
+  checkIns: Record<string, CheckInEntry[]>;
 }
 
 type MissionAction =
@@ -107,7 +175,10 @@ type MissionAction =
     }
   | { type: 'SET_ANALYZING_VISUAL'; payload: boolean }
   | { type: 'QUEUE_EARTH_PACKET'; payload: EarthTelemetryPacket }
-  | { type: 'SET_RUNTIME_API_KEY'; payload: string };
+  | { type: 'SET_RUNTIME_API_KEY'; payload: string }
+  | { type: 'SET_ACTIVE_TAB'; payload: HudTabId }
+  | { type: 'ADD_CHECK_IN'; payload: CheckInEntry }
+  | { type: 'DELETE_CHECK_IN'; payload: { crewId: string; entryId: string } };
 
 const initialRoster = loadInitialCrewRoster();
 const initialCrew = initialRoster[0] || DEFAULT_CREW_ROSTER[0];
@@ -141,6 +212,8 @@ const initialState: MissionState = {
   isAnalyzingVisual: false,
   queuedPackets: [],
   runtimeApiKey: '',
+  activeTab: loadInitialTab(),
+  checkIns: loadInitialCheckIns(),
 };
 
 function missionReducer(
@@ -212,6 +285,11 @@ function missionReducer(
         (c) => c.id !== action.payload || !c.isCustom
       );
       if (filtered.length === 0) return state;
+      const deletedIsCustom = state.crewRoster.some(
+        (c) => c.id === action.payload && c.isCustom
+      );
+      const nextCheckIns = { ...state.checkIns };
+      if (deletedIsCustom) delete nextCheckIns[action.payload];
       const nextActiveCrew =
         state.activeCrewId === action.payload
           ? filtered[0]
@@ -221,6 +299,7 @@ function missionReducer(
       return {
         ...state,
         crewRoster: filtered,
+        checkIns: nextCheckIns,
         activeCrewId: nextActiveCrew.id,
         scenarioId: nextScenario,
         selectedZone: nextZone,
@@ -332,6 +411,33 @@ function missionReducer(
         ...state,
         runtimeApiKey: action.payload,
       };
+    case 'SET_ACTIVE_TAB':
+      return {
+        ...state,
+        activeTab: action.payload,
+      };
+    case 'ADD_CHECK_IN': {
+      const list = state.checkIns[action.payload.crewId] || [];
+      return {
+        ...state,
+        checkIns: {
+          ...state.checkIns,
+          [action.payload.crewId]: [...list, action.payload],
+        },
+      };
+    }
+    case 'DELETE_CHECK_IN': {
+      const list = state.checkIns[action.payload.crewId] || [];
+      return {
+        ...state,
+        checkIns: {
+          ...state.checkIns,
+          [action.payload.crewId]: list.filter(
+            (e) => e.id !== action.payload.entryId
+          ),
+        },
+      };
+    }
     default:
       return state;
   }
@@ -339,6 +445,15 @@ function missionReducer(
 
 interface MissionContextValue extends MissionState {
   activeCrewMember: CrewMemberProfile;
+  /** Crew-adjusted zones with check-ins overlaid (single source for all tabs). */
+  zones: Record<BodyZoneId, VitalSignReading[]>;
+  activeCheckIns: CheckInEntry[];
+  checkInStreakDays: number;
+  latestDay: number;
+  metricLinks: MetricLink[];
+  setActiveTab: (tab: HudTabId) => void;
+  addCheckIn: (entry: CheckInEntry) => void;
+  deleteCheckIn: (entryId: string) => void;
   zoneStatuses: Record<BodyZoneId, TriageStatus>;
   currentZoneReadings: VitalSignReading[];
   readinessScore: number;
@@ -378,6 +493,22 @@ export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, [state.crewRoster]);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(CHECKINS_STORAGE_KEY, JSON.stringify(state.checkIns));
+    } catch {
+      // Ignore storage errors
+    }
+  }, [state.checkIns]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(TAB_STORAGE_KEY, state.activeTab);
+    } catch {
+      // Ignore storage errors
+    }
+  }, [state.activeTab]);
+
   const activeCrewMember = useMemo(
     () =>
       state.crewRoster.find((c) => c.id === state.activeCrewId) ||
@@ -385,10 +516,28 @@ export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({
     [state.crewRoster, state.activeCrewId]
   );
 
-  const adjustedZones = useMemo(
-    () => getCrewAdjustedZones(state.scenarioId, activeCrewMember),
-    [state.scenarioId, activeCrewMember]
+  const activeCheckIns = useMemo(
+    () => state.checkIns[activeCrewMember.id] || [],
+    [state.checkIns, activeCrewMember.id]
   );
+
+  const adjustedZones = useMemo(
+    () =>
+      applyCheckIns(
+        getCrewAdjustedZones(state.scenarioId, activeCrewMember),
+        activeCheckIns
+      ),
+    [state.scenarioId, activeCrewMember, activeCheckIns]
+  );
+
+  const checkInStreakDays = useMemo(
+    () => checkInStreak(activeCheckIns),
+    [activeCheckIns]
+  );
+
+  const latestDay = useMemo(() => latestMissionDay(adjustedZones), [adjustedZones]);
+
+  const metricLinks = useMemo(() => findMetricLinks(adjustedZones), [adjustedZones]);
 
   const zoneStatuses = useMemo(
     () => evaluateAllZones(adjustedZones, state.environment),
@@ -398,6 +547,17 @@ export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({
   const currentZoneReadings = useMemo(
     () => adjustedZones[state.selectedZone],
     [adjustedZones, state.selectedZone]
+  );
+
+  const liveGuidance = useMemo(
+    () =>
+      resolveLiveGuidance(
+        state.guidance,
+        zoneStatuses[state.guidance.zoneId],
+        state.environment,
+        activeCrewMember
+      ),
+    [state.guidance, zoneStatuses, state.environment, activeCrewMember]
   );
 
   const readinessScore = useMemo(
@@ -469,6 +629,24 @@ export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({
   const setRuntimeApiKey = useCallback((key: string) => {
     dispatch({ type: 'SET_RUNTIME_API_KEY', payload: key });
   }, []);
+
+  const setActiveTab = useCallback((tab: HudTabId) => {
+    dispatch({ type: 'SET_ACTIVE_TAB', payload: tab });
+  }, []);
+
+  const addCheckIn = useCallback((entry: CheckInEntry) => {
+    dispatch({ type: 'ADD_CHECK_IN', payload: entry });
+  }, []);
+
+  const deleteCheckIn = useCallback(
+    (entryId: string) => {
+      dispatch({
+        type: 'DELETE_CHECK_IN',
+        payload: { crewId: activeCrewMember.id, entryId },
+      });
+    },
+    [activeCrewMember.id]
+  );
 
   const requestLiveAiGuidance = useCallback(async () => {
     dispatch({ type: 'SET_SYNTHESIZING_AI', payload: true });
@@ -583,6 +761,9 @@ export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({
         zoneStatuses,
         completedSteps: state.completedStepIds,
         visualExamAttached: state.visualExamAnalysis,
+        recentCheckIns: [...activeCheckIns]
+          .sort((a, b) => b.timestampIso.localeCompare(a.timestampIso))
+          .slice(0, 5),
         crewNotes,
       };
       dispatch({ type: 'QUEUE_EARTH_PACKET', payload: packet });
@@ -597,6 +778,7 @@ export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({
       zoneStatuses,
       state.completedStepIds,
       state.visualExamAnalysis,
+      activeCheckIns,
     ]
   );
 
@@ -615,7 +797,16 @@ export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({
   const value = useMemo<MissionContextValue>(
     () => ({
       ...state,
+      guidance: liveGuidance,
       activeCrewMember,
+      zones: adjustedZones,
+      activeCheckIns,
+      checkInStreakDays,
+      latestDay,
+      metricLinks,
+      setActiveTab,
+      addCheckIn,
+      deleteCheckIn,
       zoneStatuses,
       currentZoneReadings,
       readinessScore,
@@ -639,7 +830,16 @@ export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({
     }),
     [
       state,
+      liveGuidance,
       activeCrewMember,
+      adjustedZones,
+      activeCheckIns,
+      checkInStreakDays,
+      latestDay,
+      metricLinks,
+      setActiveTab,
+      addCheckIn,
+      deleteCheckIn,
       zoneStatuses,
       currentZoneReadings,
       readinessScore,

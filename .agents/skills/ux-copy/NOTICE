@@ -1,0 +1,10 @@
+This skill is a modified, vendor-neutral adaptation of:
+  https://github.com/anthropics/knowledge-work-plugins (design/skills/ux-copy/SKILL.md)
+Copyright Anthropic, PBC. Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Changes (2026-11-14, ARGUS project):
+- Removed tool- and vendor-specific instructions (slash-command usage, connector/MCP sections,
+  design-tool integrations, assistant-specific wording) so any coding agent or human can follow it.
+- Rewritten into the open Agent Skills SKILL.md format (name + description frontmatter only).
+- Edited and extended content (e.g. WCAG 2.1 -> 2.2 AA, ARIA widget patterns, text-reduction guidance,
+  merge checklists).

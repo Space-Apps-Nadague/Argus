@@ -1,33 +1,38 @@
 /**
- * ARGUS — Autonomous Flight Surgeon Guidance, Self-Exam Checklist & Multimodal Triage Panel
- * Single Source of Truth: specs/02-ui-dashboard.md (§1 Right Column — 30%)
+ * ARGUS — Flight Surgeon tab (specs/02-ui-dashboard.md §2.4)
+ * Hazard context + guided checklist (left) · visual self-exam + Earth packet (right).
+ * Long explanations live behind ⓘ / "More" to keep the HUD low-text.
  */
 
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Camera,
   CheckCircle2,
+  ChevronDown,
   Circle,
   Clock,
   Download,
-  Eye,
   FileCheck2,
+  ListChecks,
   RefreshCw,
   Send,
   ShieldAlert,
-  Sparkles,
-  Stethoscope,
   Upload,
   Wrench,
   X,
 } from 'lucide-react';
 import { useMission } from '../context/MissionContext';
 import { VISUAL_EXAM_SAMPLES } from '../data/telemetryScenarios';
-import {
-  ENVIRONMENT_META,
-  STATUS_COLORS,
-  STATUS_LABELS,
-} from '../utils/triageEngine';
+import { ENVIRONMENT_META } from '../utils/triageEngine';
+import { InfoTip } from './InfoTip';
+import { Card } from './ui/Card';
+import { StatusPill } from './ui/StatusPill';
+
+const URGENCY_LABEL = {
+  routine_downlink: 'Routine downlink',
+  priority_packet: 'Priority packet',
+  immediate_emergency_packet: 'Send now',
+} as const;
 
 export const FlightSurgeonPanel: React.FC = () => {
   const {
@@ -45,16 +50,22 @@ export const FlightSurgeonPanel: React.FC = () => {
     clearVisualExam,
     queuedPackets,
     queueEarthPacket,
+    activeCheckIns,
   } = useMission();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [packetConfirmation, setPacketConfirmation] = useState<string | null>(
-    null
-  );
+  const [packetConfirmation, setPacketConfirmation] = useState<string | null>(null);
   const [showPacketModal, setShowPacketModal] = useState(false);
-
+  const [openStep, setOpenStep] = useState<string | null>(null);
+  const [showMore, setShowMore] = useState(false);
   const envMeta = ENVIRONMENT_META[environment];
-  const statusColor = STATUS_COLORS[guidance.triageStatus];
+
+  useEffect(() => {
+    if (!showPacketModal) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setShowPacketModal(false);
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [showPacketModal]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -66,19 +77,15 @@ export const FlightSurgeonPanel: React.FC = () => {
 
   const handleQueuePacket = () => {
     const pkt = queueEarthPacket(
-      `Autonomous ARGUS triage packet (${guidance.headline}) — ${completedStepIds.length}/${guidance.guidedSteps.length} countermeasures logged.`
+      `ARGUS triage packet (${guidance.headline}) — ${completedStepIds.length}/${guidance.guidedSteps.length} countermeasures logged.`
     );
-    setPacketConfirmation(
-      `Packet ${pkt.packetId} queued for Deep Space Network uplink (ETA ${pkt.commDelayLabel})`
-    );
+    setPacketConfirmation(`${pkt.packetId} queued · arrives in ${pkt.commDelayLabel.replace(' ONE-WAY', '')}`);
   };
 
   const handleDownloadLatestPacket = () => {
-    if (queuedPackets.length === 0) return;
+    if (!queuedPackets.length) return;
     const latest = queuedPackets[0];
-    const blob = new Blob([JSON.stringify(latest, null, 2)], {
-      type: 'application/json',
-    });
+    const blob = new Blob([JSON.stringify(latest, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -87,365 +94,282 @@ export const FlightSurgeonPanel: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
+  const done = completedStepIds.length;
+  const total = guidance.guidedSteps.length;
+
   return (
-    <section
-      aria-label="Autonomous Flight Surgeon Guidance and Visual Self-Exam"
-      className="flex flex-col h-full bg-slate-900/60 border border-cyan-500/20 rounded-xl overflow-hidden shadow-[0_0_30px_rgba(2,6,23,0.8)]"
-    >
-      {/* Top Panel Header */}
-      <div className="px-4 py-2.5 border-b border-slate-800/90 bg-slate-950/60 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <Stethoscope className="w-4 h-4 text-cyan-400" />
-          <div>
-            <h2 className="font-mono text-xs font-bold uppercase tracking-wider text-slate-100">
-              Autonomous Flight Surgeon
-            </h2>
-            <p className="text-[11px] text-slate-400">
-              Plain-language crew guidance &amp; multimodal self-exam
-            </p>
-          </div>
-        </div>
-
-        {/* AI Source Badge + Live Clinical AI Refresh Button */}
-        <div className="flex items-center gap-1.5">
-          <span
-            className={`px-2 py-0.5 rounded text-[10px] font-mono font-semibold border ${
-              guidance.source === 'live_ai'
-                ? 'bg-cyan-500/15 text-cyan-300 border-cyan-400/50'
-                : 'bg-slate-900 text-slate-300 border-slate-700'
-            }`}
-          >
-            {guidance.source === 'live_ai'
-              ? 'LIVE CLINICAL AI'
-              : 'OFFLINE HRP CACHE'}
-          </span>
-          <button
-            type="button"
-            onClick={requestLiveAiGuidance}
-            disabled={isSynthesizingAi}
-            title="Synthesize or refresh guidance via Live Clinical AI"
-            className="p-1.5 rounded bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-400/40 transition-colors disabled:opacity-50"
-          >
-            <RefreshCw
-              className={`w-3.5 h-3.5 ${isSynthesizingAi ? 'animate-spin' : ''}`}
-            />
-          </button>
-        </div>
-      </div>
-
-      {/* Scrollable Clinical Content Area */}
-      <div className="flex-1 overflow-y-auto p-3.5 space-y-3.5">
-        {/* 1. Spaceflight Hazard Context Card */}
-        <div
-          className="p-3 rounded-xl border bg-slate-950/80"
-          style={{ borderColor: `${statusColor}55` }}
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+      {/* LEFT: context + checklist */}
+      <div className="flex flex-col gap-4">
+        <Card
+          icon={<ShieldAlert className="h-4 w-4" />}
+          title="Situation"
+          actions={
+            <>
+              <span
+                className={`rounded-full border px-2 py-0.5 text-[11px] ${
+                  guidance.source === 'live_ai' ? 'border-hud-accent/50 text-hud-accent' : 'border-hud-line text-hud-muted'
+                }`}
+              >
+                {guidance.source === 'live_ai' ? 'Live AI' : 'Offline protocol'}
+              </span>
+              <button
+                type="button"
+                onClick={requestLiveAiGuidance}
+                disabled={isSynthesizingAi}
+                aria-label="Refresh guidance with Clinical AI"
+                title="Refresh with Clinical AI (needs key)"
+                className="hud-focus rounded-lg border border-hud-line p-1.5 text-hud-muted hover:text-hud-accent disabled:opacity-50"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${isSynthesizingAi ? 'animate-spin' : ''}`} />
+              </button>
+            </>
+          }
+          bodyClassName="px-4 pb-4 space-y-3"
         >
-          <div className="flex items-center justify-between gap-2 mb-1.5">
-            <span className="font-mono text-[11px] font-bold uppercase tracking-wider text-cyan-300 flex items-center gap-1.5">
-              <ShieldAlert className="w-3.5 h-3.5" style={{ color: statusColor }} />
-              Spaceflight Hazard Context ({envMeta.shortLabel})
-            </span>
-            <span
-              className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase"
-              style={{
-                backgroundColor: `${statusColor}20`,
-                color: statusColor,
-              }}
-            >
-              {STATUS_LABELS[guidance.triageStatus]}
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusPill status={guidance.triageStatus} size="md" />
+            <span className="rounded-full border border-hud-line px-2.5 py-1 text-xs text-hud-muted">
+              {URGENCY_LABEL[guidance.earthConsultUrgency]}
             </span>
           </div>
-
-          <h3 className="font-mono text-xs font-bold text-slate-100 mb-1.5">
-            {guidance.headline}
-          </h3>
-
-          <p className="text-xs text-slate-300 leading-relaxed mb-2">
-            {guidance.plainLanguageExplanation}
-          </p>
-
-          <div className="p-2 rounded-lg bg-slate-900/90 border border-slate-800 text-[11px] text-slate-400 leading-relaxed">
-            <span className="font-mono text-cyan-400 font-semibold">
-              NASA HRP Mechanism:{' '}
-            </span>
-            {guidance.hazardContextSummary}
-          </div>
-        </div>
-
-        {/* 2. Numbered Guided Self-Assessment & Countermeasures Checklist */}
-        <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/90">
-          <div className="flex items-center justify-between mb-2.5">
-            <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-slate-100 flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-              Guided Self-Assessment &amp; Countermeasures
-            </h3>
-            <span className="font-mono text-[11px] text-cyan-400">
-              {completedStepIds.length}/{guidance.guidedSteps.length} DONE
-            </span>
-          </div>
-
-          <div className="space-y-2">
-            {guidance.guidedSteps.map((step) => {
-              const isDone = completedStepIds.includes(step.id);
-              return (
-                <div
-                  key={step.id}
-                  onClick={() => toggleStepCompleted(step.id)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      toggleStepCompleted(step.id);
-                    }
-                  }}
-                  className={`p-2.5 rounded-lg border transition-all cursor-pointer ${
-                    isDone
-                      ? 'bg-emerald-950/25 border-emerald-500/40 text-slate-300'
-                      : 'bg-slate-900/80 border-slate-800 hover:border-cyan-500/40'
-                  }`}
-                >
-                  <div className="flex items-start gap-2.5">
-                    <div className="mt-0.5 shrink-0">
-                      {isDone ? (
-                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                      ) : (
-                        <Circle className="w-4 h-4 text-cyan-400/70" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <span
-                          className={`font-mono text-xs font-bold ${
-                            isDone
-                              ? 'line-through text-emerald-300/80'
-                              : 'text-slate-100'
-                          }`}
-                        >
-                          {step.stepNumber}. {step.title}
-                        </span>
-                        <span className="inline-flex items-center gap-1 font-mono text-[10px] text-slate-400 shrink-0">
-                          <Clock className="w-3 h-3 text-cyan-400" />
-                          {step.estimatedMinutes}m
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-300 mt-1 leading-relaxed">
-                        {step.plainInstruction}
-                      </p>
-                      <div className="mt-1.5 flex items-center gap-1.5 text-[10px] font-mono text-cyan-300/90">
-                        <Wrench className="w-3 h-3" />
-                        <span>Hardware: {step.hardwareRequired}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* 3. Visual Self-Exam Input: 1-Click Sample Test Images + Webcam/File Upload */}
-        <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/90">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="font-mono text-xs font-bold uppercase tracking-wider text-slate-100 flex items-center gap-1.5">
-              <Camera className="w-3.5 h-3.5 text-cyan-400" />
-              Visual Self-Exam Input
-            </h3>
+          <h3 className="text-base font-semibold leading-snug text-hud-text">{guidance.headline}</h3>
+          <div>
             <button
               type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="px-2 py-1 rounded bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-400/40 font-mono text-[10px] text-cyan-300 flex items-center gap-1 transition-colors"
+              onClick={() => setShowMore((v) => !v)}
+              aria-expanded={showMore}
+              className="hud-focus inline-flex items-center gap-1 rounded text-xs text-hud-accent"
             >
-              <Upload className="w-3 h-3" />
-              <span>Upload / Webcam</span>
+              {showMore ? 'Less' : 'What this means'}
+              <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showMore ? 'rotate-180' : ''}`} aria-hidden="true" />
             </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              onChange={handleFileChange}
-              className="hidden"
-            />
+            {showMore && (
+              <div className="mt-2 space-y-2 text-sm leading-relaxed text-hud-text/90">
+                <p>{guidance.plainLanguageExplanation}</p>
+                <p className="flex items-start gap-1.5 text-xs text-hud-muted">
+                  <span className="shrink-0 font-medium text-hud-accent">{envMeta.shortLabel} mechanism</span>
+                  {guidance.hazardContextSummary}
+                </p>
+              </div>
+            )}
           </div>
+        </Card>
 
-          <p className="text-[11px] text-slate-400 mb-2">
-            Select a 1-click onboard diagnostic sample or upload a custom scan:
-          </p>
+        <Card
+          icon={<ListChecks className="h-4 w-4" />}
+          title="Steps"
+          actions={
+            <span className="font-mono text-xs text-hud-muted" aria-label={`${done} of ${total} steps done`}>
+              {done}/{total}
+            </span>
+          }
+          bodyClassName="px-4 pb-4"
+        >
+          <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-hud-line" aria-hidden="true">
+            <div className="h-full rounded-full bg-status-green transition-all" style={{ width: `${total ? (done / total) * 100 : 0}%` }} />
+          </div>
+          <ol className="space-y-2">
+            {guidance.guidedSteps.map((step) => {
+              const isDone = completedStepIds.includes(step.id);
+              const open = openStep === step.id;
+              return (
+                <li key={step.id} className={`rounded-lg border ${isDone ? 'border-status-green/40 bg-status-green/5' : 'border-hud-line bg-hud-bg/50'}`}>
+                  <div className="flex items-center gap-2 px-2 py-1.5">
+                    <button
+                      type="button"
+                      role="checkbox"
+                      aria-checked={isDone}
+                      aria-label={`${step.title}: mark ${isDone ? 'not done' : 'done'}`}
+                      onClick={() => toggleStepCompleted(step.id)}
+                      className="hud-focus rounded-full p-1"
+                    >
+                      {isDone ? (
+                        <CheckCircle2 className="h-5 w-5 text-status-green" aria-hidden="true" />
+                      ) : (
+                        <Circle className="h-5 w-5 text-hud-muted" aria-hidden="true" />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setOpenStep(open ? null : step.id)}
+                      aria-expanded={open}
+                      className="hud-focus flex min-w-0 flex-1 items-center gap-2 rounded px-1 py-1 text-left"
+                    >
+                      <span className={`flex-1 text-sm ${isDone ? 'text-hud-muted line-through' : 'text-hud-text'}`}>
+                        {step.stepNumber}. {step.title}
+                      </span>
+                      <span className="flex shrink-0 items-center gap-1 font-mono text-[11px] text-hud-muted">
+                        <Clock className="h-3 w-3" aria-hidden="true" />
+                        {step.estimatedMinutes}m
+                      </span>
+                      <ChevronDown className={`h-4 w-4 shrink-0 text-hud-muted transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
+                    </button>
+                  </div>
+                  {open && (
+                    <div className="space-y-1.5 border-t border-hud-line px-3 py-2 text-sm leading-relaxed text-hud-text/90">
+                      <p>{step.plainInstruction}</p>
+                      <p className="flex items-center gap-1.5 text-xs text-hud-muted">
+                        <Wrench className="h-3 w-3" aria-hidden="true" />
+                        {step.hardwareRequired}
+                      </p>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ol>
+        </Card>
+      </div>
 
-          {/* 3 One-Click Sample Test Images */}
-          <div className="grid grid-cols-3 gap-1.5 mb-2.5">
-            {VISUAL_EXAM_SAMPLES.map((sample) => {
-              const sColor = STATUS_COLORS[sample.defaultFindingStatus];
-              const isSelectedSample =
-                visualExamAnalysis?.sampleIdOrFileName === sample.title;
+      {/* RIGHT: visual exam + Earth packet */}
+      <div className="flex flex-col gap-4">
+        <Card
+          icon={<Camera className="h-4 w-4" />}
+          title="Visual self-exam"
+          actions={
+            <>
+              <button type="button" onClick={() => fileInputRef.current?.click()} className="hud-btn">
+                <Upload className="h-3.5 w-3.5" aria-hidden="true" />
+                Upload
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handleFileChange}
+                className="hidden"
+                aria-label="Upload exam image"
+              />
+            </>
+          }
+          bodyClassName="px-4 pb-4 space-y-3"
+        >
+          <div className="grid grid-cols-3 gap-2" role="group" aria-label="Sample images">
+            {VISUAL_EXAM_SAMPLES.map((s) => {
+              const sel = visualExamAnalysis?.sampleIdOrFileName === s.title;
               return (
                 <button
-                  key={sample.id}
+                  key={s.id}
                   type="button"
-                  onClick={() => runSampleVisualExam(sample)}
+                  onClick={() => runSampleVisualExam(s)}
                   disabled={isAnalyzingVisual}
-                  className={`p-2 rounded-lg border text-left transition-all flex flex-col justify-between ${
-                    isSelectedSample
-                      ? 'bg-slate-800 border-cyan-400 shadow-[0_0_12px_rgba(34,211,238,0.2)]'
-                      : 'bg-slate-900/80 border-slate-800 hover:border-slate-700'
-                  }`}
+                  aria-pressed={sel}
+                  className={`hud-focus hud-tile overflow-hidden text-left ${sel ? 'hud-tile-selected' : ''}`}
                 >
-                  <div className="flex items-center justify-between gap-1 mb-1">
-                    <Eye className="w-3 h-3" style={{ color: sColor }} />
-                    <span
-                      className="w-2 h-2 rounded-full"
-                      style={{ backgroundColor: sColor }}
-                    />
-                  </div>
-                  <span className="font-mono text-[10px] font-bold text-slate-200 leading-tight">
-                    {sample.title}
-                  </span>
+                  <img src={s.previewSvgDataUrl} alt="" className="h-20 w-full bg-hud-bg object-cover" />
+                  <span className="block px-2 py-1.5 text-[11px] leading-tight text-hud-text">{s.title}</span>
                 </button>
               );
             })}
           </div>
 
-          {/* Visual Self-Exam Triage Result Card */}
           {isAnalyzingVisual && (
-            <div className="p-3 rounded-lg bg-slate-900 border border-cyan-500/30 text-xs font-mono text-cyan-300 flex items-center gap-2">
-              <RefreshCw className="w-4 h-4 animate-spin" />
-              Running multimodal medical image triage...
-            </div>
+            <p role="status" className="flex items-center gap-2 rounded-lg border border-hud-line px-3 py-2 text-xs text-hud-accent">
+              <RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" />
+              Analyzing image…
+            </p>
           )}
 
           {visualExamAnalysis && !isAnalyzingVisual && (
-            <div
-              className="p-2.5 rounded-lg bg-slate-900/95 border space-y-2"
-              style={{
-                borderColor: `${STATUS_COLORS[visualExamAnalysis.findingStatus]}66`,
-              }}
-            >
+            <div className="space-y-2 rounded-lg border border-hud-line bg-hud-bg/50 p-3" role="status">
               <div className="flex items-center justify-between gap-2">
-                <span className="font-mono text-xs font-bold text-slate-100 truncate">
-                  {visualExamAnalysis.sampleIdOrFileName}
-                </span>
-                <div className="flex items-center gap-1.5">
-                  <span
-                    className="px-1.5 py-0.5 rounded font-mono text-[10px] font-bold uppercase"
-                    style={{
-                      backgroundColor: `${
-                        STATUS_COLORS[visualExamAnalysis.findingStatus]
-                      }20`,
-                      color: STATUS_COLORS[visualExamAnalysis.findingStatus],
-                    }}
-                  >
-                    {STATUS_LABELS[visualExamAnalysis.findingStatus]}
-                  </span>
+                <span className="truncate text-sm font-medium text-hud-text">{visualExamAnalysis.sampleIdOrFileName}</span>
+                <span className="flex items-center gap-1">
+                  <StatusPill status={visualExamAnalysis.findingStatus} />
+                  <InfoTip label="Clinical finding" align="right">
+                    <span className="block">{visualExamAnalysis.clinicalSummary}</span>
+                    <span className="mt-1 block text-hud-muted">{visualExamAnalysis.modality}</span>
+                  </InfoTip>
                   <button
                     type="button"
                     onClick={clearVisualExam}
-                    title="Clear visual exam"
-                    className="text-slate-400 hover:text-slate-200"
+                    aria-label="Clear exam result"
+                    className="hud-focus rounded p-1 text-hud-muted hover:text-hud-text"
                   >
-                    <X className="w-3.5 h-3.5" />
+                    <X className="h-3.5 w-3.5" />
                   </button>
-                </div>
+                </span>
               </div>
-
               {activePreviewImageUrl && (
-                <div className="rounded-md overflow-hidden border border-slate-800 bg-slate-950 flex justify-center">
-                  <img
-                    src={activePreviewImageUrl}
-                    alt={visualExamAnalysis.sampleIdOrFileName}
-                    className="h-32 w-full object-contain"
-                  />
-                </div>
+                <img
+                  src={activePreviewImageUrl}
+                  alt={visualExamAnalysis.sampleIdOrFileName}
+                  className="h-36 w-full rounded-md border border-hud-line bg-hud-bg object-contain"
+                />
               )}
-
-              <p className="text-xs text-slate-200 leading-relaxed">
-                {visualExamAnalysis.plainCrewGuidance}
-              </p>
-              <p className="text-[11px] text-slate-400 leading-relaxed">
-                <strong className="text-cyan-300 font-mono">Finding:</strong>{' '}
-                {visualExamAnalysis.clinicalSummary}
-              </p>
-              <p className="text-[11px] text-emerald-300/90 font-mono">
-                Action: {visualExamAnalysis.recommendedAction}
-              </p>
+              <p className="text-sm leading-relaxed text-hud-text/90">{visualExamAnalysis.plainCrewGuidance}</p>
+              <p className="text-xs font-medium text-status-green">→ {visualExamAnalysis.recommendedAction}</p>
             </div>
           )}
-        </div>
-      </div>
+        </Card>
 
-      {/* 4. Bottom Action Footer: Queue Telemetry Packet for Earth Flight Surgeon */}
-      <div className="p-3.5 bg-slate-950/90 border-t border-slate-800/90 space-y-2">
-        {packetConfirmation && (
-          <div className="px-3 py-2 rounded-lg bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-xs font-mono flex items-center justify-between gap-2">
-            <span className="flex items-center gap-1.5">
-              <FileCheck2 className="w-4 h-4 shrink-0 text-emerald-400" />
-              <span>{packetConfirmation}</span>
-            </span>
-            <button
-              type="button"
-              onClick={() => setShowPacketModal(true)}
-              className="underline text-cyan-300 hover:text-cyan-200 shrink-0"
-            >
-              Inspect
-            </button>
-          </div>
-        )}
-
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleQueuePacket}
-            className="flex-1 py-2.5 px-3 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-mono text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(34,211,238,0.3)] transition-all"
-          >
-            <Send className="w-3.5 h-3.5" />
-            <span>Queue Telemetry Packet for Earth Flight Surgeon</span>
-          </button>
-
-          {queuedPackets.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setShowPacketModal((prev) => !prev)}
-              title="Inspect Queued Earth Telemetry Packets"
-              className="px-2.5 py-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-cyan-500/40 font-mono text-xs text-cyan-300"
-            >
-              ({queuedPackets.length})
-            </button>
+        <Card
+          icon={<Send className="h-4 w-4" />}
+          title="Earth packet"
+          actions={
+            <InfoTip label="About Earth packets" align="right">
+              Bundles readiness, zone status, completed steps, the latest visual exam and recent check-ins for the ground flight
+              surgeon. One-way delay: {envMeta.commDelay.replace(' ONE-WAY', '')}.
+            </InfoTip>
+          }
+          bodyClassName="px-4 pb-4 space-y-3"
+        >
+          <ul className="flex flex-wrap gap-2 text-xs text-hud-muted">
+            <li className="rounded-full border border-hud-line px-2.5 py-1">{done} steps</li>
+            <li className="rounded-full border border-hud-line px-2.5 py-1">{visualExamAnalysis ? '1 exam' : 'No exam'}</li>
+            <li className="rounded-full border border-hud-line px-2.5 py-1">{Math.min(activeCheckIns.length, 5)} check-ins</li>
+          </ul>
+          {packetConfirmation && (
+            <p role="status" className="flex items-center justify-between gap-2 rounded-lg border border-status-green/40 bg-status-green/10 px-3 py-2 text-xs text-green-200">
+              <span className="flex items-center gap-1.5">
+                <FileCheck2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+                {packetConfirmation}
+              </span>
+              <button type="button" onClick={() => setShowPacketModal(true)} className="hud-focus rounded underline">
+                Inspect
+              </button>
+            </p>
           )}
-        </div>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={handleQueuePacket} className="hud-btn-primary flex-1">
+              <Send className="h-4 w-4" aria-hidden="true" />
+              Queue packet
+            </button>
+            {queuedPackets.length > 0 && (
+              <button type="button" onClick={() => setShowPacketModal(true)} className="hud-btn" aria-label={`Inspect ${queuedPackets.length} queued packets`}>
+                {queuedPackets.length}
+              </button>
+            )}
+          </div>
+        </Card>
       </div>
 
-      {/* Modal to Inspect / Download Queued Earth Telemetry Packet */}
       {showPacketModal && queuedPackets.length > 0 && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-xl rounded-xl bg-slate-900 border border-cyan-500/40 shadow-2xl overflow-hidden">
-            <div className="px-4 py-3 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
-              <span className="font-mono text-xs font-bold text-cyan-300">
-                DSN UPLINK BUFFER // LATEST EARTH FLIGHT SURGEON PACKET
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-hud-bg/80 p-4 backdrop-blur-sm"
+          onMouseDown={(e) => e.target === e.currentTarget && setShowPacketModal(false)}
+        >
+          <div role="dialog" aria-modal="true" aria-labelledby="packet-title" className="w-full max-w-xl overflow-hidden rounded-xl border border-hud-line bg-hud-panel shadow-2xl">
+            <div className="flex items-center justify-between border-b border-hud-line px-4 py-3">
+              <span id="packet-title" className="font-display text-sm font-semibold tracking-wide text-hud-text">
+                Latest packet · {queuedPackets[0].packetId}
               </span>
               <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleDownloadLatestPacket}
-                  className="px-2.5 py-1 rounded bg-cyan-500/20 border border-cyan-400/50 text-cyan-300 font-mono text-xs flex items-center gap-1"
-                >
-                  <Download className="w-3.5 h-3.5" />
+                <button type="button" onClick={handleDownloadLatestPacket} className="hud-btn" autoFocus>
+                  <Download className="h-3.5 w-3.5" aria-hidden="true" />
                   Export JSON
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setShowPacketModal(false)}
-                  className="text-slate-400 hover:text-slate-200"
-                >
-                  <X className="w-4 h-4" />
+                <button type="button" onClick={() => setShowPacketModal(false)} aria-label="Close" className="hud-focus rounded p-1 text-hud-muted hover:text-hud-text">
+                  <X className="h-4 w-4" />
                 </button>
               </div>
             </div>
-            <pre className="p-4 text-[11px] font-mono text-slate-200 overflow-x-auto max-h-[60vh]">
-              {JSON.stringify(queuedPackets[0], null, 2)}
-            </pre>
+            <pre className="max-h-[60vh] overflow-auto p-4 font-mono text-[11px] text-hud-text">{JSON.stringify(queuedPackets[0], null, 2)}</pre>
           </div>
         </div>
       )}
-    </section>
+    </div>
   );
 };
