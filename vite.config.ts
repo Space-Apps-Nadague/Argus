@@ -9,7 +9,7 @@ export default defineConfig({
     port: 5173,
     host: true,
     proxy: {
-      // ARGUS AI backend (server/, specs/03-ai-backend.md)
+      // ARGUS AI backend (server/, specs/04-ai-backend.md)
       '/api': {
         target: `http://127.0.0.1:${process.env.ARGUS_SERVER_PORT || 8787}`,
         changeOrigin: true,

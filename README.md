@@ -15,6 +15,7 @@ This repository strictly follows **Spec-Driven Development** (`AGENTS.md`). Ever
    - [`specs/01-data-schema.md`](./specs/01-data-schema.md) — Domain models, `0g` microgravity vital thresholds, and AI JSON schemas.
    - [`specs/02-ui-dashboard.md`](./specs/02-ui-dashboard.md) — Single-screen HUD grid, 3D Bio-Twin layers/zones, and interactive clinical workflows.
    - [`specs/03-requirements.md`](./specs/03-requirements.md) — Mission health monitoring challenge requirements, considerations, and traceability matrix.
+   - [`specs/04-ai-backend.md`](./specs/04-ai-backend.md) — AI backend: local/free provider chain, endpoints, and deterministic models.
    - [`specs/tasks.md`](./specs/tasks.md) — Active sprint task board, status tracking (`[TODO]`, `[IN PROGRESS]`, `[DONE]`), and file ownership.
 2. **Spec First:** Never introduce new telemetry fields, status thresholds, or component props in code without updating the corresponding file in `/specs` first.
 3. **Claim Your Task:** Mark your task as `[IN PROGRESS]` in `specs/tasks.md` before modifying files, and `[DONE]` once verified by `npm run build` and `npm test`.
@@ -36,14 +37,15 @@ npm install
 npm run dev
 ```
 
-### Optional: Live Multimodal Clinical AI API Key
-ARGUS works **100% offline out-of-the-box** using NASA HRP-grounded pre-cached clinical protocols. To enable live multimodal synthesis and vision triage:
+### Optional: Live AI (free — local model or free cloud tier)
+ARGUS works **100% offline out-of-the-box** using NASA HRP-grounded pre-cached clinical protocols. Live AI runs on the ARGUS backend (`server/`), so no key ever reaches the browser:
 
 ```bash
-cp .env.example .env
-# Set VITE_AI_API_KEY=your_api_key_here in .env
+cp .env.example .env   # pick AI_PROVIDERS and set AI_LOCAL_MODEL and/or a free key
+npm run ai:local       # optional: check that Ollama and the model are ready
+npm run dev:all        # Vite + AI backend (or `npm run dev:local` to force the local model)
 ```
-*(You can also enter or clear a Clinical AI API key directly from the top HUD bar at runtime.)*
+Providers: local Ollama / LM Studio, OpenRouter free models, Gemini free tier, Groq, or any OpenAI-compatible endpoint. See [`specs/04-ai-backend.md`](./specs/04-ai-backend.md).
 
 ### Verify Build & Deterministic Triage Tests
 ```bash

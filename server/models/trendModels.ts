@@ -1,8 +1,8 @@
 /**
- * Deterministic per-metric trend models (specs/03-ai-backend.md §5). No LLM involved.
+ * Deterministic per-metric trend models (specs/04-ai-backend.md §5). No LLM involved.
  *
- * TODO(Task 23): once Sprint 5 merges, delegate baseline/drift/forecast to
- * `src/utils/driftAnalytics.ts` (computeDrift / forecastMetric) and keep only `daysToRed` here.
+ * TODO(Task 27): delegate baseline/drift/forecast to Sprint 7's `src/utils/driftAnalytics.ts`
+ * (computeDrift / forecastMetric) and keep only `daysToRed` here.
  */
 
 import type { BodyZoneId, GravityEnvironment, VitalSignReading } from '../../src/types/argus';

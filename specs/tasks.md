@@ -199,11 +199,13 @@
   - `specs/00-architecture.md`
   - `specs/tasks.md`
 
-## Sprint 5: ARGOS Prototype Merge, Tabbed HUD & Daily Check-In
+---
+
+## Sprint 7: ARGOS Prototype Merge, Tabbed HUD & Daily Check-In
 
 > Ideas ported from the reference prototype `ARGOS_The_Thousand_Eyes.html` (kept untouched in the repo root).
 
-### Task 12: Agent-Agnostic UI Skills (`.agents/skills/`)
+### Task 16: Agent-Agnostic UI Skills (`.agents/skills/`)
 - **Status:** `[DONE]`
 - **Spec References:** `specs/00-architecture.md` (Directory Structure), `AGENTS.md` (§5)
 - **Files Owned:**
@@ -215,7 +217,7 @@
   - `AGENTS.md`
   - `docs/CONTRIBUTING.md`
 
-### Task 13: Tabbed HUD Layout & Low-Text UI Primitives
+### Task 17: Tabbed HUD Layout & Low-Text UI Primitives
 - **Status:** `[DONE]`
 - **Spec References:** `specs/02-ui-dashboard.md` (§1 Layout, §2 Tabs, §3 UI Primitives)
 - **Files Owned:**
@@ -237,7 +239,7 @@
   - `src/utils/__tests__/liveGuidance.test.ts`
   - `vite.config.ts` (exclude local agent worktrees from Vitest)
 
-### Task 14: Personal-Baseline Drift, Short-Range Forecast & "Why" Links
+### Task 18: Personal-Baseline Drift, Short-Range Forecast & "Why" Links
 - **Status:** `[DONE]`
 - **Spec References:** `specs/01-data-schema.md` (§2 `METRIC_TYPICAL_SD`, §5 Drift Analytics), `specs/02-ui-dashboard.md` (§2 Trends tab)
 - **Files Owned:**
@@ -246,7 +248,7 @@
   - `src/components/TrendsTab.tsx`
   - `src/utils/__tests__/driftAnalytics.test.ts`
 
-### Task 15: Daily Crew Check-In Entry
+### Task 19: Daily Crew Check-In Entry
 - **Status:** `[DONE]`
 - **Spec References:** `specs/01-data-schema.md` (§1 `MetricId`, §2 `METRIC_INPUT_RANGES`, §4 `EarthTelemetryPacket.recentCheckIns`, §6 `CheckInEntry`), `specs/02-ui-dashboard.md` (§2 Check-in tab)
 - **Files Owned:**
@@ -256,7 +258,7 @@
   - `src/context/MissionContext.tsx`
   - `src/utils/__tests__/checkIns.test.ts`
 
-### Task 16: Visual Design Tokens & Accessibility Pass
+### Task 20: Visual Design Tokens & Accessibility Pass
 - **Status:** `[DONE]`
 - **Spec References:** `specs/02-ui-dashboard.md` (§4 Visual Language & Accessibility)
 - **Files Owned:**
@@ -264,7 +266,7 @@
   - `src/index.css`
   - `index.html`
 
-### Task 17: Document Future ARGUS Companion (AI Chat) — Docs Only
+### Task 21: Document Future ARGUS Companion (AI Chat) — Docs Only
 - **Status:** `[DONE]`
 - **Spec References:** `specs/01-data-schema.md` (§7 Future), `specs/02-ui-dashboard.md` (§5 Future)
 - **Files Owned:**
@@ -279,30 +281,30 @@
 
 ---
 
-## Sprint 6: AI Backend (Provider-Agnostic, Free & Local-First)
+## Sprint 8: AI Backend (Provider-Agnostic, Free & Local-First)
 
-> Spec: `specs/03-ai-backend.md`. Built on branch `feature/ai-backend` in a git worktree, on top of Sprint 5. It avoided Sprint 5's files; wiring the new endpoints into the tabbed HUD is Task 23.
+> Spec: `specs/04-ai-backend.md`. Built on branch `feature/ai-backend` in a git worktree, on top of Sprint 7. It avoided Sprint 7's files; wiring the new endpoints into the tabbed HUD is Task 27.
 
-### Task 18: AI Backend Spec & Shared API Types
+### Task 22: AI Backend Spec & Shared API Types
 - **Status:** `[DONE]`
-- **Files Owned:** `specs/03-ai-backend.md`, `src/types/aiApi.ts`, `specs/tasks.md` (Sprint 6 block), `AGENTS.md` (§1 spec list)
+- **Files Owned:** `specs/04-ai-backend.md`, `src/types/aiApi.ts`, `specs/tasks.md` (Sprint 8 block), `AGENTS.md` (§1 spec list)
 
-### Task 19: Server Skeleton, Provider Chain (Local + Cloud) & Health
+### Task 23: Server Skeleton, Provider Chain (Local + Cloud) & Health
 - **Status:** `[DONE]`
 - **Files Owned:** `server/index.ts`, `server/app.ts`, `server/env.ts`, `server/ai/*`, `server/routes/health.ts`, `server/tsconfig.json`, `vite.config.ts`, `package.json`, `.env.example`, `docker-compose.yml`, `scripts/check-local-ai.ts`
 
-### Task 20: Port Flight Surgeon Guidance & Vision to the Backend
+### Task 24: Port Flight Surgeon Guidance & Vision to the Backend
 - **Status:** `[DONE]`
 - **Files Owned:** `server/routes/guidance.ts`, `server/routes/vision.ts`, `src/services/flightSurgeonAi.ts`, `src/services/argusApi.ts`
 
-### Task 21: Trend Models, Diagnostics & Recommendations
+### Task 25: Trend Models, Diagnostics & Recommendations
 - **Status:** `[DONE]`
 - **Files Owned:** `server/models/trendModels.ts`, `server/models/crewSnapshot.ts`, `server/models/diagnosticsRules.ts`, `server/models/countermeasureLibrary.ts`, `server/routes/diagnostics.ts`, `server/routes/recommendations.ts`
 
-### Task 22: Wellbeing (Mental Health) Model & Crew Companion Chat API
+### Task 26: Wellbeing (Mental Health) Model & Crew Companion Chat API
 - **Status:** `[DONE]`
 - **Files Owned:** `server/models/wellbeingModel.ts`, `server/routes/wellbeing.ts`, `server/routes/chat.ts`, `server/__tests__/*`
 
-### Task 23: Wire AI Endpoints into the Tabbed HUD
+### Task 27: Wire AI Endpoints into the Tabbed HUD
 - **Status:** `[TODO]`
-- **Notes:** Send Sprint 5 check-ins (`CheckInEntry`) with AI requests so the server applies them via `applyCheckIns` before triage/trends (today the backend rebuilds zones from the scenario only). Remove `VITE_AI_API_KEY` mentions from `README.md`, `specs/00-architecture.md` and the `TopMissionBar.tsx` key placeholder (Sprint 5 owns them). Swap `trendModels.ts` internals to Sprint 5's `driftAnalytics.ts`; add Diagnostics / Plan / Wellbeing / Companion views to the tabbed HUD; provider badge in `TopMissionBar.tsx`; wellbeing check-ins + chat history in `MissionContext.tsx`.
+- **Notes:** Send Sprint 7 check-ins (`CheckInEntry`) with AI requests so the server applies them via `applyCheckIns` before triage/trends (today the backend rebuilds zones from the scenario only). Update the `TopMissionBar.tsx` key placeholder (still mentions `VITE_AI_API_KEY`). Swap `trendModels.ts` internals to Sprint 7's `driftAnalytics.ts`; add Diagnostics / Plan / Wellbeing / Companion views to the tabbed HUD; provider badge in `TopMissionBar.tsx`; wellbeing check-ins + chat history in `MissionContext.tsx`.

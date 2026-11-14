@@ -1,6 +1,6 @@
 /**
  * ARGUS — Flight Surgeon AI service (client side)
- * Single Source of Truth: specs/00-architecture.md, specs/01-data-schema.md (§4), specs/03-ai-backend.md
+ * Single Source of Truth: specs/00-architecture.md, specs/01-data-schema.md (§4), specs/04-ai-backend.md
  *
  * All model calls now run on the ARGUS backend (`server/`), which picks a free/local provider
  * and falls back to offline protocols. If the backend itself is unreachable, the same offline

@@ -9,7 +9,7 @@
 - **3D Bio-Twin:** Three.js (`three`, `@react-three/fiber`, `@react-three/drei`) for a central hero-stage, rotating, interactive 3D sculpted anatomical figure differentiating male and female morphologies (`BiologicalSex`: `'female' | 'male'`), with selectable layers (`all`, `dermal`, `skeletal`, `organs`), camera focus presets, clickable body parts, and a WebGL error-boundary fallback
 - **Data Visualization:** Recharts (`AreaChart`, `ReferenceArea`, `ResponsiveContainer`, `Tooltip`, `XAxis`, `YAxis`) for 14-to-30-day vital trends
 - **Icons:** `lucide-react`
-- **AI Layer:** Multimodal Clinical AI service returning structured JSON (`FlightSurgeonGuidance` & `VisualExamAnalysis`) + deterministic pre-cached offline demo fallback when `VITE_AI_API_KEY` is absent or offline
+- **AI Layer:** Multimodal Clinical AI service returning structured JSON (`FlightSurgeonGuidance` & `VisualExamAnalysis`) served by the ARGUS AI backend (`server/`, `specs/04-ai-backend.md`: local or free cloud models, key never in the browser) + deterministic pre-cached offline fallback when no model or backend is reachable
 - **State Management:** React Context / `useReducer` (`MissionContext.tsx`) seeded with a multi-astronaut crew roster (persisted in `localStorage`), individualized 30-day synthetic telemetry, instant crisis overrides, per-crew daily check-ins (persisted in `localStorage`) overlaid on the synthetic series, and the active HUD tab
 - **Analytics:** Pure deterministic TypeScript (`driftAnalytics.ts`) for personal-baseline drift (σ), short-range forecasts with 90% prediction intervals, and evidence-backed metric links. Informational only: it never changes a triage status.
 - **Layout:** Slim top mission bar + 5-tab HUD (`Bio-Twin`, `Trends`, `Check-in`, `Flight Surgeon`, `Crew`). See `specs/02-ui-dashboard.md`.
@@ -17,7 +17,7 @@
 
 ## Directory Structure
 - `.agents/skills/` — Vendor-neutral agent skills (`frontend-design`, `design-system`, `accessibility-review`, `ux-copy`, `design-critique`) used for all UI work
-- `ARGOS_The_Thousand_Eyes.html` — Reference prototype (vanilla JS) whose ideas were ported in Sprint 5; not part of the build
+- `ARGOS_The_Thousand_Eyes.html` — Reference prototype (vanilla JS) whose ideas were ported in Sprint 7; not part of the build
 - `specs/` — Canonical Specification Documents (Single Source of Truth)
   - `specs/00-architecture.md` — System architecture, tech stack, and directory layout
   - `specs/01-data-schema.md` — Data models (including `CrewMemberProfile`), deterministic triage thresholds, and AI JSON schemas

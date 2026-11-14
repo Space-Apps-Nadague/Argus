@@ -1,6 +1,6 @@
 /**
  * ARGUS — AI Backend API Contract (shared by `server/` and the React client)
- * Single Source of Truth: specs/03-ai-backend.md
+ * Single Source of Truth: specs/04-ai-backend.md
  *
  * Guardrail (AGENTS.md §2.4): every TriageStatus below is computed deterministically
  * by `src/utils/triageEngine.ts` or the server's deterministic models — never by an LLM.

@@ -1,6 +1,6 @@
 # Spec 02: ARGUS Mission Control Bio-Twin Dashboard UI
 
-> Sprint 5 replaces the fixed 3-column single screen with a **slim top bar + 5-tab HUD**. Ideas are ported from the ARGOS prototype (`ARGOS_The_Thousand_Eyes.html`). Design guidance: `.agents/skills/frontend-design`, `design-system`, `ux-copy`, `accessibility-review`.
+> Sprint 7 replaces the fixed 3-column single screen with a **slim top bar + 5-tab HUD**. Ideas are ported from the ARGOS prototype (`ARGOS_The_Thousand_Eyes.html`). Design guidance: `.agents/skills/frontend-design`, `design-system`, `ux-copy`, `accessibility-review`.
 
 ## 1. Layout
 
