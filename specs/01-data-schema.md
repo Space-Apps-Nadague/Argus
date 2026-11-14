@@ -343,9 +343,9 @@ export interface CheckInEntry {
 
 ---
 
-## 7. Future: ARGUS Companion Chat (not implemented)
+## 7. ARGUS Companion Chat (`src/components/CompanionDrawer.tsx`, `src/utils/companionBrain.ts`)
 
-Planned port of the ARGOS prototype's conversational companion (see `specs/02-ui-dashboard.md` §5 and issue #7). Draft types only. Do **not** add them to `src/types/argus.ts` until the task is claimed.
+Port of the ARGOS prototype's conversational companion (`jv()`, `send()`, `brain()`, `speak()`, `mic()` in `ARGOS_The_Thousand_Eyes.html`). Fully implemented (issue #7).
 
 ```typescript
 export type CompanionIntent =
@@ -358,9 +358,15 @@ export interface CompanionMessage {
   text: string;
   timestampIso: string;
   intent?: CompanionIntent;
-  source: 'live_ai' | 'offline_brain';
+  source?: 'live_ai' | 'offline_brain';
 }
 ```
+
+- **Offline Brain First:** Deterministic pure rule engine (`src/utils/companionBrain.ts`) answering questions on crew readiness, zone statuses, vitals vs personal baseline, drift & forecast, NASA HRP metric links, cumulative radiation, and spaceflight countermeasures with 0 network dependencies.
+- **Live Clinical AI Second:** Streams replies via `streamCrewChat` (`POST /api/ai/chat`) grounded in the crew snapshot when the ARGUS backend / AI provider is reachable; seamlessly falls back to the offline brain on network error or timeout.
+- **Voice I/O:** Optional text-to-speech with natural English voice synthesis (`window.speechSynthesis`) and voice dictation via Web Speech API (`SpeechRecognition`).
+- **Red-Flag Safety Guardrail:** Critical emergency phrases (chest pain, acute dyspnea, loss of consciousness, self-harm/crisis) immediately return an emergency action protocol advising the astronaut to stop activity, alert crewmates, and downlink an emergency packet to the Flight Surgeon. The companion NEVER mutates triage status or lowers urgency.
+- **Persistence:** Local conversation history is preserved per crew member in `localStorage` under `argus_companion_chat_<crewId>`.
 
 ---
 

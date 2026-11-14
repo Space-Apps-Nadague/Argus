@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { Activity, Award, Flame, Globe, KeyRound, Orbit, Radio, UserPlus, X } from 'lucide-react';
+import { Activity, Award, Bot, Flame, Globe, KeyRound, Orbit, Radio, UserPlus, X } from 'lucide-react';
 import { useMission } from '../context/MissionContext';
 import { GravityEnvironment, ScenarioId, TriageStatus } from '../types/argus';
 import { getCrewAdjustedZones, TELEMETRY_SCENARIOS } from '../data/telemetryScenarios';
@@ -46,6 +46,7 @@ export const TopMissionBar: React.FC = () => {
     setRuntimeApiKey,
     checkIns,
     milestones,
+    setCompanionOpen,
   } = useMission();
 
   const [showKeyInput, setShowKeyInput] = useState(false);
@@ -294,6 +295,18 @@ export const TopMissionBar: React.FC = () => {
               </div>
             )}
           </div>
+
+          <button
+            type="button"
+            onClick={() => setCompanionOpen(true)}
+            aria-label="Open ARGUS Companion chat drawer"
+            title="ARGUS Companion (offline brain + Clinical AI + voice)"
+            className="hud-focus flex items-center gap-1.5 rounded-lg border border-hud-accent/60 bg-hud-accent/15 px-2.5 py-1.5 text-xs text-hud-text hover:bg-hud-accent/25 transition-colors"
+          >
+            <Bot className="h-4 w-4 text-hud-accent" aria-hidden="true" />
+            <span className="font-display font-semibold tracking-wider">ARGUS</span>
+            <span className="hidden xl:inline text-[10px] text-hud-muted font-sans">Companion</span>
+          </button>
         </div>
       </div>
 

@@ -103,11 +103,11 @@ Laid out in 2 columns on wide screens:
   - **Screen-Constrained Popovers:** `TopMissionBar` popovers (Readiness Milestone Badges and Clinical AI key) use viewport-safe positioning (`fixed inset-x-3 top-16` on mobile `< sm`, `absolute right-0` with `max-w-[calc(100vw-1.5rem)]` on desktop) with keyboard Esc dismiss to eliminate horizontal scroll and viewport spillover.
   - Tabs scroll horizontally on narrow screens with no page-level horizontal overflow. The Bio-Twin grid stacks on `< lg`, and Trends / Check-in grids stack on `< xl`.
 
-## 5. Future: ARGUS Companion (AI chat) — not implemented
-Planned port of the ARGOS prototype's chat companion (`jv()`, `send()`, `brain()`, `speak()`, `mic()` in `ARGOS_The_Thousand_Eyes.html`). Tracked in issue #7.
-- **Entry point:** `ARGUS` button in the top bar opens a right slide-over drawer, available on every tab.
-- **Offline brain first:** a deterministic intent engine (`red_flag`, `status`, `metric`, `symptom`, `forecast`, `why`, `radiation`, `help`) answers from triage, drift, forecast, links and check-ins. No API key needed.
-- **Live Clinical AI second:** when a key is configured, replies use the existing Clinical AI client with a data-only context. It falls back to the offline brain on timeout/error.
-- **Voice:** optional text-to-speech replies and dictation via browser speech APIs.
-- **Red flags:** phrases like chest pain or trouble breathing get an urgent fixed reply and point to emergency protocols / Earth packet.
-- **Guardrails:** never sets or overrides a triage status, invents no numbers, plain language, conversation stored per crew member locally.
+## 5. ARGUS Companion (AI chat) (`src/components/CompanionDrawer.tsx`, `src/utils/companionBrain.ts`)
+Port of the ARGOS prototype's chat companion (`jv()`, `send()`, `brain()`, `speak()`, `mic()` in `ARGOS_The_Thousand_Eyes.html`). Fully implemented (issue #7).
+- **Entry point:** `ARGUS Companion` button in the top mission bar (`TopMissionBar.tsx`) opens a right slide-over drawer, accessible across all tabs with keyboard shortcut and Esc dismiss.
+- **Offline brain first:** a deterministic intent engine in `src/utils/companionBrain.ts` (`red_flag`, `status`, `metric`, `symptom`, `forecast`, `why`, `radiation`, `help`) answers from triage, drift, forecast, links, and check-ins with 0 network calls.
+- **Live Clinical AI second:** when the backend / provider is available, replies stream via `streamCrewChat` with a structured snapshot context, seamlessly falling back to the offline brain on network error or timeout.
+- **Voice I/O:** optional text-to-speech replies via `window.speechSynthesis` (British voice heuristic) and dictation via browser Web Speech API (`SpeechRecognition`).
+- **Red flags:** critical phrases (chest pain, shortness of breath, faint, self-harm/crisis in English and Hebrew) trigger an immediate urgent fixed protocol pointing to the Flight Surgeon / Earth emergency packet, vital checks, and crewmate notification.
+- **Guardrails:** never sets or overrides a triage status, never lowers urgency, invents no numbers, uses plain language, and conversation history is persisted per crew member in `localStorage`.

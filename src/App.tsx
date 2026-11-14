@@ -20,6 +20,7 @@ import { CheckInTab } from './components/CheckInTab';
 import { FlightSurgeonPanel } from './components/FlightSurgeonPanel';
 import { CrewTab } from './components/CrewTab';
 import { CrewManagerModal } from './components/CrewManagerModal';
+import { CompanionDrawer } from './components/CompanionDrawer';
 
 const PANELS: Record<HudTabId, React.FC> = {
   biotwin: BioTwinTab,
@@ -52,6 +53,7 @@ export const App: React.FC = () => (
       <TopMissionBar />
       <TabBar />
       <CrewManagerModal />
+      <CompanionDrawer />
       <main className="mx-auto w-full max-w-[1800px] p-3 md:p-4 min-w-0">
         <ScheduledRoutineBanner />
         <ActivePanel />
