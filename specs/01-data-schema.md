@@ -127,6 +127,14 @@ export interface ThresholdRange {
 | `behavioral` | `daily_sleep_hours` | Daily Sleep Duration | `hours` | `7.0–9.0` (`6.0–10.0`) | `7.0–9.0` (`6.0–10.0`) | `7.0–9.0` (`6.0–10.0`) | `7.0–9.0` (`6.0–10.0`) |
 | `behavioral` | `mood_index` | Behavioral Mood Index | `/10` | `7.0–10.0` (`5.0–10.0`) | `7.0–10.0` (`5.0–10.0`) | `7.0–10.0` (`5.0–10.0`) | `7.0–10.0` (`5.0–10.0`) |
 
+### Passive Wearable Metrics (non-triage) and how each indicator is collected
+With the two-device kit (`specs/05-data-platform.md` §4) nothing needs typing:
+- **From the watch:** `systolic_bp` (cuff-calibrated every 28 days [SRC-075]), `daily_sleep_hours`, `core_temp`, `mood_index` and `pvt_lapses`. Body temperature is *estimated* from overnight wrist temperature against the personal baseline [SRC-074]; a watch does not measure true core temperature. Mood is one tap a day.
+- **From a weekly glucometer photo:** `blood_glucose` [SRC-077], since watches cannot measure glucose [SRC-076].
+- **Clinical reference for the team bands** (PR #20): AHA blood pressure categories [SRC-070, SRC-071]; ADA glucose ranges [SRC-072, SRC-073].
+- **Minute-level streams with no thresholds of their own:** `heart_rate` (bpm), `resp_rate` (breaths/min), `activity` (g), `sleep_state` (0/1), `wrist_temp` (°C), `diastolic_bp` (mmHg) and `dose_rate` (µGy/h). They feed the daily values of `resting_hr`, `spo2`, `sleep_eff`, `core_temp` and `rad_dose` (spec 05 §5.1) and the AI context.
+- **Time:** timestamps are real UTC `timestamptz`, and `missionDay` is derived from the mission start.
+
 ### Typical Day-to-Day Variability (`METRIC_TYPICAL_SD`) & Check-In Input Ranges (`METRIC_INPUT_RANGES`)
 Both tables live in `src/utils/triageEngine.ts` next to `METRIC_THRESHOLDS`. Neither table affects triage status.
 - `METRIC_TYPICAL_SD` is the minimum standard deviation used for personal-baseline drift (§5), so a very flat baseline week does not turn tiny changes into huge σ values.
@@ -140,17 +148,17 @@ Both tables live in `src/utils/triageEngine.ts` next to `METRIC_THRESHOLDS`. Nei
 | `resting_hr` | `3` | `30` | `180` | On waking, before moving: wearable or 30 s pulse count × 2. |
 | `hrv_rmssd` | `6` | `5` | `250` | Overnight RMSSD from your wearable. |
 | `spo2` | `0.7` | `70` | `100` | Finger oximeter, warm hand, still for 30 s. |
-| `systolic_bp` | `4` | `60` | `240` | Automated arm cuff at heart level, seated/rested 5 min. |
+| `systolic_bp` | `4` | `60` | `240` | Automatic: watch spot readings, seated (watch cuff-calibrated every 28 days). |
 | `bmd_delta` | `0.15` | `-5` | `3` | Monthly QCT/DXA-equivalent scan result vs previous scan (%). |
 | `ared_load` | `2.5` | `0` | `60` | Total from the ARED/resistance device log for today. |
-| `blood_glucose` | `5` | `40` | `400` | Fasting or pre-meal glucometer fingerstick capillary test. |
+| `blood_glucose` | `5` | `40` | `400` | Weekly fasting finger-prick, then a photo of the meter screen. |
 | `rad_dose` | `0.15` | `0` | `50` | Personal dosimeter: last 24 h reading. |
 | `wbc_lymph` | `0.2` | `0.1` | `10` | Point-of-care blood analyzer, finger-prick sample. |
-| `core_temp` | `0.15` | `34.0` | `42.0` | Tympanic or double-sensor forehead heat-flux thermometer. |
+| `core_temp` | `0.15` | `34.0` | `42.0` | Automatic: estimated from overnight watch wrist temperature. |
 | `sleep_eff` | `3` | `0` | `100` | Wearable sleep efficiency for last night (%). |
-| `pvt_lapses` | `0.8` | `0` | `50` | 3-minute Psychomotor Vigilance Test on the crew tablet. |
-| `daily_sleep_hours` | `0.5` | `0` | `24` | Actigraphy sleep duration log or smart sleep-band summary. |
-| `mood_index` | `0.5` | `1` | `10` | Daily behavioral self-assessment visual analog scale (1=Lowest, 10=Optimal). |
+| `pvt_lapses` | `0.8` | `0` | `50` | 3-minute Psychomotor Vigilance Test on the watch. |
+| `daily_sleep_hours` | `0.5` | `0` | `24` | Automatic: sleep duration from the watch. |
+| `mood_index` | `0.5` | `1` | `10` | One tap on the watch each evening (1 = lowest, 10 = optimal). |
 
 ---
 
@@ -316,6 +324,8 @@ export interface MetricLink {
 
 ## 6. Daily Crew Check-In (`CheckInEntry`, `src/utils/checkIns.ts`)
 
+> HUD v2 removed the Check-in tab. The overlay code below stays so stored entries (and a future logging UI, issue #1) keep working.
+
 Ported from the ARGOS prototype's daily check-in. Crew members type real readings, which are overlaid on top of the synthetic 30-day series.
 
 ```typescript
@@ -345,12 +355,9 @@ export interface CheckInEntry {
 
 ## 7. ARGUS Companion Chat (`src/components/CompanionDrawer.tsx`, `src/utils/companionBrain.ts`)
 
-Port of the ARGOS prototype's conversational companion (`jv()`, `send()`, `brain()`, `speak()`, `mic()` in `ARGOS_The_Thousand_Eyes.html`). Fully implemented (issue #7).
+Port of the ARGOS prototype's conversational companion (`jv()`, `send()`, `brain()`, `speak()`, `mic()` in `ARGOS_The_Thousand_Eyes.html`). Fully implemented (issue #7). Also integrates with the AI backend types in `src/types/aiApi.ts` (`CrewChatMessage`, `ChatRequest`, `ChatStreamEvent`; see `specs/04-ai-backend.md`). Chat history is stored per crew member in `localStorage` (`argus_chat_v1` → `Record<crewId, CrewChatMessage[]>`, last 50 messages).
 
 ```typescript
-export type CompanionIntent =
-  | 'red_flag' | 'status' | 'metric' | 'symptom' | 'forecast' | 'why' | 'radiation' | 'help' | 'fallback';
-
 export interface CompanionMessage {
   id: string;
   crewId: string;
@@ -362,6 +369,73 @@ export interface CompanionMessage {
 }
 ```
 
+## 8. Mission Location (`SpaceLocationId`, `src/data/spaceLocations.ts`)
+
+```typescript
+export type SpaceLocationId =
+  | 'earth_pre' | 'earth_post' | 'leo' | 'gateway'
+  | 'lunar_surface' | 'mars_transit' | 'mars_surface' | 'rover';
+
+export interface SpaceLocation {
+  id: SpaceLocationId;
+  label: string;               // "Mars transit"
+  gravityG: number;            // 0, 0.16, 0.38, 1
+  gravityLabel: string;        // "≈0 g"
+  commDelaySec: [number, number]; // one-way light time range in seconds, [0, 0] on Earth
+  radiation: 'shielded' | 'magnetosphere' | 'deep_space' | 'surface';
+  clock: 'earth' | 'leo' | 'lunar' | 'mars';
+  description: string;
+}
+```
+- Stored per crew member: `localStorage` `argus_locations_v1` → `Record<crewId, SpaceLocationId>`. Default `mars_transit` (matches the `0g_transit` thresholds).
+- Sent to the AI backend as optional `locationId` on every request; the server adds the location line to prompts.
+- **Thresholds per location:** each `SpaceLocationId` maps to one threshold set in §2 through `LOCATION_ENVIRONMENT` (`src/data/spaceLocations.ts`):
+  - `earth_pre`, `earth_post` and `leo` → `iss_leo`
+  - `gateway` and `mars_transit` → `0g_transit`
+  - `lunar_surface` → `lunar_base`
+  - `mars_surface` and `rover` → `mars_base`
+
+  The location selector in the top bar is the single control; the environment follows it.
+
+## 9. User Accounts (`UserAccount`, server-side)
+Accounts live in the database (`users`, `sessions`; `specs/05-data-platform.md` §3.1, §6). The browser never stores password hashes.
+
+```typescript
+export type UserRole = 'admin' | 'astronaut' | 'flight_surgeon';
+
+export interface UserAccount {
+  id: string;
+  username: string;            // unique, case-insensitive, 3–32 chars
+  role: UserRole;
+  crewId?: string;             // astronaut id; required for 'astronaut'
+  createdAtIso: string;
+  disabled?: boolean;
+}
+```
+- Passwords: argon2id on the server, at least 10 characters. The first run creates the admin (`POST /api/auth/setup`, or `npm run db:seed`).
+- Archiving a crew member keeps their accounts and history; an admin purge deletes both.
+
+## 10. Emergency Protocols (`EmergencyProtocol`, `src/data/emergencyProtocols.ts`)
+
+```typescript
+export interface EmergencyProtocol {
+  id: 'fire' | 'depress' | 'toxic' | 'medical' | 'radiation' | 'co2';
+  title: string;
+  icon: string;                // lucide icon name
+  trigger: string;             // when to use it, one line
+  steps: string[];
+}
+
+export interface EmergencyRun {
+  protocolId: EmergencyProtocol['id'];
+  crewId: string;
+  startedAtIso: string;
+  completed: Record<number, string>; // step index → ISO time
+}
+```
+Runs are kept in memory for the session and included in the Earth packet notes when the crew taps `Notify Earth`.
+
+
 - **Offline Brain First:** Deterministic pure rule engine (`src/utils/companionBrain.ts`) answering questions on crew readiness, zone statuses, vitals vs personal baseline, drift & forecast, NASA HRP metric links, cumulative radiation, and spaceflight countermeasures with 0 network dependencies.
 - **Live Clinical AI Second:** Streams replies via `streamCrewChat` (`POST /api/ai/chat`) grounded in the crew snapshot when the ARGUS backend / AI provider is reachable; seamlessly falls back to the offline brain on network error or timeout.
 - **Voice I/O:** Optional text-to-speech with natural English voice synthesis (`window.speechSynthesis`) and voice dictation via Web Speech API (`SpeechRecognition`).
@@ -370,7 +444,7 @@ export interface CompanionMessage {
 
 ---
 
-## 8. Scheduled Mission Routine & Gamification Milestones (`REQ-08`, `REQ-09`)
+## 11. Scheduled Mission Routine & Gamification Milestones (`REQ-08`, `REQ-09`)
 
 To keep non-physician astronauts consistently engaged in preventative clinical health checks during multi-year missions, ARGUS provides periodic mission routine prompts and a deterministic gamification milestone system.
 

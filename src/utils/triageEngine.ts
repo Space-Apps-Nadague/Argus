@@ -96,12 +96,15 @@ export const METRIC_THRESHOLDS_0G: Record<string, ThresholdRange> = {
   resting_hr: { nominalMin: 52, nominalMax: 74, yellowMin: 46, yellowMax: 86 },
   hrv_rmssd: { nominalMin: 42, nominalMax: 85, yellowMin: 30, yellowMax: 95 },
   spo2: { nominalMin: 96, nominalMax: 100, yellowMin: 93, yellowMax: 100 },
+  // Team bands (PR #20). Clinical reference: AHA categories and hypotension <90/60 (Source: SRC-070, SRC-071).
   systolic_bp: { nominalMin: 100, nominalMax: 130, yellowMin: 90, yellowMax: 140 },
   bmd_delta: { nominalMin: -0.8, nominalMax: 0.2, yellowMin: -1.3, yellowMax: 0.5 },
   ared_load: { nominalMin: 18, nominalMax: 30, yellowMin: 12, yellowMax: 35 },
+  // Team bands (PR #20). Clinical reference: ADA fasting ranges and hypoglycemia levels (Source: SRC-072, SRC-073).
   blood_glucose: { nominalMin: 70, nominalMax: 110, yellowMin: 60, yellowMax: 140 },
   rad_dose: { nominalMin: 0.4, nominalMax: 1.2, yellowMin: 0.0, yellowMax: 2.5 },
   wbc_lymph: { nominalMin: 1.5, nominalMax: 3.5, yellowMin: 1.2, yellowMax: 4.0 },
+  // Body temperature. With the watch-only kit it is estimated from overnight wrist temperature (Source: SRC-074).
   core_temp: { nominalMin: 36.5, nominalMax: 37.5, yellowMin: 36.0, yellowMax: 38.0 },
   sleep_eff: { nominalMin: 82, nominalMax: 96, yellowMin: 72, yellowMax: 100 },
   pvt_lapses: { nominalMin: 0, nominalMax: 2, yellowMin: 0, yellowMax: 4 },
@@ -189,17 +192,17 @@ export const METRIC_INPUT_RANGES: Record<MetricId, MetricInputRange> = {
   resting_hr: { min: 30, max: 180, how: 'On waking, before moving: wearable or 30 s pulse count × 2.' },
   hrv_rmssd: { min: 5, max: 250, how: 'Overnight RMSSD from your wearable.' },
   spo2: { min: 70, max: 100, how: 'Finger oximeter, warm hand, still for 30 s.' },
-  systolic_bp: { min: 60, max: 240, how: 'Automated arm cuff at heart level, seated/rested 5 min.' },
+  systolic_bp: { min: 60, max: 240, how: 'Automatic: watch blood-pressure spot readings, seated (watch calibrated with a cuff every 28 days).' },
   bmd_delta: { min: -5, max: 3, how: 'Monthly QCT/DXA-equivalent scan result vs previous scan (%).' },
   ared_load: { min: 0, max: 60, how: 'Total from the ARED/resistance device log for today.' },
-  blood_glucose: { min: 40, max: 400, how: 'Fasting or pre-meal glucometer fingerstick capillary test.' },
+  blood_glucose: { min: 40, max: 400, how: 'Weekly fasting finger-prick on the glucometer, then a photo of the meter screen.' },
   rad_dose: { min: 0, max: 50, how: 'Personal dosimeter: last 24 h reading.' },
   wbc_lymph: { min: 0.1, max: 10, how: 'Point-of-care blood analyzer, finger-prick sample.' },
-  core_temp: { min: 34.0, max: 42.0, how: 'Tympanic or double-sensor forehead heat-flux thermometer.' },
+  core_temp: { min: 34.0, max: 42.0, how: 'Automatic: estimated from overnight watch wrist temperature vs your baseline.' },
   sleep_eff: { min: 0, max: 100, how: 'Wearable sleep efficiency for last night (%).' },
-  pvt_lapses: { min: 0, max: 50, how: '3-minute Psychomotor Vigilance Test on the crew tablet.' },
-  daily_sleep_hours: { min: 0, max: 24, how: 'Actigraphy sleep duration log or smart sleep-band summary.' },
-  mood_index: { min: 1, max: 10, how: 'Daily behavioral self-assessment visual analog scale (1=Lowest, 10=Optimal).' },
+  pvt_lapses: { min: 0, max: 50, how: '3-minute Psychomotor Vigilance Test on the watch.' },
+  daily_sleep_hours: { min: 0, max: 24, how: 'Automatic: sleep duration from the watch.' },
+  mood_index: { min: 1, max: 10, how: 'One tap on the watch each evening (1 = lowest, 10 = optimal).' },
 };
 
 export const METRIC_IDS = Object.keys(METRIC_TYPICAL_SD) as MetricId[];

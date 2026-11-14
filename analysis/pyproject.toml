@@ -1,0 +1,26 @@
+[project]
+name = "argus-analysis"
+version = "0.1.0"
+description = "ARGUS NASA reference data and crew analytics notebooks (specs/05-data-platform.md §7)"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "pandas>=2.2",
+  "duckdb>=1.1",
+  "scipy>=1.13",
+  "statsmodels>=0.14",
+  "matplotlib>=3.9",
+  "psycopg[binary]>=3.2",
+  "requests>=2.32",
+]
+
+[dependency-groups]
+dev = [
+    "jupyterlab>=4.2",
+    "nbconvert>=7.16",
+    "nbformat>=5.10",
+    "ipykernel>=6.29",
+    "tabulate>=0.10.0",
+]
+
+[tool.uv]
+package = false

@@ -1,6 +1,6 @@
 /**
  * ARGUS — Trends tab (specs/02-ui-dashboard.md §2.2)
- * Embeds TelemetryPanel (chart, zone/metric selectors, interactive vital logger)
+ * Embeds TelemetryPanel (chart and zone/metric selectors; data arrives from devices, no manual logger)
  * alongside drift analytics and evidence-backed "Why" links.
  */
 

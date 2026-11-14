@@ -9,6 +9,7 @@ import type { GuidanceResponse } from '../../src/types/aiApi';
 import { BODY_ZONES, getOfflineFlightSurgeonGuidance } from '../../src/data/telemetryScenarios';
 import { ENVIRONMENT_META, evaluateMetricStatus } from '../../src/utils/triageEngine';
 import { completeJson } from '../ai/llm';
+import { formatCommDelay } from '../../src/data/spaceLocations';
 import { maxUrgency } from '../models/diagnosticsRules';
 import { buildCrewSnapshot, describeCrew } from '../models/crewSnapshot';
 import { ARGUS_PERSONA, jsonInstruction } from '../prompts';
@@ -62,7 +63,7 @@ guidanceRoutes.post('/guidance', async (c) => {
       {
         role: 'user',
         content: `${describeCrew(req.crewMember)}
-Environment: ${env.label} (${env.gravityG}), comm delay ${env.commDelay}.
+${snapshot.location ? `Location: ${snapshot.location.label} (${snapshot.location.gravityLabel}), one-way comm delay ${formatCommDelay(snapshot.location)}.` : `Environment: ${env.label} (${env.gravityG}), comm delay ${env.commDelay}.`}
 Scenario: ${snapshot.scenarioLabel}
 Selected zone: ${zone.name} (${zone.anatomicalSubtitle}) — HRP focus: ${zone.nasaHazardFocus}
 Deterministic zone status: ${deterministicStatus.toUpperCase()}
