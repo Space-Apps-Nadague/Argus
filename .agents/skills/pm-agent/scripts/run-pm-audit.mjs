@@ -4,12 +4,12 @@
  *
  * Designed to run in GitHub Actions (as `github-actions[bot]`) or locally via CLI.
  * Executes the 4-step PM Agent workflow defined in `.agents/skills/pm-agent/SKILL.md`:
- *   1. Inspects open/closed GitHub issues, Miro Kanban tasks, and recent commits.
- *   2. Reconciles unlinked open GitHub issues onto the Miro Kanban board.
+ *   1. Inspects open/closed GitHub issues, GitHub Projects v2 board, and recent commits.
+ *   2. Reconciles unlinked open GitHub issues onto the GitHub Projects v2 Kanban board.
  *   3. Audits `specs/03-requirements.md` (`REQ-01`–`REQ-10`) against `src/` using Gemini
  *      structured JSON output (`@google/genai`).
- *   4. Closes resolved GitHub issues (+ marks Miro cards `done`) and opens concise
- *      new `[PM Agent]` issues (+ creates linked Miro `todo` cards) while enforcing
+ *   4. Closes resolved GitHub issues (+ marks Project cards `Done`) and opens concise
+ *      new `[PM Agent]` issues (+ adds Project `Todo` cards) while enforcing
  *      the 5-open-issue anti-spam guardrail.
  *
  * Usage:
@@ -28,7 +28,7 @@ const SKILL_DIR = path.resolve(SCRIPT_DIR, '..');
 const ISSUES_DIR = path.resolve(SKILL_DIR, 'issues');
 const REPO_ROOT = path.resolve(SKILL_DIR, '../../..');
 const GH_SCRIPT = path.resolve(SCRIPT_DIR, 'gh-pm-issue.mjs');
-const MIRO_SCRIPT = path.resolve(SCRIPT_DIR, 'miro-pm-board.mjs');
+const PROJECT_SCRIPT = path.resolve(SCRIPT_DIR, 'gh-pm-project.mjs');
 
 function loadDotEnvFiles() {
   const candidates = [
@@ -234,24 +234,28 @@ async function main() {
 
   console.log(`[PM Agent] Starting autonomous audit (dryRun=${dryRun})...`);
 
-  // Step 1: Inspect GitHub Issues, Miro Board, and recent Git commits
+  // Step 1: Inspect GitHub Issues, GitHub Projects v2 Board, and recent Git commits
   const ghState = runJsonScript(GH_SCRIPT, ['list', '--state', 'all']);
   const allIssues = ghState.issues || [];
   const openIssues = allIssues.filter((i) => i.state === 'open');
   const closedIssues = allIssues.filter((i) => i.state === 'closed');
 
-  let miroState = null;
-  const miroConfigured = Boolean(
-    process.env.MIRO_ACCESS_TOKEN && process.env.MIRO_BOARD_ID
+  let projectState = null;
+  const projectConfigured = Boolean(
+    process.env.PM_PROJECT_NUMBER || process.env.GITHUB_PROJECT_NUMBER
   );
-  if (miroConfigured) {
+  if (projectConfigured) {
     try {
-      miroState = runJsonScript(MIRO_SCRIPT, ['list']);
+      projectState = runJsonScript(PROJECT_SCRIPT, ['list']);
     } catch (err) {
-      console.warn(`[PM Agent] Miro board query failed (continuing with GitHub): ${err.message}`);
+      console.warn(
+        `[PM Agent] GitHub Project query failed (continuing with GitHub Issues): ${err.message}`
+      );
     }
   } else {
-    console.log('[PM Agent] MIRO_ACCESS_TOKEN / MIRO_BOARD_ID not set; skipping Miro sync.');
+    console.log(
+      '[PM Agent] PM_PROJECT_NUMBER not set; skipping GitHub Projects v2 Kanban sync.'
+    );
   }
 
   const recentCommits = execSync('git log -n 10 --oneline', {
@@ -263,32 +267,29 @@ async function main() {
     encoding: 'utf8',
   }).trim();
 
-  // Step 2: Reconcile any unlinked open GitHub issues onto the Miro Kanban board
-  const miroBackfilled = [];
-  if (miroState && Array.isArray(miroState.tasks)) {
+  // Step 2: Reconcile any unlinked open GitHub issues onto the GitHub Projects v2 board
+  const projectBackfilled = [];
+  if (projectState && Array.isArray(projectState.items)) {
     for (const issue of openIssues) {
-      const alreadyLinked = miroState.tasks.some(
-        (t) => t.linkedGithubIssue === issue.number
+      const alreadyInProject = projectState.items.some(
+        (t) => t.issueNumber === issue.number
       );
-      if (!alreadyLinked) {
-        const cleanTitle = issue.title.replace(/^\[PM Agent\]\s*/i, '');
+      if (!alreadyInProject) {
         if (dryRun) {
-          miroBackfilled.push({ dryRun: true, issueNumber: issue.number, title: cleanTitle });
+          projectBackfilled.push({
+            dryRun: true,
+            issueNumber: issue.number,
+            title: issue.title,
+          });
         } else {
-          const createdCard = runJsonScript(MIRO_SCRIPT, [
-            'create-task',
-            '--title',
-            cleanTitle,
-            '--status',
-            'todo',
+          const syncedItem = runJsonScript(PROJECT_SCRIPT, [
+            'sync-issue',
             '--issue-number',
             String(issue.number),
-            '--issue-url',
-            issue.html_url,
-            '--description',
-            `Synced from open GitHub Issue #${issue.number}`,
+            '--status',
+            'todo',
           ]);
-          miroBackfilled.push(createdCard);
+          projectBackfilled.push(syncedItem);
         }
       }
     }
@@ -359,16 +360,19 @@ Instructions:
     closedResults.push(closeRes);
     openIssueMap.delete(toClose.number);
 
-    if (miroState && Array.isArray(miroState.tasks)) {
-      const linkedCards = miroState.tasks.filter(
-        (t) => t.linkedGithubIssue === toClose.number
-      );
-      for (const card of linkedCards) {
-        try {
-          runJsonScript(MIRO_SCRIPT, ['update-task', String(card.id), '--status', 'done']);
-        } catch (err) {
-          console.warn(`[PM Agent] Failed to mark Miro card ${card.id} done: ${err.message}`);
-        }
+    if (projectConfigured) {
+      try {
+        runJsonScript(PROJECT_SCRIPT, [
+          'sync-issue',
+          '--issue-number',
+          String(toClose.number),
+          '--status',
+          'done',
+        ]);
+      } catch (err) {
+        console.warn(
+          `[PM Agent] Failed to mark Project item for issue #${toClose.number} done: ${err.message}`
+        );
       }
     }
   }
@@ -431,25 +435,19 @@ Instructions:
     ]);
     createdResults.push(createRes);
 
-    if (createRes.created && createRes.number && miroConfigured) {
+    if (createRes.created && createRes.number && projectConfigured) {
       try {
-        const miroCard = runJsonScript(MIRO_SCRIPT, [
-          'create-task',
-          '--title',
-          `[${item.priority}] ${cleanActionTitle}`,
-          '--status',
-          'todo',
+        const projectItem = runJsonScript(PROJECT_SCRIPT, [
+          'sync-issue',
           '--issue-number',
           String(createRes.number),
-          '--issue-url',
-          createRes.html_url,
-          '--description',
-          item.miroSummary || item.whyItMatters,
+          '--status',
+          'todo',
         ]);
-        createRes.miroCard = miroCard;
+        createRes.projectItem = projectItem;
       } catch (err) {
         console.warn(
-          `[PM Agent] Created GitHub issue #${createRes.number} but Miro sync failed: ${err.message}`
+          `[PM Agent] Created GitHub issue #${createRes.number} but GitHub Project sync failed: ${err.message}`
         );
       }
     }
@@ -466,8 +464,8 @@ Instructions:
         openIssuesBefore: openIssues.length,
         closedIssuesCount: closedResults.length,
         closedIssues: closedResults,
-        miroBackfilledCount: miroBackfilled.length,
-        miroBackfilled,
+        projectBackfilledCount: projectBackfilled.length,
+        projectBackfilled,
         allowedNewIssues: allowedNewCount,
         createdIssuesCount: createdResults.length,
         createdIssues: createdResults,
