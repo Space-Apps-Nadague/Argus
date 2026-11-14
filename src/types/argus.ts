@@ -44,7 +44,68 @@ export type MetricId =
   | 'daily_sleep_hours'
   | 'mood_index';
 
-export type HudTabId = 'biotwin' | 'trends' | 'checkin' | 'surgeon' | 'crew';
+export type HudTabId =
+  | 'biotwin'
+  | 'trends'
+  | 'forecast'
+  | 'eyes'
+  | 'ai'
+  | 'emergency'
+  | 'crew'
+  | 'users';
+
+/** Mission location (specs/01-data-schema.md §8) */
+export type SpaceLocationId =
+  | 'earth_pre'
+  | 'earth_post'
+  | 'leo'
+  | 'gateway'
+  | 'lunar_surface'
+  | 'mars_transit'
+  | 'mars_surface'
+  | 'rover';
+
+export interface SpaceLocation {
+  id: SpaceLocationId;
+  label: string;
+  gravityG: number;
+  gravityLabel: string;
+  /** One-way light-time range in seconds; [0, 0] on Earth. */
+  commDelaySec: [number, number];
+  radiation: 'shielded' | 'magnetosphere' | 'deep_space' | 'surface';
+  clock: 'earth' | 'leo' | 'lunar' | 'mars';
+  description: string;
+}
+
+/** User accounts (specs/01-data-schema.md §9, specs/05-data-platform.md §6) */
+export type UserRole = 'admin' | 'astronaut' | 'flight_surgeon';
+
+export interface UserAccount {
+  id: string;
+  username: string;
+  role: UserRole;
+  crewId?: string;
+  createdAtIso: string;
+  disabled?: boolean;
+}
+
+/** Emergency protocols (specs/01-data-schema.md §10) */
+export type EmergencyProtocolId = 'fire' | 'depress' | 'toxic' | 'medical' | 'radiation' | 'co2';
+
+export interface EmergencyProtocol {
+  id: EmergencyProtocolId;
+  title: string;
+  icon: string;
+  trigger: string;
+  steps: string[];
+}
+
+export interface EmergencyRun {
+  protocolId: EmergencyProtocolId;
+  crewId: string;
+  startedAtIso: string;
+  completed: Record<number, string>;
+}
 
 export type BloodType = 'O+' | 'O-' | 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-';
 
@@ -85,7 +146,7 @@ export interface TelemetryHistoryPoint {
   missionDay: number;
   dateLabel: string;
   value: number;
-  source?: 'synthetic' | 'check_in';
+  source?: 'synthetic' | 'check_in' | 'wearable' | 'clinical';
 }
 
 export interface VitalSignReading {

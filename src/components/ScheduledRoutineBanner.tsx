@@ -145,26 +145,26 @@ export const ScheduledRoutineBanner: React.FC = () => {
                 className="hud-focus inline-flex items-center gap-1.5 rounded-lg bg-hud-accent px-3.5 py-1.5 text-xs font-semibold text-hud-bg shadow-sm transition-all hover:bg-cyan-300 active:scale-95"
               >
                 <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
-                Quick-Log Routine
+                Mark Routine Done
               </button>
               <button
                 type="button"
-                onClick={() => setActiveTab('checkin')}
+                onClick={() => setActiveTab('trends')}
                 className="hud-btn"
-                title="Open detailed multi-metric check-in form"
+                title="See today's readings from your watch and dosimeter"
               >
-                <span>Full Check-In</span>
+                <span>View Trends</span>
                 <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
             </>
           ) : (
             <button
               type="button"
-              onClick={() => setActiveTab('checkin')}
+              onClick={() => setActiveTab('trends')}
               className="hud-btn"
-              title="Add or update check-in entries"
+              title="See today's readings from your watch and dosimeter"
             >
-              <span>Review Check-Ins</span>
+              <span>View Trends</span>
               <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
             </button>
           )}

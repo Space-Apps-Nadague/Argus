@@ -27,6 +27,14 @@ Before making any code change, walk through these five steps:
 
 ---
 
+### Source attribution (required)
+Every external fact, threshold, dataset or simulation parameter needs an `SRC-xxx` entry in `SOURCES.md`, a `Source: SRC-xxx` citation where it is used, and an updated **Used in** cell. Commits that use sources end with `Sources: SRC-…`, and the PR template's "Sources used" table must be filled in. `npm run check:sources` enforces the IDs. Full rule: `AGENTS.md` §7.
+
+### Database changes
+Schema lives in `server/db/schema.ts` (`specs/05-data-platform.md` §3). Change the spec, then the schema, then run `npm run db:generate` and commit the generated SQL in `server/db/migrations/`. Never edit the shared Azure database by hand. Setup and access: `docs/DATABASE.md`.
+
+---
+
 ## 2. Architectural Guardrails
 
 ### Deterministic Triage vs. Generative AI
