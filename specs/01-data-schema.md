@@ -338,3 +338,46 @@ export interface CompanionMessage {
   source: 'live_ai' | 'offline_brain';
 }
 ```
+
+---
+
+## 8. Scheduled Mission Routine & Gamification Milestones (`REQ-08`, `REQ-09`)
+
+To keep non-physician astronauts consistently engaged in preventative clinical health checks during multi-year missions, ARGUS provides periodic mission routine prompts and a deterministic gamification milestone system.
+
+### Scheduled Mission Routine (`ScheduledRoutineStatus`)
+A mission routine is due whenever the active crew member has not logged any health indicators for the active mission day (`latestDay`):
+- **Due State:** Surfaced in `ScheduledRoutineBanner.tsx` across the HUD with the current sol indicator (`MD-<day>`), core indicator checklist (resting HR, blood pressure, sleep, mood), and dual interactive options:
+  1. **Quick-Log Routine (1-Click):** Logs nominal baseline readings for the active crew member on the active sol, immediately fulfilling the daily routine, extending the sol streak, and updating biological triage.
+  2. **Open Full Check-In:** Navigates directly to `CheckInTab.tsx` for fine-grained multi-metric manual telemetry logging.
+- **Completed State:** Displays affirmative confirmation (`MD-<day> Routine Logged`) with streak counter and unlocked readiness milestone progress.
+
+### Readiness Milestones & Badges (`ReadinessMilestone`)
+
+```typescript
+export type MilestoneCategory = 'streak' | 'readiness' | 'routine';
+
+export interface ReadinessMilestone {
+  id: string;
+  title: string;
+  description: string;
+  category: MilestoneCategory;
+  icon: 'flame' | 'shield' | 'award' | 'zap' | 'check' | 'heart';
+  unlocked: boolean;
+  unlockedAtLabel?: string;
+  progress: {
+    current: number;
+    target: number;
+    unit: string;
+  };
+}
+```
+
+#### Deterministic Milestone Catalog:
+1. `'first_check'` — **First Sol Check**: Completed 1st scheduled mission routine (target: 1 check-in).
+2. `'streak_3'` — **Orbital Rhythm**: 3 consecutive sols with logged health routines (target: 3 sols).
+3. `'streak_7'` — **Vigilant Guardian**: 7 consecutive sols of continuous health telemetry (target: 7 sols).
+4. `'streak_14'` — **Deep-Space Discipline**: 14 consecutive sols of active telemetry & countermeasure adherence (target: 14 sols).
+5. `'peak_readiness'` — **Peak Condition**: Maintained Crew Readiness Score $\ge 95\%$ (target: 95%).
+6. `'countermeasure_pro'` — **Countermeasure Specialist**: Completed $\ge 2$ active countermeasure checklist items (target: 2 steps).
+
