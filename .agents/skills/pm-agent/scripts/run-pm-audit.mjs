@@ -367,8 +367,6 @@ async function main() {
   const codebaseSnapshot = [
     '=== specs/03-requirements.md ===',
     readRepoFileExcerpt('specs/03-requirements.md', 8000),
-    '=== specs/tasks.md ===',
-    readRepoFileExcerpt('specs/tasks.md', 6000),
     '=== src/types/argus.ts ===',
     readRepoFileExcerpt('src/types/argus.ts', 5000),
     '=== src/context/MissionContext.tsx ===',

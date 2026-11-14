@@ -17,7 +17,6 @@
   - `specs/00-architecture.md` — System architecture, tech stack, and directory layout
   - `specs/01-data-schema.md` — Data models (including `CrewMemberProfile`), deterministic triage thresholds, and AI JSON schemas
   - `specs/02-ui-dashboard.md` — Spacecraft HUD layout, Crew Roster & Custom Crew Creator specs, 3D Bio-Twin specs, component props, and demo controls
-  - `specs/tasks.md` — Active sprint backlog, task statuses, and file ownership
 - `src/types/argus.ts` — Canonical TypeScript interfaces matching `specs/01-data-schema.md`
 - `src/data/telemetryScenarios.ts` — Default 4-astronaut crew roster (`DEFAULT_CREW_ROSTER`), individualized 30-day telemetry generator, crisis scenarios (`nominal`, `sans_alert`, `high_co2`, `solar_storm`), pre-cached Flight Surgeon guidance, and visual self-exam samples
 - `src/utils/triageEngine.ts` — Deterministic Green/Yellow/Red threshold evaluator for `0g_transit` microgravity and Crew Readiness Score calculator

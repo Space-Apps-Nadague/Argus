@@ -6,12 +6,12 @@ Before writing, editing, or refactoring any code, read the relevant files in `/s
 - **Data Models, Thresholds & AI JSON:** `specs/01-data-schema.md`
 - **UI Layout, Bio-Map SVG & Demo Controls:** `specs/02-ui-dashboard.md`
 - **Challenge Requirements & Traceability:** `specs/03-requirements.md`
-- **Active Sprint & File Ownership:** `specs/tasks.md`
+- **Tasks, Status & File Ownership:** [GitHub Issues](https://github.com/Space-Apps-Nadague/Argus/issues) and the GitHub Projects kanban (`Backlog` / `Todo` / `Urgent` / `In Progress` / `Done`). There is no task file in the repo.
 
 ## 2. Spec-Driven Development Protocol
 1. **Spec First:** Never invent new telemetry fields, status thresholds, or component props in code without updating the corresponding file in `/specs` first.
 2. **Plan Before Coding:** State which spec sections apply and which files will change before modifying code.
-3. **Claim Tasks:** Mark your active task as `[IN PROGRESS]` in `specs/tasks.md` before editing files, and `[DONE]` once verified.
+3. **Claim Tasks:** Before editing files, assign yourself to the GitHub issue (open one if none exists, listing the files it touches) and move its card to `In Progress`. Close it from the PR with `Closes #<n>` once `npm test` and `npm run build` pass.
 4. **Deterministic Triage + AI Guidance:** Keep Green/Yellow/Red threshold evaluation deterministic in TypeScript. Use the LLM layer strictly for plain-language explanations, step-by-step guided self-exams, and vision triage.
 
 ## 3. Shared Technical Standards
