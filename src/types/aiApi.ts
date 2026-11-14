@@ -12,6 +12,7 @@ import type {
   FlightSurgeonGuidance,
   GravityEnvironment,
   ScenarioId,
+  SpaceLocationId,
   TriageStatus,
   VisualExamAnalysis,
   VisualExamSample,
@@ -72,6 +73,8 @@ export interface CrewContextRequest {
   crewMember?: CrewMemberProfile;
   scenarioId: ScenarioId;
   environment?: GravityEnvironment;
+  /** Mission location (specs/01-data-schema.md §8); added to prompts. */
+  locationId?: SpaceLocationId;
 }
 
 export interface GuidanceRequest extends CrewContextRequest {

@@ -283,6 +283,8 @@ export interface MetricLink {
 
 ## 6. Daily Crew Check-In (`CheckInEntry`, `src/utils/checkIns.ts`)
 
+> HUD v2 removed the Check-in tab. The overlay code below stays so stored entries (and a future logging UI, issue #1) keep working.
+
 Ported from the ARGOS prototype's daily check-in. Crew members type real readings, which are overlaid on top of the synthetic 30-day series.
 
 ```typescript
@@ -308,21 +310,66 @@ export interface CheckInEntry {
 
 ---
 
-## 7. Future: ARGUS Companion Chat (not implemented)
+## 7. ARGUS Companion Chat
+Implemented with the AI backend types in `src/types/aiApi.ts` (`CrewChatMessage`, `ChatRequest`, `ChatStreamEvent`; see `specs/04-ai-backend.md`). Chat history is stored per crew member in `localStorage` (`argus_chat_v1` → `Record<crewId, CrewChatMessage[]>`, last 50 messages).
 
-Planned port of the ARGOS prototype's conversational companion (see `specs/02-ui-dashboard.md` §5 and issue #7). Draft types only. Do **not** add them to `src/types/argus.ts` until the task is claimed.
+## 8. Mission Location (`SpaceLocationId`, `src/data/spaceLocations.ts`)
 
 ```typescript
-export type CompanionIntent =
-  | 'red_flag' | 'status' | 'metric' | 'symptom' | 'forecast' | 'why' | 'radiation' | 'help' | 'fallback';
+export type SpaceLocationId =
+  | 'earth_pre' | 'earth_post' | 'leo' | 'gateway'
+  | 'lunar_surface' | 'mars_transit' | 'mars_surface' | 'rover';
 
-export interface CompanionMessage {
-  id: string;
-  crewId: string;
-  role: 'crew' | 'argus';
-  text: string;
-  timestampIso: string;
-  intent?: CompanionIntent;
-  source: 'live_ai' | 'offline_brain';
+export interface SpaceLocation {
+  id: SpaceLocationId;
+  label: string;               // "Mars transit"
+  gravityG: number;            // 0, 0.16, 0.38, 1
+  gravityLabel: string;        // "≈0 g"
+  commDelaySec: [number, number]; // one-way light time range in seconds, [0, 0] on Earth
+  radiation: 'shielded' | 'magnetosphere' | 'deep_space' | 'surface';
+  clock: 'earth' | 'leo' | 'lunar' | 'mars';
+  description: string;
 }
 ```
+- Stored per crew member: `localStorage` `argus_locations_v1` → `Record<crewId, SpaceLocationId>`. Default `mars_transit` (matches the `0g_transit` thresholds).
+- Sent to the AI backend as optional `locationId` on every request; the server adds the location line to prompts.
+- Triage still uses the `0g_transit` thresholds for every location (location-specific thresholds are future work).
+
+## 9. User Accounts (`UserAccount`, `src/auth/authStore.ts`)
+
+```typescript
+export type UserRole = 'admin' | 'crew';
+
+export interface UserAccount {
+  id: string;
+  username: string;            // unique, case-insensitive, 3–32 chars
+  role: UserRole;
+  crewId?: string;             // required for 'crew'
+  passwordHash: string;        // PBKDF2-SHA256, 100k iterations, hex
+  salt: string;                // 16 random bytes, hex
+  createdAtIso: string;
+}
+```
+- `localStorage` `argus_users_v1` → `UserAccount[]`; session id in `sessionStorage` `argus_session_v1`.
+- Passwords: at least 6 characters. No default accounts: the first run creates the admin.
+- Deleting a crew member also deletes accounts linked to it.
+
+## 10. Emergency Protocols (`EmergencyProtocol`, `src/data/emergencyProtocols.ts`)
+
+```typescript
+export interface EmergencyProtocol {
+  id: 'fire' | 'depress' | 'toxic' | 'medical' | 'radiation' | 'co2';
+  title: string;
+  icon: string;                // lucide icon name
+  trigger: string;             // when to use it, one line
+  steps: string[];
+}
+
+export interface EmergencyRun {
+  protocolId: EmergencyProtocol['id'];
+  crewId: string;
+  startedAtIso: string;
+  completed: Record<number, string>; // step index → ISO time
+}
+```
+Runs are kept in memory for the session and included in the Earth packet notes when the crew taps `Notify Earth`.

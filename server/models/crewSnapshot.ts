@@ -12,6 +12,8 @@ import type {
 } from '../../src/types/argus';
 import type { CrewContextRequest, MetricTrend } from '../../src/types/aiApi';
 import { BODY_ZONES, getCrewAdjustedZones, TELEMETRY_SCENARIOS } from '../../src/data/telemetryScenarios';
+import { formatCommDelay, SPACE_LOCATIONS } from '../../src/data/spaceLocations';
+import type { SpaceLocation } from '../../src/types/argus';
 import {
   calculateCrewReadinessScore,
   DEFAULT_ENVIRONMENT,
@@ -25,6 +27,7 @@ export interface CrewSnapshot {
   scenarioId: ScenarioId;
   scenarioLabel: string;
   environment: GravityEnvironment;
+  location?: SpaceLocation;
   zones: Record<BodyZoneId, VitalSignReading[]>;
   zoneStatuses: Record<BodyZoneId, TriageStatus>;
   readinessScore: number;
@@ -42,6 +45,7 @@ export function buildCrewSnapshot(req: CrewContextRequest): CrewSnapshot {
     scenarioId: req.scenarioId,
     scenarioLabel: scenario.label,
     environment,
+    location: req.locationId ? SPACE_LOCATIONS[req.locationId] : undefined,
     zones,
     zoneStatuses: evaluateAllZones(zones, environment),
     readinessScore: calculateCrewReadinessScore(zones, environment),
@@ -77,7 +81,9 @@ export function formatSnapshotForPrompt(s: CrewSnapshot, opts: { allMetrics?: bo
 
   return [
     describeCrew(s.crewMember),
-    `Environment: ${env.label} (${env.gravityG}), Earth comm delay ${env.commDelay}, phase ${env.missionPhase}.`,
+    s.location
+      ? `Location: ${s.location.label} (${s.location.gravityLabel}), one-way comm delay to Earth ${formatCommDelay(s.location)}. ${s.location.description}`
+      : `Environment: ${env.label} (${env.gravityG}), Earth comm delay ${env.commDelay}, phase ${env.missionPhase}.`,
     `Active scenario: ${s.scenarioLabel}.`,
     `Crew Readiness Score (deterministic): ${s.readinessScore}%.`,
     `Zone triage (deterministic — authoritative, never change it):\n${zoneLines}`,

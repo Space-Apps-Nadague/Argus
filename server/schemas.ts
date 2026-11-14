@@ -31,10 +31,22 @@ export const CrewMemberSchema = z.object({
   isCustom: z.boolean().optional(),
 });
 
+export const LocationIdSchema = z.enum([
+  'earth_pre',
+  'earth_post',
+  'leo',
+  'gateway',
+  'lunar_surface',
+  'mars_transit',
+  'mars_surface',
+  'rover',
+]);
+
 export const CrewContextSchema = z.object({
   crewMember: CrewMemberSchema.optional(),
   scenarioId: ScenarioIdSchema,
   environment: EnvironmentSchema.optional(),
+  locationId: LocationIdSchema.optional(),
 });
 
 export const GuidanceRequestSchema = CrewContextSchema.extend({ zoneId: ZoneIdSchema });

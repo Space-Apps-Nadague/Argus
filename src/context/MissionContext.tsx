@@ -10,6 +10,7 @@ import React, {
   useEffect,
   useMemo,
   useReducer,
+  useState,
 } from 'react';
 import {
   AnatomicalLayer,
@@ -21,6 +22,8 @@ import {
   FlightSurgeonGuidance,
   GravityEnvironment,
   HudTabId,
+  SpaceLocation,
+  SpaceLocationId,
   MetricLink,
   ScenarioId,
   TriageStatus,
@@ -46,6 +49,7 @@ import {
   latestMissionDay,
 } from '../utils/checkIns';
 import { findMetricLinks } from '../utils/driftAnalytics';
+import { DEFAULT_SPACE_LOCATION, isSpaceLocationId, SPACE_LOCATIONS } from '../data/spaceLocations';
 import {
   analyzeVisualSelfExam,
   synthesizeFlightSurgeonGuidance,
@@ -82,7 +86,23 @@ export function resolveLiveGuidance(
   };
 }
 const TAB_STORAGE_KEY = 'argus_active_tab_v1';
-const HUD_TABS: HudTabId[] = ['biotwin', 'trends', 'checkin', 'surgeon', 'crew'];
+const HUD_TABS: HudTabId[] = ['biotwin', 'trends', 'forecast', 'eyes', 'ai', 'emergency', 'crew', 'users'];
+const LOCATIONS_STORAGE_KEY = 'argus_locations_v1';
+
+function loadInitialLocations(): Record<string, SpaceLocationId> {
+  try {
+    const raw = localStorage.getItem(LOCATIONS_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return Object.fromEntries(
+        Object.entries(parsed).filter(([, v]) => isSpaceLocationId(v))
+      ) as Record<string, SpaceLocationId>;
+    }
+  } catch {
+    // Ignore storage errors in restricted environments
+  }
+  return {};
+}
 
 function loadInitialTab(): HudTabId {
   try {
@@ -452,6 +472,11 @@ interface MissionContextValue extends MissionState {
   latestDay: number;
   metricLinks: MetricLink[];
   setActiveTab: (tab: HudTabId) => void;
+  /** True when a crew user is signed in: the active crew member can't be changed. */
+  isCrewLocked: boolean;
+  spaceLocationId: SpaceLocationId;
+  spaceLocation: SpaceLocation;
+  setSpaceLocation: (id: SpaceLocationId) => void;
   addCheckIn: (entry: CheckInEntry) => void;
   deleteCheckIn: (entryId: string) => void;
   zoneStatuses: Record<BodyZoneId, TriageStatus>;
@@ -480,10 +505,33 @@ interface MissionContextValue extends MissionState {
 
 const MissionContext = createContext<MissionContextValue | undefined>(undefined);
 
-export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({
+interface MissionProviderProps {
+  children: React.ReactNode;
+  /** Crew users are locked to their own crew member (specs/02-ui-dashboard.md §6). */
+  lockedCrewId?: string;
+  /** Called after a crew member is deleted (e.g. to remove linked accounts). */
+  onCrewDeleted?: (crewId: string) => void;
+}
+
+export const MissionProvider: React.FC<MissionProviderProps> = ({
   children,
+  lockedCrewId,
+  onCrewDeleted,
 }) => {
-  const [state, dispatch] = useReducer(missionReducer, initialState);
+  const [state, dispatch] = useReducer(missionReducer, initialState, (s) =>
+    lockedCrewId && lockedCrewId !== s.activeCrewId && s.crewRoster.some((c) => c.id === lockedCrewId)
+      ? missionReducer(s, { type: 'SELECT_CREW_MEMBER', payload: lockedCrewId })
+      : s
+  );
+  const [locations, setLocations] = useState<Record<string, SpaceLocationId>>(loadInitialLocations);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(LOCATIONS_STORAGE_KEY, JSON.stringify(locations));
+    } catch {
+      // Ignore storage errors
+    }
+  }, [locations]);
 
   useEffect(() => {
     try {
@@ -514,6 +562,14 @@ export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({
       state.crewRoster.find((c) => c.id === state.activeCrewId) ||
       state.crewRoster[0],
     [state.crewRoster, state.activeCrewId]
+  );
+
+  const spaceLocationId: SpaceLocationId = locations[activeCrewMember.id] ?? DEFAULT_SPACE_LOCATION;
+  const spaceLocation = SPACE_LOCATIONS[spaceLocationId];
+
+  const setSpaceLocation = useCallback(
+    (id: SpaceLocationId) => setLocations((prev) => ({ ...prev, [activeCrewMember.id]: id })),
+    [activeCrewMember.id]
   );
 
   const activeCheckIns = useMemo(
@@ -571,8 +627,9 @@ export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 
   const selectCrewMember = useCallback((crewId: string) => {
+    if (lockedCrewId && crewId !== lockedCrewId) return;
     dispatch({ type: 'SELECT_CREW_MEMBER', payload: crewId });
-  }, []);
+  }, [lockedCrewId]);
 
   const createCrewMember = useCallback(
     (newMember: Omit<CrewMemberProfile, 'id' | 'isCustom'>) => {
@@ -587,9 +644,15 @@ export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({
     []
   );
 
-  const deleteCrewMember = useCallback((crewId: string) => {
-    dispatch({ type: 'DELETE_CREW_MEMBER', payload: crewId });
-  }, []);
+  const deleteCrewMember = useCallback(
+    (crewId: string) => {
+      if (lockedCrewId) return; // only admins manage the roster
+      dispatch({ type: 'DELETE_CREW_MEMBER', payload: crewId });
+      setLocations(({ [crewId]: _removed, ...rest }) => rest);
+      onCrewDeleted?.(crewId);
+    },
+    [lockedCrewId, onCrewDeleted]
+  );
 
   const updateCrewMemberSex = useCallback(
     (crewId: string, sex: BiologicalSex) => {
@@ -805,6 +868,10 @@ export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({
       latestDay,
       metricLinks,
       setActiveTab,
+      isCrewLocked: Boolean(lockedCrewId),
+      spaceLocationId,
+      spaceLocation,
+      setSpaceLocation,
       addCheckIn,
       deleteCheckIn,
       zoneStatuses,
@@ -838,6 +905,10 @@ export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({
       latestDay,
       metricLinks,
       setActiveTab,
+      lockedCrewId,
+      spaceLocationId,
+      spaceLocation,
+      setSpaceLocation,
       addCheckIn,
       deleteCheckIn,
       zoneStatuses,

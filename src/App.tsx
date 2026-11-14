@@ -1,61 +1,99 @@
 /**
  * ARGUS — Astronaut Readiness Guidance & Unified Surveillance
- * Tabbed HUD layout (specs/02-ui-dashboard.md §1–§2)
+ * HUD v2 layout (specs/02-ui-dashboard.md §1, §6)
  *
- * - Top bar: `TopMissionBar.tsx` (brand, comm delay, readiness, scenario, crew strip)
- * - Tab bar: `TabBar.tsx` (Bio-Twin · Trends · Check-in · Flight Surgeon · Crew)
- * - Panels: one full-width panel per tab; only the active panel is mounted
- * - Dialog: `CrewManagerModal.tsx` (add crew member)
+ * - Sign-in: `AuthGate.tsx` (first-run admin setup, then username + password)
+ * - Top bar: `TopMissionBar.tsx` (brand, location, comm delay, clock, readiness, user menu, admin crew strip)
+ * - Left tab rail: `TabBar.tsx` (Bio-Twin · Trends · Forecast · Eyes · ARGUS AI · Emergency · Crew/Users for admins)
+ * - Panels: one panel per tab; only the active panel is mounted
  */
 
 import React from 'react';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { MissionProvider, useMission } from './context/MissionContext';
 import { HudTabId } from './types/argus';
+import { AuthGate } from './components/AuthGate';
 import { TopMissionBar } from './components/TopMissionBar';
-import { TabBar, HUD_TAB_DEFS, panelId, tabId } from './components/TabBar';
+import { TabBar, panelId, tabId, visibleTabs } from './components/TabBar';
 import { BioTwinTab } from './components/BioTwinTab';
 import { TrendsTab } from './components/TrendsTab';
-import { CheckInTab } from './components/CheckInTab';
-import { FlightSurgeonPanel } from './components/FlightSurgeonPanel';
+import { ForecastTab } from './components/ForecastTab';
+import { EyesTab } from './components/EyesTab';
+import { AiTab } from './components/AiTab';
+import { EmergencyTab } from './components/EmergencyTab';
 import { CrewTab } from './components/CrewTab';
+import { UsersTab } from './components/UsersTab';
 import { CrewManagerModal } from './components/CrewManagerModal';
 
 const PANELS: Record<HudTabId, React.FC> = {
   biotwin: BioTwinTab,
   trends: TrendsTab,
-  checkin: CheckInTab,
-  surgeon: FlightSurgeonPanel,
+  forecast: ForecastTab,
+  eyes: EyesTab,
+  ai: AiTab,
+  emergency: EmergencyTab,
   crew: CrewTab,
+  users: UsersTab,
 };
 
-const ActivePanel: React.FC = () => {
-  const { activeTab } = useMission();
+const Hud: React.FC = () => {
+  const { isAdmin } = useAuth();
+  const { activeTab: storedTab } = useMission();
+  const tabs = visibleTabs(isAdmin);
+  // A crew user may have a stored admin-only tab; fall back to Bio-Twin.
+  const activeTab: HudTabId = tabs.some((t) => t.id === storedTab) ? storedTab : 'biotwin';
+
   return (
-    <>
-      {HUD_TAB_DEFS.map(({ id }) => {
-        const Panel = PANELS[id];
-        const active = id === activeTab;
-        return (
-          <div key={id} role="tabpanel" id={panelId(id)} aria-labelledby={tabId(id)} hidden={!active} tabIndex={0} className="outline-none">
-            {active && <Panel />}
-          </div>
-        );
-      })}
-    </>
+    <div className="min-h-screen bg-hud-bg text-hud-text hud-grid-bg">
+      <TopMissionBar />
+      {isAdmin && <CrewManagerModal />}
+      <div className="md:flex">
+        <TabBar isAdmin={isAdmin} activeTab={activeTab} />
+        <main className="mx-auto w-full min-w-0 max-w-[1800px] p-3 md:p-4">
+          {tabs.map(({ id }) => {
+            const Panel = PANELS[id];
+            const active = id === activeTab;
+            return (
+              <div
+                key={id}
+                role="tabpanel"
+                id={panelId(id)}
+                aria-labelledby={tabId(id)}
+                hidden={!active}
+                tabIndex={0}
+                className="outline-none"
+              >
+                {active && <Panel />}
+              </div>
+            );
+          })}
+        </main>
+      </div>
+    </div>
+  );
+};
+
+/** Remounts the mission state per signed-in user so crew users are locked to their own astronaut. */
+const SignedInApp: React.FC = () => {
+  const { currentUser, removeAccountsForCrew } = useAuth();
+  if (!currentUser) return null;
+  return (
+    <MissionProvider
+      key={currentUser.id}
+      lockedCrewId={currentUser.role === 'crew' ? currentUser.crewId : undefined}
+      onCrewDeleted={removeAccountsForCrew}
+    >
+      <Hud />
+    </MissionProvider>
   );
 };
 
 export const App: React.FC = () => (
-  <MissionProvider>
-    <div className="min-h-screen bg-hud-bg text-hud-text hud-grid-bg">
-      <TopMissionBar />
-      <TabBar />
-      <CrewManagerModal />
-      <main className="mx-auto w-full max-w-[1800px] p-3 md:p-4">
-        <ActivePanel />
-      </main>
-    </div>
-  </MissionProvider>
+  <AuthProvider>
+    <AuthGate>
+      <SignedInApp />
+    </AuthGate>
+  </AuthProvider>
 );
 
 export default App;

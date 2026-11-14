@@ -105,19 +105,6 @@ export const CrewTab: React.FC = () => {
                 )}
                 <button
                   type="button"
-                  className="hud-btn"
-                  onClick={() => {
-                    selectCrewMember(m.id);
-                    setActiveTab('checkin');
-                  }}
-                  title="Check-in streak (days)"
-                >
-                  <ClipboardCheck className="h-3.5 w-3.5" aria-hidden="true" />
-                  {streak}d
-                  <span className="sr-only"> check-in streak. Open check-in</span>
-                </button>
-                <button
-                  type="button"
                   className="hud-btn ml-auto"
                   aria-expanded={open}
                   aria-controls={`crew-details-${m.id}`}

@@ -4,12 +4,15 @@
  */
 
 import React, { useState } from 'react';
-import { Activity, Flame, KeyRound, Radio, UserPlus, X } from 'lucide-react';
+import { Activity, Flame, KeyRound, LogOut, MapPin, Radio, ShieldCheck, UserPlus, UserRound, X } from 'lucide-react';
 import { useMission } from '../context/MissionContext';
-import { ScenarioId, TriageStatus } from '../types/argus';
+import { useAuth } from '../context/AuthContext';
+import { formatCommDelay, SPACE_LOCATION_ORDER, SPACE_LOCATIONS } from '../data/spaceLocations';
+import { MissionClock } from './MissionClock';
+import { ScenarioId, SpaceLocationId, TriageStatus } from '../types/argus';
 import { getCrewAdjustedZones, TELEMETRY_SCENARIOS } from '../data/telemetryScenarios';
 import { applyCheckIns } from '../utils/checkIns';
-import { ENVIRONMENT_META, evaluateAllZones } from '../utils/triageEngine';
+import { evaluateAllZones } from '../utils/triageEngine';
 import { hasConfiguredAiKey } from '../services/flightSurgeonAi';
 import { StatusIcon, STATUS_WORD } from './ui/StatusPill';
 
@@ -44,10 +47,14 @@ export const TopMissionBar: React.FC = () => {
     runtimeApiKey,
     setRuntimeApiKey,
     checkIns,
+    latestDay,
+    spaceLocation,
+    spaceLocationId,
+    setSpaceLocation,
   } = useMission();
+  const { currentUser, isAdmin, logout } = useAuth();
 
   const [showKeyInput, setShowKeyInput] = useState(false);
-  const envMeta = ENVIRONMENT_META[environment];
   const hasKey = hasConfiguredAiKey(runtimeApiKey);
   const rStatus = readinessStatus(readinessScore);
   const streak = countermeasureStreakSols + (completedStepIds.length > 0 ? 1 : 0);
@@ -66,21 +73,42 @@ export const TopMissionBar: React.FC = () => {
             </span>
             <div className="leading-tight">
               <h1 className="font-display text-lg font-bold tracking-[0.2em] text-hud-text">ARGUS</h1>
-              <p className="text-[11px] text-hud-muted">Crew Bio-Twin · {envMeta.shortLabel}</p>
+              <p className="text-[11px] text-hud-muted">
+                {activeCrewMember.callsign} · {spaceLocation.gravityLabel}
+              </p>
             </div>
           </div>
+          <label
+            className="flex items-center gap-1.5 rounded-lg border border-hud-line bg-hud-panel/80 px-2.5 py-1.5"
+            title={spaceLocation.description}
+          >
+            <MapPin className="h-3.5 w-3.5 text-hud-accent" aria-hidden="true" />
+            <span className="sr-only">Mission location</span>
+            <select
+              value={spaceLocationId}
+              onChange={(e) => setSpaceLocation(e.target.value as SpaceLocationId)}
+              className="hud-focus cursor-pointer rounded bg-transparent text-xs font-medium text-hud-text"
+            >
+              {SPACE_LOCATION_ORDER.map((id) => (
+                <option key={id} value={id} className="bg-hud-panel text-hud-text">
+                  {SPACE_LOCATIONS[id].label}
+                </option>
+              ))}
+            </select>
+          </label>
           <span
             title="One-way signal delay to Earth"
             className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 font-mono text-[11px] text-amber-300"
           >
             <Radio className="h-3.5 w-3.5" aria-hidden="true" />
-            {envMeta.commDelay.replace(' ONE-WAY', '')}
+            {formatCommDelay(spaceLocation)}
             <span className="font-sans text-amber-200/80">to Earth</span>
           </span>
         </div>
 
-        {/* Readiness · scenario · AI key */}
+        {/* Clock · readiness · scenario · AI key · user */}
         <div className="flex flex-wrap items-center gap-2">
+          <MissionClock location={spaceLocation} missionDay={latestDay} />
           <div
             className="flex items-center gap-2.5 rounded-lg border border-hud-line bg-hud-panel/80 px-3 py-1.5"
             aria-label={`${activeCrewMember.callsign} readiness ${readinessScore} percent, ${STATUS_WORD[rStatus]}`}
@@ -154,10 +182,32 @@ export const TopMissionBar: React.FC = () => {
               </div>
             )}
           </div>
+
+          <div className="flex items-center gap-1.5 rounded-lg border border-hud-line bg-hud-panel/80 py-1 pl-2.5 pr-1">
+            {isAdmin ? (
+              <ShieldCheck className="h-4 w-4 text-hud-accent" aria-hidden="true" />
+            ) : (
+              <UserRound className="h-4 w-4 text-hud-accent" aria-hidden="true" />
+            )}
+            <div className="leading-tight">
+              <div className="text-xs font-semibold text-hud-text">{currentUser?.username}</div>
+              <div className="text-[10px] text-hud-muted">{isAdmin ? 'Admin' : 'Crew'}</div>
+            </div>
+            <button
+              type="button"
+              onClick={logout}
+              className="hud-focus ml-1 rounded-md p-1.5 text-hud-muted hover:bg-hud-bg hover:text-hud-text"
+              aria-label="Sign out"
+              title="Sign out"
+            >
+              <LogOut className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Crew strip */}
+      {/* Crew strip (admin only) */}
+      {isAdmin && (
       <div className="border-t border-hud-line/70 bg-hud-panel/40">
         <div className="max-w-[1800px] mx-auto flex items-center gap-2 px-3 md:px-4 py-1.5">
           <div className="flex min-w-0 flex-1 items-center gap-1.5 no-scrollbar overflow-x-auto py-0.5" role="group" aria-label="Active crew member">
@@ -195,6 +245,7 @@ export const TopMissionBar: React.FC = () => {
           </button>
         </div>
       </div>
+      )}
     </header>
   );
 };
