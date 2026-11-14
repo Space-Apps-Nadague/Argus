@@ -4,12 +4,12 @@
  */
 
 import React, { useState } from 'react';
-import { Activity, Flame, KeyRound, Radio, UserPlus, X } from 'lucide-react';
+import { Activity, Flame, Globe, KeyRound, Orbit, Radio, UserPlus, X } from 'lucide-react';
 import { useMission } from '../context/MissionContext';
-import { ScenarioId, TriageStatus } from '../types/argus';
+import { GravityEnvironment, ScenarioId, TriageStatus } from '../types/argus';
 import { getCrewAdjustedZones, TELEMETRY_SCENARIOS } from '../data/telemetryScenarios';
 import { applyCheckIns } from '../utils/checkIns';
-import { ENVIRONMENT_META, evaluateAllZones } from '../utils/triageEngine';
+import { ENVIRONMENT_META, ENVIRONMENT_ORDER, evaluateAllZones } from '../utils/triageEngine';
 import { hasConfiguredAiKey } from '../services/flightSurgeonAi';
 import { StatusIcon, STATUS_WORD } from './ui/StatusPill';
 
@@ -36,6 +36,7 @@ export const TopMissionBar: React.FC = () => {
     selectCrewMember,
     setCrewModalOpen,
     environment,
+    setEnvironment,
     scenarioId,
     setScenario,
     readinessScore,
@@ -71,7 +72,7 @@ export const TopMissionBar: React.FC = () => {
                   Astronaut Readiness Guidance &amp; Unified Surveillance
                 </span>
               </div>
-              <p className="text-[11px] text-hud-muted">Crew Bio-Twin · {envMeta.shortLabel}</p>
+              <p className="text-[11px] text-hud-muted">Crew Bio-Twin · {envMeta.shortLabel} ({envMeta.gravityG})</p>
             </div>
           </div>
           <span
@@ -82,9 +83,17 @@ export const TopMissionBar: React.FC = () => {
             {envMeta.commDelay.replace(' ONE-WAY', '')}
             <span className="font-sans text-amber-200/80">to Earth</span>
           </span>
+          <span
+            title={`Local gravity field: ${envMeta.gravityG} (${envMeta.label})`}
+            className="hidden md:inline-flex items-center gap-1.5 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2.5 py-1 font-mono text-[11px] text-cyan-300"
+          >
+            <Orbit className="h-3.5 w-3.5 text-cyan-400" aria-hidden="true" />
+            <span>{envMeta.gravityG}</span>
+            <span className="font-sans text-cyan-200/80">gravity</span>
+          </span>
         </div>
 
-        {/* Readiness · scenario · AI key */}
+        {/* Readiness · location · scenario · AI key */}
         <div className="flex flex-wrap items-center gap-2">
           <div
             className="flex items-center gap-2.5 rounded-lg border border-hud-line bg-hud-panel/80 px-3 py-1.5"
@@ -103,6 +112,23 @@ export const TopMissionBar: React.FC = () => {
               {streak}d
             </span>
           </div>
+
+          <label className="flex items-center gap-2 rounded-lg border border-hud-line bg-hud-panel/80 px-2.5 py-1.5">
+            <Globe className="h-3.5 w-3.5 text-hud-accent" aria-hidden="true" />
+            <span className="text-[11px] text-hud-muted">Location</span>
+            <select
+              value={environment}
+              onChange={(e) => setEnvironment(e.target.value as GravityEnvironment)}
+              className="hud-focus cursor-pointer rounded bg-transparent text-xs font-medium text-hud-text"
+              aria-label="Mission Location and Gravity Environment"
+            >
+              {ENVIRONMENT_ORDER.map((loc) => (
+                <option key={loc} value={loc} className="bg-hud-panel text-hud-text">
+                  {ENVIRONMENT_META[loc].shortLabel} ({ENVIRONMENT_META[loc].gravityG})
+                </option>
+              ))}
+            </select>
+          </label>
 
           <label className="flex items-center gap-2 rounded-lg border border-hud-line bg-hud-panel/80 px-2.5 py-1.5">
             <span className="text-[11px] text-hud-muted">Scenario</span>

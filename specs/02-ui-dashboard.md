@@ -16,8 +16,10 @@
 ```
 
 - **Top Bar (`TopMissionBar.tsx`) — slim, low-text:**
-  - Brand `ARGUS` (display font) + expanded abbreviation `Astronaut Readiness Guidance & Unified Surveillance` + small `Crew Bio-Twin`.
-  - Comm delay badge (`14m 22s ONE-WAY`).
+  - Brand `ARGUS` (display font) + expanded abbreviation `Astronaut Readiness Guidance & Unified Surveillance` + small `Crew Bio-Twin · <Location> (<Gravity>)`.
+  - Dynamic **Signal Comm Delay to Earth** badge (`Real-time to Earth`, `1.3s to Earth`, `14m 22s to Earth`, `18m 10s to Earth`).
+  - Dynamic **Surface/Orbital Gravity** badge (`0.00g`, `0.16g`, `0.38g`).
+  - **Location / Habitat Selector** dropdown (`iss_leo`, `lunar_base`, `0g_transit`, `mars_base` presets) dynamically updating comm delay, gravity thresholds, Earth packet metadata, and autonomous urgency.
   - **Crew Readiness Score** `0–100%` with status color + daily countermeasure streak.
   - **Simulate Medical Event** dropdown (`nominal`, `sans_alert`, `high_co2`, `solar_storm`).
   - Optional Clinical AI key button (icon only + tooltip).

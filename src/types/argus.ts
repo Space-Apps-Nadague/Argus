@@ -3,7 +3,19 @@
  * Single Source of Truth: specs/01-data-schema.md
  */
 
-export type GravityEnvironment = '0g_transit';
+export type GravityEnvironment = '0g_transit' | 'iss_leo' | 'lunar_base' | 'mars_base';
+
+export type MissionLocation = GravityEnvironment;
+
+export interface LocationPreset {
+  id: GravityEnvironment;
+  label: string;
+  shortLabel: string;
+  gravityG: string;
+  commDelay: string;
+  missionPhase: string;
+  hazardOverview: string;
+}
 
 export type BodyZoneId = 'neuro' | 'cardio' | 'musculo' | 'immune' | 'behavioral';
 

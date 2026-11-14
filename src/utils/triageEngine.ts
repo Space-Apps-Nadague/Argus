@@ -41,6 +41,24 @@ export const ENVIRONMENT_META: Record<
     hazardOverview: string;
   }
 > = {
+  'iss_leo': {
+    label: 'ISS Low Earth Orbit',
+    shortLabel: 'ISS (LEO)',
+    gravityG: '0.00g',
+    commDelay: 'Real-time ONE-WAY',
+    missionPhase: 'EXPEDITION 72 // LEO STATION OPS',
+    hazardOverview:
+      'Microgravity produces cephalad fluid shifts without terrestrial hydrostatic pressure; partial geomagnetic shielding reduces radiation, with real-time ground tele-medical support.',
+  },
+  'lunar_base': {
+    label: 'Artemis Lunar Base (1/6g)',
+    shortLabel: 'Lunar Base',
+    gravityG: '0.16g',
+    commDelay: '1.3s ONE-WAY',
+    missionPhase: 'ARTEMIS BASE CAMP // SHACKLETON RIM',
+    hazardOverview:
+      'Partial lunar gravity (1/6g) reduces cephalad venous pooling and preserves partial skeletal load; abrasive surface regolith and high SPE radiation present operational challenges.',
+  },
   '0g_transit': {
     label: '0g Deep-Space Transit',
     shortLabel: '0g Transit',
@@ -50,12 +68,28 @@ export const ENVIRONMENT_META: Record<
     hazardOverview:
       'Microgravity induces cephalad fluid shift toward the head, increasing intracranial & optic nerve sheath pressure (SANS), accelerating bone mineral loss, and requiring closed-loop CO₂ scrubbing.',
   },
+  'mars_base': {
+    label: 'Mars Surface Base (3/8g)',
+    shortLabel: 'Mars Base',
+    gravityG: '0.38g',
+    commDelay: '18m 10s ONE-WAY',
+    missionPhase: 'JEZERO CRATER HABITAT // SOL 204',
+    hazardOverview:
+      'Partial Martian gravity (3/8g) mitigates SANS risk and provides axial loading; substantial comm latency requires autonomous crew health surveillance and delayed tele-consultation.',
+  },
 };
 
+export const ENVIRONMENT_ORDER: GravityEnvironment[] = [
+  'iss_leo',
+  'lunar_base',
+  '0g_transit',
+  'mars_base',
+];
+
 /**
- * 0g microgravity threshold lookup table matching specs/01-data-schema.md §2
+ * Baseline 0g microgravity threshold lookup table matching specs/01-data-schema.md §2
  */
-export const METRIC_THRESHOLDS: Record<string, ThresholdRange> = {
+export const METRIC_THRESHOLDS_0G: Record<string, ThresholdRange> = {
   onsd: { nominalMin: 4.5, nominalMax: 5.5, yellowMin: 4.2, yellowMax: 5.9 },
   iop: { nominalMin: 11, nominalMax: 18, yellowMin: 9, yellowMax: 21 },
   cabin_co2: { nominalMin: 1.5, nominalMax: 3.5, yellowMin: 1.0, yellowMax: 4.5 },
@@ -73,6 +107,45 @@ export const METRIC_THRESHOLDS: Record<string, ThresholdRange> = {
   pvt_lapses: { nominalMin: 0, nominalMax: 2, yellowMin: 0, yellowMax: 4 },
   daily_sleep_hours: { nominalMin: 7.0, nominalMax: 9.0, yellowMin: 6.0, yellowMax: 10.0 },
   mood_index: { nominalMin: 7.0, nominalMax: 10.0, yellowMin: 5.0, yellowMax: 10.0 },
+};
+
+export const METRIC_THRESHOLDS = METRIC_THRESHOLDS_0G;
+
+/**
+ * Gravity- and location-adjusted thresholds matching specs/01-data-schema.md §2
+ */
+export const ENVIRONMENT_METRIC_THRESHOLDS: Record<
+  GravityEnvironment,
+  Record<string, ThresholdRange>
+> = {
+  '0g_transit': METRIC_THRESHOLDS_0G,
+  'iss_leo': {
+    ...METRIC_THRESHOLDS_0G,
+    rad_dose: { nominalMin: 0.2, nominalMax: 0.6, yellowMin: 0.0, yellowMax: 1.2 },
+    cabin_co2: { nominalMin: 1.2, nominalMax: 3.0, yellowMin: 0.8, yellowMax: 4.0 },
+  },
+  'lunar_base': {
+    ...METRIC_THRESHOLDS_0G,
+    onsd: { nominalMin: 4.3, nominalMax: 5.3, yellowMin: 4.0, yellowMax: 5.7 },
+    iop: { nominalMin: 11, nominalMax: 19, yellowMin: 9, yellowMax: 21 },
+    cabin_co2: { nominalMin: 1.2, nominalMax: 3.2, yellowMin: 0.8, yellowMax: 4.2 },
+    resting_hr: { nominalMin: 54, nominalMax: 76, yellowMin: 48, yellowMax: 88 },
+    systolic_bp: { nominalMin: 105, nominalMax: 135, yellowMin: 95, yellowMax: 145 },
+    bmd_delta: { nominalMin: -0.6, nominalMax: 0.2, yellowMin: -1.0, yellowMax: 0.5 },
+    ared_load: { nominalMin: 14, nominalMax: 26, yellowMin: 10, yellowMax: 30 },
+    rad_dose: { nominalMin: 0.3, nominalMax: 0.9, yellowMin: 0.0, yellowMax: 2.0 },
+  },
+  'mars_base': {
+    ...METRIC_THRESHOLDS_0G,
+    onsd: { nominalMin: 4.1, nominalMax: 5.1, yellowMin: 3.8, yellowMax: 5.5 },
+    iop: { nominalMin: 12, nominalMax: 20, yellowMin: 10, yellowMax: 22 },
+    cabin_co2: { nominalMin: 1.2, nominalMax: 3.0, yellowMin: 0.8, yellowMax: 4.0 },
+    resting_hr: { nominalMin: 55, nominalMax: 78, yellowMin: 50, yellowMax: 90 },
+    systolic_bp: { nominalMin: 110, nominalMax: 135, yellowMin: 95, yellowMax: 145 },
+    bmd_delta: { nominalMin: -0.4, nominalMax: 0.3, yellowMin: -0.8, yellowMax: 0.6 },
+    ared_load: { nominalMin: 12, nominalMax: 24, yellowMin: 8, yellowMax: 28 },
+    rad_dose: { nominalMin: 0.3, nominalMax: 0.8, yellowMin: 0.0, yellowMax: 1.8 },
+  },
 };
 
 /**
@@ -137,9 +210,13 @@ export function isMetricId(id: string): id is MetricId {
 
 export function getMetricThreshold(
   metricId: string,
-  _environment: GravityEnvironment = DEFAULT_ENVIRONMENT
+  environment: GravityEnvironment = DEFAULT_ENVIRONMENT
 ): ThresholdRange {
+  const envTable =
+    ENVIRONMENT_METRIC_THRESHOLDS[environment] ??
+    ENVIRONMENT_METRIC_THRESHOLDS[DEFAULT_ENVIRONMENT];
   return (
+    envTable[metricId] ??
     METRIC_THRESHOLDS[metricId] ?? {
       nominalMin: 0,
       nominalMax: 100,
@@ -155,7 +232,8 @@ export function formatFlightNormBadge(
   environment: GravityEnvironment = DEFAULT_ENVIRONMENT
 ): string {
   const range = getMetricThreshold(metricId, environment);
-  return `0g Norm: ${range.nominalMin}–${range.nominalMax} ${unit}`;
+  const meta = ENVIRONMENT_META[environment] ?? ENVIRONMENT_META[DEFAULT_ENVIRONMENT];
+  return `${meta.shortLabel} Norm: ${range.nominalMin}–${range.nominalMax} ${unit}`;
 }
 
 /**
