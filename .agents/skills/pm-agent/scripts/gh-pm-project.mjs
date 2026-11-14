@@ -16,7 +16,7 @@
  *
  * Usage:
  *   node .agents/skills/pm-agent/scripts/gh-pm-project.mjs list [--project <number>] [--owner <login>]
- *   node .agents/skills/pm-agent/scripts/gh-pm-project.mjs sync-issue --issue-number <n> --status "backlog|todo|urgent|in_progress|done" [--project <number>] [--owner <login>]
+ *   node .agents/skills/pm-agent/scripts/gh-pm-project.mjs sync-issue --issue-number <n> --status "backlog|todo|urgent|in_progress|done" [--priority "P0|P1|P2"] [--project <number>] [--owner <login>]
  */
 
 import { execSync } from 'node:child_process';
@@ -203,6 +203,18 @@ async function fetchProjectMetadata(owner, projectNumber, token) {
                   optionId
                 }
               }
+              priorityValue: fieldValueByName(name: "Priority") {
+                ... on ProjectV2ItemFieldSingleSelectValue {
+                  name
+                  optionId
+                }
+              }
+              priorityValue: fieldValueByName(name: "Priority") {
+                ... on ProjectV2ItemFieldSingleSelectValue {
+                  name
+                  optionId
+                }
+              }
               content {
                 ... on Issue {
                   id
@@ -242,6 +254,18 @@ async function fetchProjectMetadata(owner, projectNumber, token) {
                   optionId
                 }
               }
+              priorityValue: fieldValueByName(name: "Priority") {
+                ... on ProjectV2ItemFieldSingleSelectValue {
+                  name
+                  optionId
+                }
+              }
+              priorityValue: fieldValueByName(name: "Priority") {
+                ... on ProjectV2ItemFieldSingleSelectValue {
+                  name
+                  optionId
+                }
+              }
               content {
                 ... on Issue {
                   id
@@ -269,39 +293,45 @@ async function fetchProjectMetadata(owner, projectNumber, token) {
   return project;
 }
 
-function resolveStatusOption(project, desiredStatus) {
-  const fields = project.fields?.nodes || [];
-  const statusField = fields.find(
-    (f) => f && f.name && f.name.toLowerCase() === 'status' && Array.isArray(f.options)
-  );
-  if (!statusField) return { fieldId: null, option: null };
+const STATUS_ALIASES = {
+  backlog: ['backlog', 'not urgent', 'later'],
+  todo: ['todo', 'to do', 'regular', 'ready'],
+  urgent: ['urgent', 'p0', 'high', 'critical'],
+  'in progress': ['in progress', 'doing', 'active'],
+  done: ['done', 'completed', 'closed'],
+};
 
-  const normalized = String(desiredStatus || 'todo')
+const PRIORITY_ALIASES = {
+  p0: ['p0', 'urgent', 'critical', 'high'],
+  p1: ['p1', 'medium', 'normal', 'regular'],
+  p2: ['p2', 'low', 'backlog'],
+};
+
+function resolveSingleSelectOption(project, fieldName, desiredValue, aliasMap) {
+  const fields = project.fields?.nodes || [];
+  const targetField = fields.find(
+    (f) => f && f.name && f.name.toLowerCase() === fieldName.toLowerCase() && Array.isArray(f.options)
+  );
+  if (!targetField) return { fieldId: null, option: null, availableOptions: [] };
+
+  const normalized = String(desiredValue || '')
     .toLowerCase()
     .replace(/[_-]+/g, ' ')
     .trim();
 
-  const aliases = {
-    backlog: ['backlog', 'not urgent', 'later'],
-    todo: ['todo', 'to do', 'regular', 'ready'],
-    urgent: ['urgent', 'p0', 'high', 'critical'],
-    'in progress': ['in progress', 'doing', 'active'],
-    done: ['done', 'completed', 'closed'],
-  };
-  const candidates = aliases[normalized] || [normalized];
-
+  const candidates = aliasMap[normalized] || [normalized];
   let option = null;
   for (const candidate of candidates) {
     option =
-      statusField.options.find((o) => o.name.toLowerCase() === candidate) ||
-      statusField.options.find((o) => o.name.toLowerCase().includes(candidate));
+      targetField.options.find((o) => o.name.toLowerCase() === candidate) ||
+      targetField.options.find((o) => o.name.toLowerCase().includes(candidate));
     if (option) break;
   }
 
   return {
-    fieldId: statusField.id,
+    fieldId: targetField.id,
     option,
-    availableOptions: statusField.options.map((o) => o.name),
+    availableOptions: targetField.options.map((o) => o.name),
   };
 }
 
@@ -336,6 +366,7 @@ async function main() {
       .map((item) => ({
         itemId: item.id,
         status: item.fieldValueByName?.name || 'Unassigned',
+        priority: item.priorityValue?.name || 'Unassigned',
         issueNumber: item.content.number,
         title: item.content.title,
         state: item.content.state,
@@ -410,10 +441,15 @@ async function main() {
       );
     }
 
-    const { fieldId, option, availableOptions } = resolveStatusOption(project, desiredStatus);
+    const statusMatch = resolveSingleSelectOption(
+      project,
+      'Status',
+      desiredStatus,
+      STATUS_ALIASES
+    );
     let updatedStatus = null;
 
-    if (fieldId && option) {
+    if (statusMatch.fieldId && statusMatch.option) {
       await githubGraphql(
         `mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
           updateProjectV2ItemFieldValue(
@@ -429,10 +465,53 @@ async function main() {
             }
           }
         }`,
-        { projectId: project.id, itemId, fieldId, optionId: option.id },
+        {
+          projectId: project.id,
+          itemId,
+          fieldId: statusMatch.fieldId,
+          optionId: statusMatch.option.id,
+        },
         token
       );
-      updatedStatus = option.name;
+      updatedStatus = statusMatch.option.name;
+    }
+
+    let updatedPriority = null;
+    if (args.priority) {
+      const priorityMatch = resolveSingleSelectOption(
+        project,
+        'Priority',
+        args.priority,
+        PRIORITY_ALIASES
+      );
+      if (priorityMatch.fieldId && priorityMatch.option) {
+        await githubGraphql(
+          `mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+            updateProjectV2ItemFieldValue(
+              input: {
+                projectId: $projectId
+                itemId: $itemId
+                fieldId: $fieldId
+                value: { singleSelectOptionId: $optionId }
+              }
+            ) {
+              projectV2Item {
+                id
+              }
+            }
+          }`,
+          {
+            projectId: project.id,
+            itemId,
+            fieldId: priorityMatch.fieldId,
+            optionId: priorityMatch.option.id,
+          },
+          token
+        );
+        updatedPriority = priorityMatch.option.name;
+      } else {
+        updatedPriority = `Unchanged (no Priority option matching "${args.priority}"; available: ${(priorityMatch.availableOptions || []).join(', ') || 'none'})`;
+      }
     }
 
     console.log(
@@ -445,7 +524,8 @@ async function main() {
           itemId,
           status:
             updatedStatus ||
-            `Unchanged (no Status option matching "${desiredStatus}"; available: ${(availableOptions || []).join(', ')})`,
+            `Unchanged (no Status option matching "${desiredStatus}"; available: ${(statusMatch.availableOptions || []).join(', ')})`,
+          ...(args.priority ? { priority: updatedPriority } : {}),
         },
         null,
         2
