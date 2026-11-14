@@ -36,7 +36,7 @@ Columns:
 
 | ID | Source | Type | Access | Used in |
 |---|---|---|---|---|
-| SRC-020 | [CSA Bio-Monitor / Astroskin](https://www.asc-csa.gc.ca/eng/sciences/astroskin.asp) (Canadian Space Agency) | web | open | `specs/05-data-platform.md` §4, `scripts/simulate-wearables.ts` (smart shirt device) |
+| SRC-020 | [CSA Bio-Monitor / Astroskin](https://www.asc-csa.gc.ca/eng/sciences/bio-monitor.asp) (Canadian Space Agency) | web | open | `specs/05-data-platform.md` §4, `scripts/simulate-wearables.ts` (smart shirt device) |
 | SRC-021 | [Astroskin sensor sampling rates](https://support.hexoskin.com/en/astroskin/what-is-the-sampling-rate-for-the-astroskin-sensors) (Hexoskin) | web | open | `specs/05-data-platform.md` §4 (1 Hz vitals, 250 Hz ECG on device) |
 | SRC-022 | [Bio-Monitor validation, NTRS 20190000238](https://ntrs.nasa.gov/api/citations/20190000238/downloads/20190000238.pdf) | paper | open | `specs/05-data-platform.md` §4 |
 | SRC-023 | [Actigraphy in spaceflight, NTRS 20200001281](https://ntrs.nasa.gov/api/citations/20200001281/downloads/20200001281.pdf) (Actiwatch Spectrum) | paper | open | `specs/05-data-platform.md` §4, `scripts/simulate-wearables.ts` (sleep blocks, actigraph) |
