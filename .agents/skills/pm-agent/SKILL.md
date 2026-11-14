@@ -45,11 +45,17 @@ git log -n 10 --oneline
    node .agents/skills/pm-agent/scripts/gh-pm-issue.mjs close <issue_number> --comment "✅ Verified resolved in codebase."
    node .agents/skills/pm-agent/scripts/gh-pm-project.mjs sync-issue --issue-number <issue_number> --status done
    ```
-2. If an open GitHub issue is not yet on the GitHub Project board, add it with status `todo`:
+2. If an open GitHub issue has inaccurate priority (`[P0]`/`[P1]`/`[P2]`), inaccurate label (`human-review` vs `agent-task`), or needs a status update / ping:
+   ```bash
+   node .agents/skills/pm-agent/scripts/gh-pm-issue.mjs edit <issue_number> --title "[PM Agent] [P0] Updated title" --labels "agent-task"
+   node .agents/skills/pm-agent/scripts/gh-pm-issue.mjs comment <issue_number> --body "Status update or ping"
+   node .agents/skills/pm-agent/scripts/gh-pm-project.mjs sync-issue --issue-number <issue_number> --status urgent
+   ```
+3. If an open GitHub issue is not yet on the GitHub Project board, add it with its matching urgency column (`backlog`, `todo`, or `urgent`):
    ```bash
    node .agents/skills/pm-agent/scripts/gh-pm-project.mjs sync-issue --issue-number <issue_number> --status todo
    ```
-3. **No Spam Guardrail:** Never duplicate an existing open issue, and do not open new issues if 5+ `[PM Agent]` issues are already open with no new commits since the last run.
+4. **No Spam Guardrail:** Never duplicate an existing open issue, and do not open new issues if 5+ `[PM Agent]` issues are already open with no new commits since the last run.
 
 ### Step 3: Simplified GitHub Issue Format (Max 10–12 Lines)
 Write new issue bodies to `.agents/skills/pm-agent/issues/<slug>.md` using this exact short template:
