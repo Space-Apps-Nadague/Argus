@@ -78,9 +78,14 @@ Readable 3-day outlook built only from deterministic models (`forecastMetric`, `
   - Free-text symptoms with one-click presets, answered by the AI or the offline `symptomFallback.ts`.
   - Live webcam capture for the visual self-exam.
 
-### 2.4b Eyes (`EyesTab.tsx`)
-A readable version of the prototype's "Thousand Eyes" ring plus the full data/configuration view:
-- **Ring:** one eye per metric, grouped by body zone around a circle (zone label on each arc). Eye color = triage status, pupil offset = drift direction, ring around the eye = drift level. Violet arcs = `MetricLink`s. Clicking an eye selects that metric (opens Trends).
+### 2.4b Eyes (`EyesTab.tsx`, `src/features/thousandEyes/*`)
+Port of the prototype's "Thousand Eyes" ring (`ARGOS_The_Thousand_Eyes.html`) plus the full data/configuration view:
+- **Pure science module (`src/features/thousandEyes/`):**
+  - 31 indicators ordered by 12 body systems (`Cardio`, `Respiratory`, `Sleep`, `Mind`, `Muscle`, `Bone`, `Eye`, `Vestibular`, `Immune`, `Metabolic`, `Radiation`, `Habitat`).
+  - Personal baseline (`mean`, `sd`, `n`, provisional flag), location-expected shift (`expectedShift` by `SpaceLocationId`), EWMA drift (`ewmaZ`, `bad`), red-flag bounds (`redLow` / `redHigh`), RMS deviation index (`σ`), personal readiness score (`0–100`), and hidden links (`|r| ≥ 0.6`, `n ≥ 7`, same-day or next-day lag).
+  - **Real data only:** indicators without measured data stay in `'nodata'` (grey) and are never fabricated.
+- **Ring (`ThousandEyesRing.tsx`):** 31 larger eyes with generous hit targets (no values cluttered on the ring), grouped by body system around the circle. Center shows Personal Readiness and Deviation Index. Violet arcs show hidden links. Status is never shown by color alone (color + shape/ring cue + text label). Full keyboard navigation (Tab, Arrow keys around the ring, Enter/Space to inspect) and `focus-visible` ring.
+- **Details box / mobile bottom sheet (`EyeDetailSheet.tsx`):** click, tap, or Enter on any eye opens a details panel (bottom sheet on mobile `< sm`, card panel on `sm+`) with current value, status badge, personal baseline, location-expected shift, drift `σ`, measurement guide (`how`), and plain-language tip (plus "Open in Trends" when mapped to an ARGUS metric).
 - **Data table:** zone, metric, value + unit, status, personal baseline (mean ± SD), drift σ, nominal range, caution range, +3 day forecast.
 - **Configuration:** signed-in user + role, crew profile (baselines, notes), mission location (gravity, comm delay), scenario, threshold environment, AI provider chain.
 
