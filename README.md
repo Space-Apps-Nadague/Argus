@@ -16,9 +16,8 @@ This repository strictly follows **Spec-Driven Development** (`AGENTS.md`). Ever
    - [`specs/02-ui-dashboard.md`](./specs/02-ui-dashboard.md) — Single-screen HUD grid, 3D Bio-Twin layers/zones, and interactive clinical workflows.
    - [`specs/03-requirements.md`](./specs/03-requirements.md) — Mission health monitoring challenge requirements, considerations, and traceability matrix.
    - [`specs/04-ai-backend.md`](./specs/04-ai-backend.md) — AI backend: local/free provider chain, endpoints, and deterministic models.
-   - [`specs/tasks.md`](./specs/tasks.md) — Active sprint task board, status tracking (`[TODO]`, `[IN PROGRESS]`, `[DONE]`), and file ownership.
 2. **Spec First:** Never introduce new telemetry fields, status thresholds, or component props in code without updating the corresponding file in `/specs` first.
-3. **Claim Your Task:** Mark your task as `[IN PROGRESS]` in `specs/tasks.md` before modifying files, and `[DONE]` once verified by `npm run build` and `npm test`.
+3. **Claim Your Task:** Tasks live in [GitHub Issues](https://github.com/Space-Apps-Nadague/Argus/issues) and on the GitHub Projects kanban. Assign yourself and move the card to `In Progress` before modifying files; close it from your PR (`Closes #<n>`) once `npm run build` and `npm test` pass.
 4. **Deterministic Triage + AI Guidance:** Keep `green` / `yellow` / `red` threshold evaluation strictly deterministic in TypeScript (`src/utils/triageEngine.ts`). Use the Clinical AI layer (`src/services/flightSurgeonAi.ts`) strictly for plain-language explanations, step-by-step guided self-exams, and visual self-exam triage.
 
 See [`docs/CONTRIBUTING.md`](./docs/CONTRIBUTING.md) for the complete contributor guide and architecture handover.
@@ -82,4 +81,4 @@ npm run build
 
 ## 4. Roadmap
 
-- **ARGUS Companion (AI chat):** a chat drawer with a deterministic offline "brain", optional live Clinical AI, and voice in/out, ported from the `ARGOS_The_Thousand_Eyes.html` prototype. Specified in `specs/02-ui-dashboard.md` §5 and `specs/01-data-schema.md` §7, tracked as a `[TODO]` backlog item in `specs/tasks.md`.
+- **ARGUS Companion (AI chat):** a chat drawer with a deterministic offline "brain", optional live Clinical AI, and voice in/out, ported from the `ARGOS_The_Thousand_Eyes.html` prototype. Specified in `specs/02-ui-dashboard.md` §5 and `specs/01-data-schema.md` §7, tracked in issue [#7](https://github.com/Space-Apps-Nadague/Argus/issues/7).

@@ -108,6 +108,15 @@ function inferKanbanColumn(priorityOrTitle) {
   return 'todo';
 }
 
+function inferPriorityTag(priorityOrTitle) {
+  const text = String(priorityOrTitle || '').toUpperCase();
+  if (text.includes('P0')) return 'P0';
+  if (text.includes('P2')) return 'P2';
+  return 'P1';
+}
+
+const CATEGORY_LABELS = ['ui-ux', 'clinical-ai', 'telemetry-data', 'infra-ci'];
+
 function formatIssueMarkdown(item) {
   const critiqueBullets = (item.pmCritique || [])
     .slice(0, 2)
@@ -157,6 +166,37 @@ async function generateAuditPlan(apiKey, prompt) {
           required: ['number', 'resolutionComment'],
         },
       },
+      issuesToUpdate: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            number: { type: 'number' },
+            newPriority: { type: 'string', enum: ['P0', 'P1', 'P2'] },
+            newAssigneeType: {
+              type: 'string',
+              enum: ['human-review', 'agent-task'],
+            },
+            newCategory: {
+              type: 'string',
+              enum: ['ui-ux', 'clinical-ai', 'telemetry-data', 'infra-ci'],
+            },
+            newKanbanColumn: {
+              type: 'string',
+              enum: ['backlog', 'todo', 'urgent'],
+            },
+            comment: { type: 'string' },
+          },
+          required: [
+            'number',
+            'newPriority',
+            'newAssigneeType',
+            'newCategory',
+            'newKanbanColumn',
+            'comment',
+          ],
+        },
+      },
       issuesToCreate: {
         type: 'array',
         items: {
@@ -167,6 +207,10 @@ async function generateAuditPlan(apiKey, prompt) {
             assigneeType: {
               type: 'string',
               enum: ['human-review', 'agent-task'],
+            },
+            category: {
+              type: 'string',
+              enum: ['ui-ux', 'clinical-ai', 'telemetry-data', 'infra-ci'],
             },
             kanbanColumn: {
               type: 'string',
@@ -189,6 +233,7 @@ async function generateAuditPlan(apiKey, prompt) {
             'slug',
             'priority',
             'assigneeType',
+            'category',
             'kanbanColumn',
             'title',
             'reqRefs',
@@ -200,7 +245,7 @@ async function generateAuditPlan(apiKey, prompt) {
         },
       },
     },
-    required: ['auditSummary', 'issuesToClose', 'issuesToCreate'],
+    required: ['auditSummary', 'issuesToClose', 'issuesToUpdate', 'issuesToCreate'],
   };
 
   let lastErr = null;
@@ -293,12 +338,14 @@ async function main() {
       );
       if (!alreadyInProject) {
         const targetStatus = inferKanbanColumn(issue.title);
+        const targetPriority = inferPriorityTag(issue.title);
         if (dryRun) {
           projectBackfilled.push({
             dryRun: true,
             issueNumber: issue.number,
             title: issue.title,
             status: targetStatus,
+            priority: targetPriority,
           });
         } else {
           const syncedItem = runJsonScript(PROJECT_SCRIPT, [
@@ -307,6 +354,8 @@ async function main() {
             String(issue.number),
             '--status',
             targetStatus,
+            '--priority',
+            targetPriority,
           ]);
           projectBackfilled.push(syncedItem);
         }
@@ -318,8 +367,6 @@ async function main() {
   const codebaseSnapshot = [
     '=== specs/03-requirements.md ===',
     readRepoFileExcerpt('specs/03-requirements.md', 8000),
-    '=== specs/tasks.md ===',
-    readRepoFileExcerpt('specs/tasks.md', 6000),
     '=== src/types/argus.ts ===',
     readRepoFileExcerpt('src/types/argus.ts', 5000),
     '=== src/context/MissionContext.tsx ===',
@@ -346,6 +393,9 @@ ${recentCommits}
 Currently Open GitHub Issues (${openIssues.length}):
 ${JSON.stringify(openIssues, null, 2)}
 
+Current GitHub Projects v2 Kanban Items (${projectState?.items?.length || 0}):
+${JSON.stringify(projectState?.items || [], null, 2)}
+
 Recently Closed GitHub Issues (${closedIssues.length}):
 ${JSON.stringify(closedIssues.slice(0, 10), null, 2)}
 
@@ -354,9 +404,13 @@ ${codebaseSnapshot}
 
 Instructions:
 1. Check every currently OPEN GitHub issue above. ONLY include an issue in "issuesToClose" if you can verify in the Codebase Snapshot that its requested feature/tasks are now genuinely implemented in src/. Do NOT close an issue if it is still unimplemented.
-2. Propose at most ${maxNewLimit} high-impact new issues in "issuesToCreate" for gaps in REQ-01 through REQ-10 that are NOT already covered by an existing open issue. If existing open issues already cover the top priorities, return an empty array [] for "issuesToCreate".
-3. For each new issue:
+2. Review all remaining OPEN issues in "issuesToUpdate":
+   - If an issue is missing a "human-review" or "agent-task" label, missing a category label ("ui-ux", "clinical-ai", "telemetry-data", "infra-ci"), or has the wrong label, priority (P0/P1/P2), Project Priority field, or Kanban column ("urgent"/"todo"/"backlog"), include it in "issuesToUpdate" with the corrected values.
+   - Use "comment" to post a concise status update, progress note from recent commits, or a ping (e.g., "@YaronL16" for "human-review" blockers or stale P0s) ONLY when meaningful (leave "comment" as "" if nothing new needs to be said).
+3. Propose at most ${maxNewLimit} high-impact new issues in "issuesToCreate" for gaps in REQ-01 through REQ-10 that are NOT already covered by an existing open issue. If existing open issues already cover the top priorities, return an empty array [] for "issuesToCreate".
+4. For each new issue:
    - Set "assigneeType" to "human-review" if it requires a human product/UX/clinical/credential decision or manual review, or "agent-task" if it is a concrete coding/spec/UI task ready for an AI coding agent to implement.
+   - Set "category" to one of: "ui-ux", "clinical-ai", "telemetry-data", or "infra-ci".
    - Set "kanbanColumn" based on urgency: "urgent" for P0 (critical hackathon/demo impact), "todo" for P1 (regular urgency), or "backlog" for P2 (not urgent / polish).`;
 
   const { model, plan } = await generateAuditPlan(geminiApiKey, prompt);
@@ -399,6 +453,119 @@ Instructions:
     }
   }
 
+  // Step 4b: Reconcile open issues (re-prioritize, fix labels, sync Kanban, or comment/ping)
+  const updatedResults = [];
+  const projectItemByIssue = new Map(
+    (projectState?.items || []).map((item) => [item.issueNumber, item])
+  );
+
+  for (const upd of plan.issuesToUpdate || []) {
+    const existing = openIssueMap.get(upd.number);
+    if (!existing) continue;
+
+    const currentLabels = existing.labels || [];
+    const targetAssigneeLabel =
+      upd.newAssigneeType === 'human-review' ? 'human-review' : 'agent-task';
+    const targetCategoryLabel = CATEGORY_LABELS.includes(upd.newCategory)
+      ? upd.newCategory
+      : 'ui-ux';
+    const otherLabels = currentLabels.filter(
+      (l) =>
+        l !== 'human-review' &&
+        l !== 'agent-task' &&
+        !CATEGORY_LABELS.includes(l)
+    );
+    const nextLabels = [...otherLabels, targetAssigneeLabel, targetCategoryLabel];
+    const labelsChanged =
+      !currentLabels.includes(targetAssigneeLabel) ||
+      !currentLabels.includes(targetCategoryLabel) ||
+      (currentLabels.includes('human-review') && currentLabels.includes('agent-task')) ||
+      currentLabels.filter((l) => CATEGORY_LABELS.includes(l)).length > 1;
+
+    const cleanBodyTitle = existing.title
+      .replace(/^\[PM(?:\s+Agent)?\]\s*/i, '')
+      .replace(/^\[P[012]\]\s*/i, '')
+      .trim();
+    const nextTitle = `[PM Agent] [${upd.newPriority}] ${cleanBodyTitle}`;
+    const titleChanged = nextTitle !== existing.title;
+
+    const targetKanban = upd.newKanbanColumn || inferKanbanColumn(upd.newPriority);
+    const existingProjectItem = projectItemByIssue.get(upd.number);
+    const currentKanban = (existingProjectItem?.status || '').toLowerCase();
+    const kanbanChanged = !currentKanban || !currentKanban.includes(targetKanban);
+    const currentProjectPriority = (existingProjectItem?.priority || '').toUpperCase();
+    const projectPriorityChanged =
+      !currentProjectPriority || currentProjectPriority !== upd.newPriority.toUpperCase();
+
+    const commentText = String(upd.comment || '').trim();
+    const updatedRecently =
+      existing.updated_at &&
+      Date.now() - new Date(existing.updated_at).getTime() < 60 * 60 * 1000;
+    const shouldComment =
+      Boolean(commentText) && (labelsChanged || titleChanged || kanbanChanged || !updatedRecently);
+
+    if (
+      !labelsChanged &&
+      !titleChanged &&
+      !kanbanChanged &&
+      !projectPriorityChanged &&
+      !shouldComment
+    ) {
+      continue;
+    }
+
+    if (dryRun) {
+      updatedResults.push({
+        dryRun: true,
+        number: upd.number,
+        titleChanged,
+        nextTitle: titleChanged ? nextTitle : undefined,
+        labelsChanged,
+        nextLabels: labelsChanged ? nextLabels : undefined,
+        kanbanChanged,
+        targetKanban,
+        projectPriorityChanged,
+        targetPriority: upd.newPriority,
+        comment: shouldComment ? commentText : undefined,
+      });
+      continue;
+    }
+
+    const actionRecord = { number: upd.number };
+    if (titleChanged || labelsChanged) {
+      const editArgs = ['edit', String(upd.number)];
+      if (titleChanged) editArgs.push('--title', nextTitle);
+      if (labelsChanged) editArgs.push('--labels', nextLabels.join(','));
+      actionRecord.edit = runJsonScript(GH_SCRIPT, editArgs);
+    }
+    if ((kanbanChanged || projectPriorityChanged) && projectConfigured) {
+      try {
+        actionRecord.projectItem = runJsonScript(PROJECT_SCRIPT, [
+          'sync-issue',
+          '--issue-number',
+          String(upd.number),
+          '--status',
+          targetKanban,
+          '--priority',
+          upd.newPriority,
+        ]);
+      } catch (err) {
+        console.warn(
+          `[PM Agent] Failed to update Project fields for #${upd.number}: ${err.message}`
+        );
+      }
+    }
+    if (shouldComment) {
+      actionRecord.comment = runJsonScript(GH_SCRIPT, [
+        'comment',
+        String(upd.number),
+        '--body',
+        commentText,
+      ]);
+    }
+    updatedResults.push(actionRecord);
+  }
+
   // Enforce 5-open-issue No Spam Guardrail after accounting for closed issues
   const remainingOpenPmIssues = Array.from(openIssueMap.values()).filter((i) =>
     /^\[pm(?:\s+agent)?\]/i.test(i.title)
@@ -438,14 +605,19 @@ Instructions:
       .trim();
     const fullTitle = `[PM Agent] [${item.priority}] ${cleanActionTitle}`;
     const issueLabel = item.assigneeType === 'human-review' ? 'human-review' : 'agent-task';
+    const categoryLabel = CATEGORY_LABELS.includes(item.category)
+      ? item.category
+      : 'ui-ux';
+    const issueLabels = [issueLabel, categoryLabel];
     const kanbanStatus = item.kanbanColumn || inferKanbanColumn(item.priority);
 
     if (dryRun) {
       createdResults.push({
         dryRun: true,
         title: fullTitle,
-        labels: [issueLabel],
+        labels: issueLabels,
         kanbanStatus,
+        priority: item.priority,
         issueFilePath,
         bodyMarkdown,
       });
@@ -457,7 +629,7 @@ Instructions:
       '--title',
       fullTitle,
       '--labels',
-      issueLabel,
+      issueLabels.join(','),
       '--body',
       `@${issueFilePath}`,
     ]);
@@ -471,6 +643,8 @@ Instructions:
           String(createRes.number),
           '--status',
           kanbanStatus,
+          '--priority',
+          item.priority,
         ]);
         createRes.projectItem = projectItem;
       } catch (err) {
@@ -492,6 +666,8 @@ Instructions:
         openIssuesBefore: openIssues.length,
         closedIssuesCount: closedResults.length,
         closedIssues: closedResults,
+        updatedIssuesCount: updatedResults.length,
+        updatedIssues: updatedResults,
         projectBackfilledCount: projectBackfilled.length,
         projectBackfilled,
         allowedNewIssues: allowedNewCount,

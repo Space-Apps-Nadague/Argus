@@ -295,9 +295,15 @@ async function main() {
     const number = args._[1];
     const rawBody = resolveTextArg(args.body);
     const rawTitle = resolveTextArg(args.title);
-    if (!number || (!rawBody && !rawTitle)) {
+    const labels = args.labels
+      ? String(args.labels)
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : undefined;
+    if (!number || (!rawBody && !rawTitle && !labels)) {
       throw new Error(
-        'Usage: gh-pm-issue.mjs edit <issue_number> [--title "<title>"] --body "<markdown_or_@file>"'
+        'Usage: gh-pm-issue.mjs edit <issue_number> [--title "<title>"] [--body "<markdown_or_@file>"] [--labels "l1,l2"]'
       );
     }
     const payload = {};
@@ -308,6 +314,9 @@ async function main() {
     }
     if (rawBody) {
       payload.body = wrapPmBody(rawBody);
+    }
+    if (labels) {
+      payload.labels = labels;
     }
     const updated = await githubRequest(
       'PATCH',
@@ -321,6 +330,7 @@ async function main() {
           edited: true,
           number: updated.number,
           title: updated.title,
+          labels: (updated.labels || []).map((l) => (typeof l === 'string' ? l : l.name)),
           html_url: updated.html_url,
         },
         null,
