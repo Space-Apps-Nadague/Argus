@@ -72,7 +72,7 @@ Same content as before, laid out in 2 columns on wide screens: (left) hazard con
 - Responsive: tabs scroll horizontally on narrow screens. No page-level horizontal scroll. The Bio-Twin grid stacks on `< lg`.
 
 ## 5. Future: ARGUS Companion (AI chat) — not implemented
-Planned port of the ARGOS prototype's chat companion (`jv()`, `send()`, `brain()`, `speak()`, `mic()` in `ARGOS_The_Thousand_Eyes.html`). Tracked as a `[TODO]` backlog item in `specs/tasks.md`.
+Planned port of the ARGOS prototype's chat companion (`jv()`, `send()`, `brain()`, `speak()`, `mic()` in `ARGOS_The_Thousand_Eyes.html`). Tracked in issue #7.
 - **Entry point:** `ARGUS` button in the top bar opens a right slide-over drawer, available on every tab.
 - **Offline brain first:** a deterministic intent engine (`red_flag`, `status`, `metric`, `symptom`, `forecast`, `why`, `radiation`, `help`) answers from triage, drift, forecast, links and check-ins. No API key needed.
 - **Live Clinical AI second:** when a key is configured, replies use the existing Clinical AI client with a data-only context. It falls back to the offline brain on timeout/error.

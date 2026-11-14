@@ -7,12 +7,12 @@ Before writing, editing, or refactoring any code, read the relevant files in `/s
 - **UI Layout, Bio-Map SVG & Demo Controls:** `specs/02-ui-dashboard.md`
 - **Challenge Requirements & Traceability:** `specs/03-requirements.md`
 - **AI Backend (providers, endpoints, deterministic models):** `specs/04-ai-backend.md`
-- **Active Sprint & File Ownership:** `specs/tasks.md`
+- **Tasks, Status & File Ownership:** [GitHub Issues](https://github.com/Space-Apps-Nadague/Argus/issues) and the GitHub Projects kanban (`Backlog` / `Todo` / `Urgent` / `In Progress` / `Done`). There is no task file in the repo.
 
 ## 2. Spec-Driven Development Protocol
 1. **Spec First:** Never invent new telemetry fields, status thresholds, or component props in code without updating the corresponding file in `/specs` first.
 2. **Plan Before Coding:** State which spec sections apply and which files will change before modifying code.
-3. **Claim Tasks:** Mark your active task as `[IN PROGRESS]` in `specs/tasks.md` before editing files, and `[DONE]` once verified.
+3. **Claim Tasks:** Before editing files, assign yourself to the GitHub issue (open one if none exists, listing the files it touches) and move its card to `In Progress`. Close it from the PR with `Closes #<n>` once `npm test` and `npm run build` pass.
 4. **Deterministic Triage + AI Guidance:** Keep Green/Yellow/Red threshold evaluation deterministic in TypeScript. Use the LLM layer strictly for plain-language explanations, step-by-step guided self-exams, and vision triage.
 
 ## 3. Shared Technical Standards
@@ -34,4 +34,4 @@ Vendor-neutral skills in the open Agent Skills `SKILL.md` format. Read a skill's
 ## 6. Agent Folders & Git Conventions
 - **`.agents/` is the only tracked agent folder.** Shared, vendor-neutral agent material (skills, prompts, playbooks) goes here so every AI tool and human uses the same files.
 - **Tool-specific folders are local-only and gitignored:** `.claude/`, `.cursor/`, `.codex/`, `.gemini/`. Never commit them, and never put shared conventions in them. Don't add tool-specific instruction files (e.g. `CLAUDE.md`); `AGENTS.md` is the single entry point.
-- **Isolated work goes in git worktrees.** A tool may create worktrees inside its ignored local folder (e.g. `.claude/worktrees/<name>`) or in a sibling folder outside the repo. Branch from the commit that contains the latest work, and claim the task in `specs/tasks.md` as usual.
+- **Isolated work goes in git worktrees.** A tool may create worktrees inside its ignored local folder (e.g. `.claude/worktrees/<name>`) or in a sibling folder outside the repo. Branch from the commit that contains the latest work, and claim the GitHub issue as usual.

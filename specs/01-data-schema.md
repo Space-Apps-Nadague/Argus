@@ -310,7 +310,7 @@ export interface CheckInEntry {
 
 ## 7. Future: ARGUS Companion Chat (not implemented)
 
-Planned port of the ARGOS prototype's conversational companion (see `specs/02-ui-dashboard.md` §5 and the backlog in `specs/tasks.md`). Draft types only. Do **not** add them to `src/types/argus.ts` until the task is claimed.
+Planned port of the ARGOS prototype's conversational companion (see `specs/02-ui-dashboard.md` §5 and issue #7). Draft types only. Do **not** add them to `src/types/argus.ts` until the task is claimed.
 
 ```typescript
 export type CompanionIntent =
