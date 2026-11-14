@@ -54,6 +54,17 @@ npm run build
 
 ---
 
+### Data platform (database, accounts, wearables, analytics)
+ARGUS stores crew data in PostgreSQL: Azure for the team, embedded PGlite for solo work. See [`specs/05-data-platform.md`](specs/05-data-platform.md) and [`docs/DATABASE.md`](docs/DATABASE.md).
+```bash
+# .env: DATABASE_URL=pglite:./.data/argus (or the Azure URL), ARGUS_BOOTSTRAP_ADMIN_*, ARGUS_DEMO_PASSWORD, ARGUS_DEVICE_SECRET
+npm run db:seed                       # migrations + crew, sensor kits, admin, demo logins
+npm run simulate -- --backfill 30     # 30 days of simulated wearable data → daily metrics, triage, baselines, anomalies
+npm run data:nasa                     # NASA reference data (OSDR Inspiration4 CBC, radiation rates) with provenance
+npm run dev:all                       # sign in as valkyrie/apex/pulse/solaris (astronauts) or surgeon
+```
+Without `DATABASE_URL`, the HUD runs as an offline demo with browser-only data.
+
 ## 3. System Architecture & Key Modules
 
 | Path | Responsibility | Spec Reference |

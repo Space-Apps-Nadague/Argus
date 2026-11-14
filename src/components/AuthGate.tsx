@@ -121,7 +121,9 @@ export const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) 
         </button>
 
         <p className="text-[11px] leading-relaxed text-hud-muted">
-          Accounts are stored in this browser to keep each astronaut's view separate. This is not server-side security.
+          {mode === 'server'
+            ? 'Signed in on the ARGUS server. Astronauts see only their own data.'
+            : 'Offline demo: accounts are stored in this browser only. This is not server-side security.'}
         </p>
       </form>
     </div>
