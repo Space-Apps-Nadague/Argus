@@ -35,11 +35,15 @@ describe('resumable bootstrap fill', () => {
     // Simulate an interrupted fill for APEX: only the last few hours exist.
     await h.db.execute(sql`delete from observations where astronaut_id = 'crew-chen'`);
     await backfillSimulated(h.db, { days: 1, preflightDays: 0, crewIds: ['crew-chen'], secondaryEveryMin: 60 });
-    await h.db.execute(sql`delete from observations where astronaut_id = 'crew-chen' and ts < now() - interval '3 hours'`);
-    const partialStart = new Date(await first('crew-chen')).getTime();
+    // Interrupted the way prod was: early raw rows remain, but daily values only exist for the latest day.
+    await h.db.execute(sql`delete from daily_metrics where astronaut_id = 'crew-chen' and day < current_date`);
+    await h.db.execute(sql`delete from observations where astronaut_id = 'crew-chen' and ts > now() - interval '20 hours' and ts < now() - interval '3 hours'`);
+    const firstDay = async () => (await queryRows<{ d: string }>(h.db, sql`select min(day)::text d from daily_metrics where astronaut_id = 'crew-chen'`))[0].d;
+    const before = await firstDay();
     await backfillSimulated(h.db, { days: 1, preflightDays: 0, onlyMissing: true, secondaryEveryMin: 60 });
-    const repairedStart = new Date(await first('crew-chen')).getTime();
-    expect(repairedStart).toBeLessThan(partialStart - 12 * 3600_000); // a full day again
+    const after = await firstDay();
+    expect(after < before).toBe(true); // daily values reach back to the start of the window again
+    expect(await first('crew-chen')).toBeTruthy();
   }, 120_000);
 });
 

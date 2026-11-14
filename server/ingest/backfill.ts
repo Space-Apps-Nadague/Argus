@@ -8,7 +8,7 @@ import type { ScenarioId } from '../../src/types/argus';
 import { type DeviceKind, SENSOR_KIT } from '../db/catalog';
 import { sql, type Db } from '../db/client';
 import { getProfile } from '../db/profiles';
-import { astronauts, devices, missions, observations } from '../db/schema';
+import { astronauts, dailyMetrics, devices, missions, observations } from '../db/schema';
 import { runAnalytics } from '../jobs/analytics';
 import { evaluateTriage, rollupDays } from '../jobs/rollup';
 import { ingestReadings } from './service';
@@ -80,15 +80,21 @@ export async function backfillSimulated(db: Db, opts: BackfillOptions = {}): Pro
       from = new Date(templateStart.getTime() - preflightDays * DAY_MS);
     }
     if (opts.onlyMissing) {
-      const [{ first }] = await db
-        .select({ first: min(observations.ts) })
+      // Complete = the fill ran to the end (raw readings → daily values), with daily values back to `from`.
+      // Raw readings alone are not enough: an interrupted fill can leave early raw rows but no daily values.
+      const [{ firstDay }] = await db
+        .select({ firstDay: min(dailyMetrics.day) })
+        .from(dailyMetrics)
+        .where(eq(dailyMetrics.astronautId, id));
+      const [{ anyRaw }] = await db
+        .select({ anyRaw: min(observations.ts) })
         .from(observations)
         .where(and(eq(observations.astronautId, id), eq(observations.origin, 'simulated')));
-      if (first) {
-        // A complete fill starts at `from` (heart rate is recorded every minute); allow one hour of slack.
-        const complete = new Date(first).getTime() <= from.getTime() + 3_600_000;
-        if (complete) continue;
-        log(`${profile.callsign}: incomplete history (starts ${new Date(first).toISOString().slice(0, 10)}), refilling`);
+      const fromDay = from.toISOString().slice(0, 10);
+      const complete = Boolean(firstDay) && String(firstDay) <= fromDay; // ISO dates compare as strings
+      if (complete) continue;
+      if (anyRaw || firstDay) {
+        log(`${profile.callsign}: incomplete history (daily values from ${firstDay ?? 'none'}), refilling`);
         await resetSimulated(db, [id]);
       }
     }
