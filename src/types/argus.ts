@@ -3,7 +3,7 @@
  * Single Source of Truth: specs/01-data-schema.md
  */
 
-export type GravityEnvironment = '0g_transit' | '1_6g_moon' | '3_8g_mars';
+export type GravityEnvironment = '0g_transit';
 
 export type BodyZoneId = 'neuro' | 'cardio' | 'musculo' | 'immune' | 'behavioral';
 

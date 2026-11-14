@@ -4,8 +4,7 @@
 - **Visual Language:** Dark spacecraft HUD (`bg-slate-950`, subtle grid overlay, `cyan-400` primary HUD accents, `#22c55e` Nominal Green, `#eab308` Caution Yellow, `#ef4444` Alert Red).
 - **Top Bar (`TopMissionBar.tsx`) & Crew Roster Strip:**
   - Branding: `ARGUS // AUTONOMOUS CREW BIO-TWIN` with subtitle `Astronaut Readiness Guidance & Unified Surveillance`
-  - Simulated Earth comm delay badge (`14m 22s ONE-WAY` in `0g_transit`, `1.3s ONE-WAY` in `1_6g_moon`, `18m 40s ONE-WAY` in `3_8g_mars`)
-  - **Environment Context Switcher:** `0g Transit` | `1/6g Moon` | `3/8g Mars`
+  - Simulated Earth comm delay badge (`14m 22s ONE-WAY` in `0g_transit`)
   - **Crew Readiness Score:** `0–100%` + daily countermeasure streak
   - **Simulate Medical Event** dropdown (`nominal`, `sans_alert`, `high_co2`, `solar_storm`)
   - **Interactive Crew Roster Strip:** Displays all astronauts in the mission roster as selectable HUD pills (showing Callsign, Name, Role, Blood Type, and live Readiness status dot) + **`+ Add / Manage Crew`** button opening `CrewManagerModal.tsx`.
@@ -14,7 +13,7 @@
   - **Create Custom Crew Member Form:** Allows creating a new astronaut with full details (Full Name, Callsign, Biological Sex / 3D Anatomy, Mission Role, Age, Blood Type, Pre-Flight Resting HR, Pre-Flight ONSD, Mission Sols Logged, Countermeasure Streak, Initial Telemetry Scenario, and Medical / Physiological Notes). Custom crew members are persisted to `localStorage` and immediately receive individualized 30-day Bio-Twin telemetry.
 - **Left Column — 27% (`TelemetryPanel.tsx`):**
   - Selected zone's vital sign cards individualized to the active crew member (current value, unit, delta from pre-flight baseline, flight norm badge, plain-language tooltip/caption, clickable to select the active chart metric)
-  - Recharts longitudinal line/area chart (`AreaChart`, `ReferenceArea`, `ResponsiveContainer`) showing 14-day (or 30-day toggle) drift against a shaded `ReferenceArea` nominal range band for the current gravity environment
+  - Recharts longitudinal line/area chart (`AreaChart`, `ReferenceArea`, `ResponsiveContainer`) showing 14-day (or 30-day toggle) drift against a shaded `ReferenceArea` nominal range band for 0g microgravity
 - **Center Hero Column — 46% (`BioTwinMap.tsx` — Star of the Dashboard):**
   - Central oversized spacecraft medical bay HUD stage (`min-h-[540px]`) featuring the active astronaut's full-body 3D Holographic Bio-Twin.
   - **Anatomically Sculpted 3D Human Morphology (Male & Female Differentiation):**

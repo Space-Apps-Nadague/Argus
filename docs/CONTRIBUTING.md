@@ -10,11 +10,11 @@ Before making any code change, walk through these four steps:
 
 1. **Read the Canonical Specs (`/specs`):**
    - `specs/00-architecture.md` — Tech stack, package boundaries, and file layout.
-   - `specs/01-data-schema.md` — Every TypeScript interface, vital metric ID, gravity-adjusted threshold, and AI JSON schema.
+   - `specs/01-data-schema.md` — Every TypeScript interface, vital metric ID, `0g` microgravity threshold, and AI JSON schema.
    - `specs/02-ui-dashboard.md` — UI layout proportions, 3D Bio-Twin controls, and user interactions.
    - `specs/tasks.md` — Current task statuses and file ownership.
 2. **Update Specs First:**
-   - Need a new vital sign, gravity mode, crisis scenario, or component prop? Document it in `specs/01-data-schema.md` or `specs/02-ui-dashboard.md` **before** editing `.ts` or `.tsx` files.
+   - Need a new vital sign, crisis scenario, or component prop? Document it in `specs/01-data-schema.md` or `specs/02-ui-dashboard.md` **before** editing `.ts` or `.tsx` files.
 3. **Claim Your Task in `specs/tasks.md`:**
    - Mark the task you are working on as `[IN PROGRESS]` so other contributors know which files are actively being edited.
 4. **Verify & Document Completion:**

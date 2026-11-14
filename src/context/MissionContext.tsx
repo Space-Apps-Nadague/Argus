@@ -93,7 +93,6 @@ type MissionAction =
   | { type: 'UPDATE_CREW_SEX'; payload: { crewId: string; sex: BiologicalSex } }
   | { type: 'DELETE_CREW_MEMBER'; payload: string }
   | { type: 'SET_CREW_MODAL_OPEN'; payload: boolean }
-  | { type: 'SET_ENVIRONMENT'; payload: GravityEnvironment }
   | { type: 'SET_SCENARIO'; payload: ScenarioId }
   | { type: 'SET_SELECTED_ZONE'; payload: BodyZoneId }
   | { type: 'SET_SELECTED_METRIC'; payload: string }
@@ -239,20 +238,6 @@ function missionReducer(
         ...state,
         isCrewModalOpen: action.payload,
       };
-    case 'SET_ENVIRONMENT': {
-      const activeCrew = getActiveCrew(state.crewRoster, state.activeCrewId);
-      const nextGuidance = getOfflineFlightSurgeonGuidance(
-        state.scenarioId,
-        state.selectedZone,
-        action.payload,
-        activeCrew
-      );
-      return {
-        ...state,
-        environment: action.payload,
-        guidance: nextGuidance,
-      };
-    }
     case 'SET_SCENARIO': {
       const activeCrew = getActiveCrew(state.crewRoster, state.activeCrewId);
       const scenarioDef = TELEMETRY_SCENARIOS[action.payload];
@@ -364,7 +349,6 @@ interface MissionContextValue extends MissionState {
   updateCrewMemberSex: (crewId: string, sex: BiologicalSex) => void;
   deleteCrewMember: (crewId: string) => void;
   setCrewModalOpen: (open: boolean) => void;
-  setEnvironment: (env: GravityEnvironment) => void;
   setScenario: (scenario: ScenarioId) => void;
   setSelectedZone: (zone: BodyZoneId) => void;
   setSelectedMetricId: (metricId: string) => void;
@@ -456,10 +440,6 @@ export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const setCrewModalOpen = useCallback((open: boolean) => {
     dispatch({ type: 'SET_CREW_MODAL_OPEN', payload: open });
-  }, []);
-
-  const setEnvironment = useCallback((env: GravityEnvironment) => {
-    dispatch({ type: 'SET_ENVIRONMENT', payload: env });
   }, []);
 
   const setScenario = useCallback((scenario: ScenarioId) => {
@@ -644,7 +624,6 @@ export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({
       updateCrewMemberSex,
       deleteCrewMember,
       setCrewModalOpen,
-      setEnvironment,
       setScenario,
       setSelectedZone,
       setSelectedMetricId,
@@ -669,7 +648,6 @@ export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({
       updateCrewMemberSex,
       deleteCrewMember,
       setCrewModalOpen,
-      setEnvironment,
       setScenario,
       setSelectedZone,
       setSelectedMetricId,

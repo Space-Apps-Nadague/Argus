@@ -837,7 +837,7 @@ export function getCrewAdjustedZones(
 export function getOfflineFlightSurgeonGuidance(
   scenarioId: ScenarioId,
   zoneId: BodyZoneId,
-  environment: GravityEnvironment,
+  environment: GravityEnvironment = '0g_transit',
   crewMember?: CrewMemberProfile
 ): FlightSurgeonGuidance {
   const adjustedZones = getCrewAdjustedZones(scenarioId, crewMember);
@@ -847,10 +847,6 @@ export function getOfflineFlightSurgeonGuidance(
   const envContextMap: Record<GravityEnvironment, string> = {
     '0g_transit':
       'In 0g Deep-Space Transit (14m 22s one-way Earth comm delay), complete weightlessness drives ~2 liters of venous fluid headward while unloading skeletal structures.',
-    '1_6g_moon':
-      'In 1/6g Lunar Surface operations (1.3s comm delay), partial gravity reduces cephalad fluid congestion slightly vs 0g, but adds electrostatic lunar dust exposure and high-exertion EVA suit workloads.',
-    '3_8g_mars':
-      'In 3/8g Martian Surface operations (18m 40s one-way Earth comm delay), crew must manage post-transit orthostatic re-adaptation, 24h 39m sol circadian alignment, and full medical autonomy.',
   };
 
   // Specific crisis guidance overrides
@@ -995,7 +991,7 @@ export function getOfflineFlightSurgeonGuidance(
           : 'Elevated Neuro-Ocular Drift — Preventive ICP Countermeasures',
       hazardContextSummary: `${envContextMap[environment]} Optic nerve sheath diameter and intraocular pressure are tracked continuously to detect early Spaceflight-Associated Neuro-ocular Syndrome (SANS).`,
       plainLanguageExplanation:
-        'Your brain and eye fluid pressures are adapting to the current gravity environment. Completing routine visual acuity and ultrasound checks ensures we catch any fluid buildup early.',
+        'Your brain and eye fluid pressures are adapting to 0g microgravity. Completing routine visual acuity and ultrasound checks ensures we catch any fluid buildup early.',
       earthConsultUrgency: triageStatus === 'green' ? 'routine_downlink' : 'priority_packet',
       guidedSteps: [
         {
