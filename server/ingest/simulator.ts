@@ -84,6 +84,19 @@ export function simulate(opts: SimulationOptions): SimulatedBatch {
     const series = targets[metric];
     return series ? series[clamp(day, 0, series.length - 1)] : NaN;
   };
+  // Days before mission start are on Earth (pre-flight baseline collection, Source: SRC-024, SRC-009):
+  // the crew member's recorded pre-flight values, natural background radiation (≈3.1 mSv/yr, Source: SRC-080),
+  // no habitat CO₂ monitor or flight exercise device.
+  const EARTH: Partial<Record<MetricId, number>> = {
+    resting_hr: opts.crew.restingHrBaselineBpm,
+    onsd: opts.crew.preFlightOnsdMm,
+    rad_dose: 3.1 / 365,
+    bmd_delta: 0,
+    cabin_co2: NaN,
+    ared_load: NaN,
+  };
+  const targetFor = (metric: MetricId, day: number, earth: boolean) =>
+    earth && metric in EARTH ? (EARTH[metric] as number) : target(metric, day);
   const every = Math.max(1, opts.secondaryEveryMin ?? 5);
   const out: SimulatedBatch = new Map();
   const push = (kind: DeviceKind, metric: string, ts: number, value: number) => {
@@ -95,7 +108,7 @@ export function simulate(opts: SimulationOptions): SimulatedBatch {
   const fromMs = Math.floor(opts.from.getTime() / MIN_MS) * MIN_MS;
   const toMs = opts.to.getTime();
   let currentDay = -1;
-  let dayPlan: { awakeMinutes: Set<number>; shiftMin: number; tDay: number; progress: number } | null = null;
+  let dayPlan: { awakeMinutes: Set<number>; shiftMin: number; tDay: number; progress: number; earth: boolean } | null = null;
 
   for (let ts = fromMs; ts < toMs; ts += MIN_MS) {
     const dayIndex = Math.floor((ts - opts.templateStart.getTime()) / DAY_MS);
@@ -104,11 +117,13 @@ export function simulate(opts: SimulationOptions): SimulatedBatch {
 
     if (dayIndex !== currentDay) {
       currentDay = dayIndex;
+      const earth = dayIndex < 0 && opts.templateDayOverride === undefined;
+      const T = (m: MetricId) => targetFor(m, tDay, earth);
       const progress = clamp(dayIndex / (TEMPLATE_DAYS - 1), 0, 1);
       // Circadian drift: up to +2 h later by mission day 30 (Source: SRC-025).
       const shiftMin = Math.round(120 * progress);
       // Sleep efficiency target → number of awake minutes inside the 8 h in-bed window (Source: SRC-023).
-      const eff = target('sleep_eff', tDay);
+      const eff = T('sleep_eff');
       const awakeCount = Math.round((1 - (Number.isFinite(eff) ? eff : 90) / 100) * 480);
       const awakeMinutes = new Set<number>();
       while (awakeMinutes.size < awakeCount) {
@@ -116,39 +131,40 @@ export function simulate(opts: SimulationOptions): SimulatedBatch {
         const len = 3 + Math.floor(rand() * 12);
         for (let k = 0; k < len && awakeMinutes.size < awakeCount; k++) awakeMinutes.add(startBout + k);
       }
-      dayPlan = { awakeMinutes, shiftMin, tDay, progress };
+      dayPlan = { awakeMinutes, shiftMin, tDay, progress, earth };
 
       // Nightly summaries at wake time, 07:00 + shift (ring + actigraph) (Source: SRC-023, SRC-029).
       const wakeTs = Date.UTC(new Date(ts).getUTCFullYear(), new Date(ts).getUTCMonth(), new Date(ts).getUTCDate()) + (420 + shiftMin) * MIN_MS;
       if (wakeTs >= fromMs && wakeTs < toMs) {
-        push('smartwatch', 'resting_hr', wakeTs, Math.round(target('resting_hr', tDay) + gauss() * 0.8));
-        push('smartwatch', 'hrv_rmssd', wakeTs, Math.round(target('hrv_rmssd', tDay) + gauss() * 2));
+        push('smartwatch', 'resting_hr', wakeTs, Math.round(T('resting_hr') + gauss() * 0.8));
+        push('smartwatch', 'hrv_rmssd', wakeTs, Math.round(T('hrv_rmssd') + gauss() * 2));
         push('smartwatch', 'sleep_eff', wakeTs, r1(clamp(100 * (1 - awakeCount / 480), 0, 100)));
         // Overnight wrist temperature → body-temperature estimate (Source: SRC-074);
         // body temperature drifts up slightly over the mission (Source: SRC-025).
-        const body = target('core_temp', tDay) + 0.15 * progress + gauss() * 0.07;
+        const body = T('core_temp') + 0.15 * progress + gauss() * 0.07;
         push('smartwatch', 'core_temp', wakeTs, r2(body));
         push('smartwatch', 'wrist_temp', wakeTs, r2(body - 2.6));
-        push('smartwatch', 'daily_sleep_hours', wakeTs, r1(target('daily_sleep_hours', tDay) + gauss() * 0.25));
+        push('smartwatch', 'daily_sleep_hours', wakeTs, r1(T('daily_sleep_hours') + gauss() * 0.25));
       }
       // Daily automatic feeds, watch apps, periodic exams and the weekly glucometer photo. Nothing is typed.
       const midnight = wakeTs - (420 + shiftMin) * MIN_MS;
       const daily: Array<[DeviceKind, string, number, number, number]> = [
-        ['smartwatch', 'pvt_lapses', 8 * 60 + 30, Math.max(0, Math.round(target('pvt_lapses', tDay))), 1],
-        ['smartwatch', 'mood_index', 21 * 60, clamp(Math.round(target('mood_index', tDay) + gauss() * 0.5), 1, 10), 1],
-        ['manual', 'blood_glucose', 7 * 60 + 45 + shiftMin, Math.round(target('blood_glucose', tDay) + gauss() * 3), 7],
-        ['habitat_sensor', 'cabin_co2', 12 * 60, r1(target('cabin_co2', tDay) + gauss() * 0.1), 1],
-        ['exercise_device', 'ared_load', 18 * 60 + 45, r1(target('ared_load', tDay) + gauss() * 0.8), 1],
-        ['clinical_exam', 'onsd', 9 * 60, r2(target('onsd', tDay) + gauss() * 0.03), 3],
-        ['clinical_exam', 'iop', 9 * 60 + 5, Math.round(target('iop', tDay) + gauss() * 0.5), 3],
-        ['clinical_exam', 'wbc_lymph', 9 * 60 + 10, r2(target('wbc_lymph', tDay) + gauss() * 0.05), 3],
-        ['clinical_exam', 'bmd_delta', 9 * 60 + 15, r2(target('bmd_delta', tDay)), 7],
+        ['smartwatch', 'pvt_lapses', 8 * 60 + 30, Math.max(0, Math.round(T('pvt_lapses'))), 1],
+        ['smartwatch', 'mood_index', 21 * 60, clamp(Math.round(T('mood_index') + gauss() * 0.5), 1, 10), 1],
+        ['manual', 'blood_glucose', 7 * 60 + 45 + shiftMin, Math.round(T('blood_glucose') + gauss() * 3), 7],
+        ['habitat_sensor', 'cabin_co2', 12 * 60, r1(T('cabin_co2') + gauss() * 0.1), 1],
+        ['exercise_device', 'ared_load', 18 * 60 + 45, r1(T('ared_load') + gauss() * 0.8), 1],
+        ['clinical_exam', 'onsd', 9 * 60, r2(T('onsd') + gauss() * 0.03), 3],
+        ['clinical_exam', 'iop', 9 * 60 + 5, Math.round(T('iop') + gauss() * 0.5), 3],
+        ['clinical_exam', 'wbc_lymph', 9 * 60 + 10, r2(T('wbc_lymph') + gauss() * 0.05), 3],
+        ['clinical_exam', 'bmd_delta', 9 * 60 + 15, r2(T('bmd_delta')), 7],
       ];
       const isLastDay = midnight + DAY_MS >= toMs;
       for (const [kind, metric, minute, value, everyDays] of daily) {
         const at = midnight + minute * MIN_MS;
         if (!Number.isFinite(value) || at < fromMs || at >= toMs) continue;
-        if (dayIndex % everyDays === 0 || isLastDay) push(kind, metric, at, value);
+        const cadence = earth && kind === 'clinical_exam' ? 7 : everyDays; // pre-flight exams are weekly
+        if (dayIndex % cadence === 0 || isLastDay) push(kind, metric, at, value);
       }
     }
     const plan = dayPlan!;
@@ -161,7 +177,7 @@ export function simulate(opts: SimulationOptions): SimulatedBatch {
     const exercising = (bodyMinute >= 600 && bodyMinute < 645) || (bodyMinute >= 1020 && bodyMinute < 1065);
     const hourAngle = (2 * Math.PI * bodyMinute) / 1440;
 
-    const resting = target('resting_hr', plan.tDay);
+    const resting = targetFor('resting_hr', plan.tDay, plan.earth);
     let hr = asleep
       ? resting - 2 + gauss() * 1.5
       : resting + 12 + 4 * Math.sin(hourAngle - Math.PI / 2) + gauss() * 3;
@@ -174,16 +190,16 @@ export function simulate(opts: SimulationOptions): SimulatedBatch {
     push('smartwatch', 'sleep_state', ts, asleep ? 1 : 0);
 
     if (minuteOfDay % every === 0) {
-      const spo2 = target('spo2', plan.tDay) - (asleep ? 0.4 : 0) + gauss() * 0.5;
+      const spo2 = targetFor('spo2', plan.tDay, plan.earth) - (asleep ? 0.4 : 0) + gauss() * 0.5;
       push('smartwatch', 'spo2', ts, r1(clamp(spo2, 80, 100)));
       push('smartwatch', 'resp_rate', ts, r1(asleep ? 13 + gauss() : exercising ? 28 + gauss() * 3 : 16 + gauss() * 1.5));
       // Dose rate (µGy/h) from the daily mSv target, ±8 % (Source: SRC-026).
-      const dose = (target('rad_dose', plan.tDay) * 1000) / 24;
+      const dose = (targetFor('rad_dose', plan.tDay, plan.earth) * 1000) / 24;
       push('dosimeter', 'dose_rate', ts, r1(Math.max(0, dose * (1 + gauss() * 0.08))));
     }
     // Watch blood pressure: spot readings morning, afternoon, evening while seated (Source: SRC-075).
     if (bodyMinute === 8 * 60 || bodyMinute === 14 * 60 || bodyMinute === 20 * 60) {
-      const sys = target('systolic_bp', plan.tDay) + gauss() * 4;
+      const sys = targetFor('systolic_bp', plan.tDay, plan.earth) + gauss() * 4;
       push('smartwatch', 'systolic_bp', ts, Math.round(sys));
       push('smartwatch', 'diastolic_bp', ts, Math.round(sys * 0.64 + gauss() * 3));
     }

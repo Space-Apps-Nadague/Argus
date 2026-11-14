@@ -3,12 +3,13 @@
  * work with every engine (PGlite included). Output: data/exports/ (gitignored, regenerate any time).
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { resolveDatabaseUrl } from '../server/db/connectionString';
 import { resolve } from 'node:path';
 import { openDb, queryRows, sql } from '../server/db/client';
 import { loadEnv } from '../server/env';
 
 loadEnv();
-const url = process.env.DATABASE_URL;
+const url = resolveDatabaseUrl();
 if (!url) {
   console.error('DATABASE_URL is not set.');
   process.exit(1);

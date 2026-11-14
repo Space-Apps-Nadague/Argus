@@ -17,7 +17,13 @@ ARGUS stores crew health data in a shared **PostgreSQL** database instead of eac
 | Local dev | `docker compose up -d postgres` (`pgvector/pgvector:0.8.0-pg17`) | each developer, with throwaway data |
 | Shared team | Azure Database for PostgreSQL Flexible Server, B1MS, PostgreSQL 17, free tier [SRC-061] | the whole team and the demo |
 
-- Connection is `DATABASE_URL` in `.env`, which is server-only. Never prefix it with `VITE_`. Azure requires `sslmode=require`.
+- **Connection, in this order** (`server/db/connectionString.ts`):
+  1. `DATABASE_URL` (local dev and teammates).
+  2. `AZURE_POSTGRESQL_CONNECTIONSTRING` as an app setting.
+  3. The same name as an App Service connection string, which Linux exposes as `CUSTOMCONNSTR_…` or `POSTGRESQLCONNSTR_…`.
+
+  Azure's `Server=…;Database=…;User Id=…;Password=…` format is converted to a TLS URL. Values are server-only: never prefix them with `VITE_`.
+- **Production (argus-space.health):** web app `argus-space` uses the private database `argus-space-server` (reachable only through the app's private network). With `ARGUS_BOOTSTRAP_ON_START=1` the app seeds an empty database on first start, then generates 30 days of simulated history and loads the NASA reference CSVs. Every `ARGUS_SIMULATE_TOPUP_MIN` minutes (default 15) it extends the simulated history to the present (`server/jobs/bootstrap.ts`).
 - Extensions: `citext` (case-insensitive usernames) and `pgcrypto` (`gen_random_uuid`). `vector` is enabled but unused until RAG is added [SRC-062].
 - Schema changes go **only** through Drizzle migrations (`server/db/migrations/`, `npm run db:migrate`). Nobody edits the Azure schema by hand.
 - Team access: one firewall rule per teammate IP, plus DB roles `argus_app` (the server) and `argus_analyst` (read-only, for notebooks). See `docs/DATABASE.md`.
@@ -133,13 +139,16 @@ Shared TypeScript lives in `shared/analytics/` and is used by both the server an
 Days are UTC calendar days, labelled as mission days (`MD-n`) from `missions.start_at`.
 
 ### 5.2 Baselines (`baselines`)
-Computed per astronaut × metric.
+Computed per astronaut × metric. As NASA does, in-flight values are compared with the same person **on Earth before launch**. Spaceflight Standard Measures collect pre-flight data [SRC-009], ARCHeR crews wore their actigraph months before flight [SRC-024], and Inspiration4 drew blood at L-92/L-44/L-3 [SRC-047].
 
 | Kind | Method |
 |---|---|
-| `preflight` | First 7 mission days, frozen once mission day 8 exists. Mean and SD, with SD floored at `METRIC_TYPICAL_SD`. This is the reference for drift. |
-| `rolling_14d` | The last 14 days of daily values: median, MAD, mean, SD, p05 and p95. This is the "your normal" band in the HUD. |
+| `preflight` | **Earth pre-flight**: daily values dated before `missions.start_at` (default 14 days, `--preflight-days`). Mean and SD, with SD floored at `METRIC_TYPICAL_SD`. This is the reference for drift. Without at least 2 Earth days (e.g. `cabin_co2`, `ared_load`, which only exist in the habitat), it falls back to `early_flight`. |
+| `early_flight` | Mission days 1–7: the adaptation reference. Radiation (`rad_dose`) drifts from this one, because its rise from Earth is environmental, not physiological (`DRIFT_FROM_EARLY_FLIGHT`). |
+| `rolling_14d` | The last 14 in-flight days: median, MAD, mean, SD, p05 and p95. This is the "your normal" band in the HUD. |
 | `hour_of_day` | `heart_rate` minute data over 14 days, grouped by UTC hour. This is the circadian reference, so the 03:00 heart rate is compared with that person's own 03:00. |
+
+The simulated Earth phase uses each crew member's recorded pre-flight values (`restingHrBaselineBpm`, `preFlightOnsdMm`), natural background radiation (≈ 3.1 mSv/yr [SRC-080]), weekly exams, no circadian shift, and no habitat CO₂ or flight exercise device. In the HUD these days appear at the start of each series as `L-n` (L-1 = the day before launch). The client drift maths uses the same rule, `baselinePoints()` in `shared/analytics`.
 
 ### 5.3 Anomaly detectors (`anomalies`)
 These are informational only: an anomaly never changes a triage status.

@@ -56,7 +56,7 @@ export const ingestKind = pgEnum('ingest_kind', [
   'seed',
 ]);
 export const ingestStatus = pgEnum('ingest_status', ['running', 'succeeded', 'failed']);
-export const baselineKind = pgEnum('baseline_kind', ['preflight', 'rolling_14d', 'hour_of_day']);
+export const baselineKind = pgEnum('baseline_kind', ['preflight', 'rolling_14d', 'hour_of_day', 'early_flight']);
 export const anomalyDetector = pgEnum('anomaly_detector', ['robust_z', 'ewma', 'cusum']);
 export const anomalySeverity = pgEnum('anomaly_severity', ['watch', 'drifting']);
 export const triageStatus = pgEnum('triage_status', ['green', 'yellow', 'red']);
