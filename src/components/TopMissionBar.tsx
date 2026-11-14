@@ -50,6 +50,18 @@ export const TopMissionBar: React.FC = () => {
 
   const [showKeyInput, setShowKeyInput] = useState(false);
   const [showMilestonesPopover, setShowMilestonesPopover] = useState(false);
+
+  React.useEffect(() => {
+    if (!showMilestonesPopover && !showKeyInput) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowMilestonesPopover(false);
+        setShowKeyInput(false);
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [showMilestonesPopover, showKeyInput]);
   const envMeta = ENVIRONMENT_META[environment];
   const hasKey = hasConfiguredAiKey(runtimeApiKey);
   const rStatus = readinessStatus(readinessScore);
@@ -99,7 +111,7 @@ export const TopMissionBar: React.FC = () => {
         </div>
 
         {/* Readiness · location · scenario · AI key */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 min-w-0">
           <div
             className="flex items-center gap-2.5 rounded-lg border border-hud-line bg-hud-panel/80 px-3 py-1.5"
             aria-label={`${activeCrewMember.callsign} readiness ${readinessScore} percent, ${STATUS_WORD[rStatus]}`}
@@ -135,7 +147,7 @@ export const TopMissionBar: React.FC = () => {
               <div
                 role="dialog"
                 aria-label="Readiness milestone badges"
-                className="absolute right-0 z-50 mt-2 w-80 rounded-xl border border-hud-line bg-hud-panel p-3 shadow-2xl"
+                className="fixed inset-x-3 top-16 z-50 sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-80 max-w-[calc(100vw-1.5rem)] rounded-xl border border-hud-line bg-hud-panel p-3 shadow-2xl"
               >
                 <div className="mb-2 flex items-center justify-between border-b border-hud-line pb-2">
                   <div className="flex items-center gap-1.5">
@@ -254,7 +266,11 @@ export const TopMissionBar: React.FC = () => {
               <KeyRound className="h-4 w-4" aria-hidden="true" />
             </button>
             {showKeyInput && (
-              <div className="absolute right-0 z-50 mt-2 w-72 rounded-xl border border-hud-line bg-hud-panel p-3 shadow-2xl">
+              <div
+                role="dialog"
+                aria-label="Clinical AI key"
+                className="fixed inset-x-3 top-16 z-50 sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-72 max-w-[calc(100vw-1.5rem)] rounded-xl border border-hud-line bg-hud-panel p-3 shadow-2xl"
+              >
                 <div className="mb-1.5 flex items-center justify-between">
                   <span className="text-xs font-semibold text-hud-text">Clinical AI key</span>
                   <button

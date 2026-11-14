@@ -931,12 +931,12 @@ export const BioTwinMap: React.FC = () => {
   return (
     <section
       aria-label="3D Holographic Human Bio-Twin Central Stage"
-      className="hud-card flex h-full flex-col overflow-hidden"
+      className="hud-card flex h-full flex-col overflow-hidden min-w-0"
     >
       {/* Stage toolbar: anatomy · scanner · rotate · reset (labels in tooltips) */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-hud-line px-4 py-2.5">
-        <h2 className="flex items-center gap-2 font-display text-[13px] font-semibold tracking-wide text-hud-text">
-          <Sparkles className="h-4 w-4 text-hud-accent" aria-hidden="true" />
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-hud-line px-4 py-2.5 min-w-0">
+        <h2 className="flex flex-wrap items-center gap-2 font-display text-[13px] font-semibold tracking-wide text-hud-text min-w-0">
+          <Sparkles className="h-4 w-4 text-hud-accent shrink-0" aria-hidden="true" />
           Bio-Twin
           <span className="font-mono text-xs font-normal text-hud-accent">{activeCrewMember.callsign}</span>
         </h2>
@@ -991,10 +991,10 @@ export const BioTwinMap: React.FC = () => {
       {/* ============================================================
           SECONDARY BAR: ANATOMICAL LAYER SWITCHER + CAMERA FOCUS PRESETS
          ============================================================ */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-hud-line/70 px-4 py-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-hud-line/70 px-4 py-2 min-w-0">
         {/* Layer Switcher */}
-        <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Anatomy layer">
-          <Layers className="mr-1 h-4 w-4 text-hud-muted" aria-hidden="true" />
+        <div className="flex flex-wrap items-center gap-1 min-w-0" role="group" aria-label="Anatomy layer">
+          <Layers className="mr-1 h-4 w-4 text-hud-muted shrink-0" aria-hidden="true" />
           {LAYER_OPTIONS.map((layer) => {
             const active = anatomicalLayer === layer.id;
             return (
@@ -1013,8 +1013,8 @@ export const BioTwinMap: React.FC = () => {
         </div>
 
         {/* Camera Focus Presets */}
-        <div className="flex items-center gap-1" role="group" aria-label="Camera focus">
-          <Crosshair className="mr-1 h-4 w-4 text-hud-muted" aria-hidden="true" />
+        <div className="flex flex-wrap items-center gap-1 min-w-0" role="group" aria-label="Camera focus">
+          <Crosshair className="mr-1 h-4 w-4 text-hud-muted shrink-0" aria-hidden="true" />
           {(Object.keys(CAMERA_PRESETS) as CameraPresetId[]).map((presetKey) => {
             const active = cameraPreset === presetKey;
             return (
@@ -1036,7 +1036,7 @@ export const BioTwinMap: React.FC = () => {
           CENTRAL EXPANSIVE 3D HOLOGRAPHIC VIEWPORT (STAR OF THE DASHBOARD)
          ============================================================ */}
       <div
-        className="relative flex-1 min-h-[500px] lg:min-h-[560px] w-full bg-[radial-gradient(ellipse_at_center,_rgba(8,51,68,0.42)_0%,_rgba(2,6,23,0.96)_72%)]"
+        className="relative flex-1 min-h-[320px] sm:min-h-[380px] md:min-h-[440px] lg:min-h-[480px] xl:min-h-[520px] w-full bg-[radial-gradient(ellipse_at_center,_rgba(8,51,68,0.42)_0%,_rgba(2,6,23,0.96)_72%)]"
         onMouseEnter={() => setIsInteracting(true)}
         onMouseLeave={() => {
           setIsInteracting(false);
@@ -1116,8 +1116,8 @@ export const BioTwinMap: React.FC = () => {
       {/* ============================================================
           BOTTOM QUICK-SELECT 5-ZONE ANATOMICAL MATRIX
          ============================================================ */}
-      <div className="border-t border-hud-line p-3">
-        <div className="grid grid-cols-5 gap-2" role="group" aria-label="Body zones">
+      <div className="border-t border-hud-line p-2 sm:p-3 min-w-0">
+        <div className="grid grid-cols-5 gap-1 sm:gap-2 min-w-0" role="group" aria-label="Body zones">
           {ZONE_ORDER.map((zoneId) => {
             const zone = BODY_ZONES[zoneId];
             const status = zoneStatuses[zoneId];
@@ -1140,18 +1140,18 @@ export const BioTwinMap: React.FC = () => {
                 }}
                 aria-pressed={isSelected}
                 aria-label={`${ZONE_SHORT_NAME[zoneId]}: ${STATUS_WORD[status]}`}
-                className={`hud-focus hud-tile flex flex-col items-center justify-center p-2 text-center ${isSelected ? 'hud-tile-selected' : ''}`}
+                className={`hud-focus hud-tile flex flex-col items-center justify-center p-1 sm:p-2 text-center min-w-0 ${isSelected ? 'hud-tile-selected' : ''}`}
               >
-                <div className="flex items-center gap-1.5 mb-1">
+                <div className="flex items-center gap-1 sm:gap-1.5 mb-0.5 sm:mb-1">
                   <span style={{ color }}>{ZONE_ICONS[zoneId]}</span>
                   <span style={{ color }}>
-                    <StatusIcon status={status} className="h-3 w-3" />
+                    <StatusIcon status={status} className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                   </span>
                 </div>
-                <span className="w-full truncate text-[11px] font-medium leading-tight text-hud-text" title={zone.name}>
+                <span className="w-full truncate text-[10px] sm:text-[11px] font-medium leading-tight text-hud-text" title={zone.name}>
                   {ZONE_SHORT_NAME[zoneId]}
                 </span>
-                <span className="mt-0.5 text-[10px] font-medium" style={{ color }}>
+                <span className="mt-0.5 text-[9px] sm:text-[10px] font-medium" style={{ color }}>
                   {STATUS_WORD[status]}
                 </span>
               </button>

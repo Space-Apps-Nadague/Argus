@@ -57,12 +57,12 @@ export const TrendsTab: React.FC = () => {
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
       {/* Telemetry Panel: Zone/Metric selectors, + Log Vital Reading, Longitudinal Chart */}
-      <div className="xl:col-span-2">
+      <div className="xl:col-span-2 min-w-0">
         <TelemetryPanel />
       </div>
 
       {/* Side Column: Drift analytics & "Why" links */}
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4 min-w-0">
         {/* Drift + forecast */}
         <Card
           icon={<Telescope className="h-4 w-4" />}

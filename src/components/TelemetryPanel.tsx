@@ -229,9 +229,9 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
   };
 
   return (
-    <div className={`space-y-4 ${className}`}>
+    <div className={`space-y-4 ${className} min-w-0`}>
       {/* Zone + metric pickers */}
-      <div className="flex flex-col gap-2.5">
+      <div className="flex flex-col gap-2.5 min-w-0">
         <div
           className="no-scrollbar flex gap-1.5 overflow-x-auto pb-0.5"
           role="group"
@@ -323,7 +323,7 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
             icon={<PlusCircle className="h-4 w-4 text-hud-accent" />}
             title={`Log Live Vital Reading · MD-${latestDay || 30}`}
           actions={
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="font-mono text-xs text-hud-muted">
                 Astronaut: <span className="text-hud-text">{activeCrewMember.callsign}</span>
               </span>
@@ -338,10 +338,10 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
           className="border-hud-accent/30 bg-slate-900/90 shadow-lg shadow-cyan-950/20"
           bodyClassName="p-4 space-y-3"
         >
-          <form onSubmit={handleLogSubmit} className="space-y-3" noValidate>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 items-start">
+          <form onSubmit={handleLogSubmit} className="space-y-3 min-w-0" noValidate>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 items-start min-w-0">
               {/* Zone selector */}
-              <div>
+              <div className="min-w-0">
                 <label htmlFor={`${formId}-zone`} className="block text-xs font-medium text-hud-muted mb-1">
                   Target Zone
                 </label>
@@ -367,7 +367,7 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
               </div>
 
               {/* Metric selector */}
-              <div>
+              <div className="min-w-0">
                 <label htmlFor={`${formId}-metric`} className="block text-xs font-medium text-hud-muted mb-1">
                   Vital Metric
                 </label>
@@ -389,14 +389,14 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
               </div>
 
               {/* Reading value input */}
-              <div>
+              <div className="min-w-0 sm:col-span-2 lg:col-span-1">
                 <div className="flex items-center justify-between mb-1">
-                  <label htmlFor={`${formId}-value`} className="block text-xs font-medium text-hud-muted">
+                  <label htmlFor={`${formId}-value`} className="block text-xs font-medium text-hud-muted truncate">
                     Reading Value ({logMetricUnit})
                   </label>
                   {previewStatus && (
                     <span
-                      className="inline-flex items-center gap-1 text-[11px] font-mono px-1.5 py-0.2 rounded"
+                      className="inline-flex shrink-0 items-center gap-1 text-[11px] font-mono px-1.5 py-0.2 rounded"
                       style={{
                         color: STATUS_COLORS[previewStatus],
                         backgroundColor: `${STATUS_COLORS[previewStatus]}15`,
@@ -427,8 +427,8 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
                 </div>
                 {validation.ok === false ? (
                   <p className="mt-1 text-[11px] text-status-red flex items-center gap-1">
-                    <AlertTriangle className="h-3 w-3" />
-                    {validation.error}
+                    <AlertTriangle className="h-3 w-3 shrink-0" />
+                    <span className="truncate">{validation.error}</span>
                   </p>
                 ) : (
                   <p className="mt-1 text-[11px] text-hud-muted truncate" title={logInputRange.how}>
@@ -436,11 +436,13 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
                   </p>
                 )}
               </div>
+            </div>
 
-              {/* Action & quick presets */}
-              <div className="flex flex-col gap-1.5 pt-0.5">
-                <span className="block text-xs font-medium text-hud-muted mb-0.5">Quick Presets</span>
-                <div className="flex items-center gap-1.5">
+            {/* Action footer: quick presets, allowed range & record button */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-hud-line/60 min-w-0">
+              <div className="flex flex-wrap items-center gap-2 min-w-0">
+                <span className="text-xs font-medium text-hud-muted shrink-0">Presets:</span>
+                <div className="flex flex-wrap items-center gap-1.5">
                   <button
                     type="button"
                     onClick={() => applyPreset('nominal')}
@@ -465,23 +467,24 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
                   >
                     Alert
                   </button>
-                  <button
-                    type="submit"
-                    disabled={validation.ok !== true || isSubmitting}
-                    className="hud-focus ml-auto flex items-center gap-1.5 rounded-lg border border-hud-accent/60 bg-hud-accent px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-cyan-300 disabled:opacity-40 disabled:pointer-events-none transition-colors"
-                  >
-                    {isSubmitting || isSynthesizingAi ? (
-                      <Sparkles className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                    )}
-                    <span>Record Reading</span>
-                  </button>
                 </div>
                 <span className="text-[10px] font-mono text-hud-muted">
-                  Allowed {logInputRange.min}–{logInputRange.max} {logMetricUnit} · {formatFlightNormBadge(logMetricId, logMetricUnit, environment)}
+                  · Allowed {logInputRange.min}–{logInputRange.max} {logMetricUnit} · {formatFlightNormBadge(logMetricId, logMetricUnit, environment)}
                 </span>
               </div>
+
+              <button
+                type="submit"
+                disabled={validation.ok !== true || isSubmitting}
+                className="hud-focus flex shrink-0 items-center gap-1.5 rounded-lg border border-hud-accent/60 bg-hud-accent px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-cyan-300 disabled:opacity-40 disabled:pointer-events-none transition-colors ml-auto sm:ml-0"
+              >
+                {isSubmitting || isSynthesizingAi ? (
+                  <Sparkles className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                )}
+                <span>Record Reading</span>
+              </button>
             </div>
 
             {logStatusMessage && (
@@ -540,8 +543,9 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
             )}, ${STATUS_WORD[status]}.${
               f3 ? ` Forecast ${f3.dateLabel} about ${fmt(f3.mean, reading.unit)}.` : ''
             }`}
+            className="min-w-0"
           >
-            <div className="h-[300px] w-full">
+            <div className="h-[300px] w-full min-w-0">
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart
                   data={rows}
