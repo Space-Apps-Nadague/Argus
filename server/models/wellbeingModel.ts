@@ -1,6 +1,6 @@
 /**
  * Deterministic behavioral-health (mental wellbeing) risk model and crisis-language detector
- * (specs/03-ai-backend.md §5). The LLM never sets the score, status or crisis flag.
+ * (specs/04-ai-backend.md §5). The LLM never sets the score, status or crisis flag.
  */
 
 import type { BodyZoneId, TriageStatus, VitalSignReading } from '../../src/types/argus';

@@ -1,5 +1,5 @@
 /**
- * Provider-agnostic LLM calls with an ordered fallback chain (specs/03-ai-backend.md §3).
+ * Provider-agnostic LLM calls with an ordered fallback chain (specs/04-ai-backend.md §3).
  * Callers always get either validated data or `null` — never an exception — so every
  * endpoint can drop to its deterministic offline result.
  */

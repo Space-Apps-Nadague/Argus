@@ -1,5 +1,5 @@
 /**
- * ARGUS AI provider registry & fallback-chain resolution (specs/03-ai-backend.md §3).
+ * ARGUS AI provider registry & fallback-chain resolution (specs/04-ai-backend.md §3).
  *
  * Every provider speaks the OpenAI-compatible Chat Completions API, so switching between a
  * local model, a free cloud tier, or a hosted agent gateway is configuration, not code.

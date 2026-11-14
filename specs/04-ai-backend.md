@@ -1,4 +1,4 @@
-# Spec 03: ARGUS AI Backend (Provider-Agnostic, Free & Local-First)
+# Spec 04: ARGUS AI Backend (Provider-Agnostic, Free & Local-First)
 
 ## 1. Purpose
 A small Node/TypeScript server (`server/`) hosts every AI feature so that:
@@ -61,7 +61,7 @@ Guardrails enforced in code:
 - Every result carries "decision support, not a diagnosis" framing for non-physician crew.
 
 ## 5. Deterministic Models
-- **Trend model** (`MetricTrend`): personal baseline = mean of first 7 mission days, SD floored at ⅛ of the nominal band; z-score of the latest value; EWMA z (α 0.3) → `steady` (<1σ) / `watch` (≥1σ) / `drifting` (≥2σ); OLS slope over the last 10 days → 3-day forecast and days until the red band (0 if already red, `null` if moving away or >60 days). After Sprint 5 merges, this delegates to `src/utils/driftAnalytics.ts`.
+- **Trend model** (`MetricTrend`): personal baseline = mean of first 7 mission days, SD floored at ⅛ of the nominal band; z-score of the latest value; EWMA z (α 0.3) → `steady` (<1σ) / `watch` (≥1σ) / `drifting` (≥2σ); OLS slope over the last 10 days → 3-day forecast and days until the red band (0 if already red, `null` if moving away or >60 days). Task 27 switches this to Sprint 7's `src/utils/driftAnalytics.ts`.
 - **Wellbeing risk** (0–100): last-3-day mean of the six 1–5 scales (stress inverted) weighted mood 25 / stress 20 / sleepQuality 15 / energy 15 / motivation 15 / cohesion 10 → up to 70 pts; worsening 7-day slope up to +10; `sleep_eff` and `pvt_lapses` triage status +5/+10 each. `<35` green, `35–59` yellow, `≥60` red; crisis forces red.
 
 ## 6. Running

@@ -1,5 +1,5 @@
 /**
- * ARGUS AI backend client (specs/03-ai-backend.md §4).
+ * ARGUS AI backend client (specs/04-ai-backend.md §4).
  * The browser never holds a provider key unless the crew types one into the HUD; it is then
  * forwarded per request in `X-AI-Key` and never stored server-side.
  */
