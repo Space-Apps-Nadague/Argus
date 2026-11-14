@@ -29,3 +29,5 @@
 - `src/components/BioTwinMap.tsx` — Interactive rotating 3D anatomical Bio-Twin with layer toggles (`all`, `dermal`, `skeletal`, `organs`) & clickable 5-zone body parts
 - `src/components/TelemetryPanel.tsx` — Vital cards + 14-to-30-day Recharts trend graphs with shaded `ReferenceArea` nominal ranges
 - `src/components/FlightSurgeonPanel.tsx` — Autonomous Flight Surgeon guidance, step-by-step exam checklist, webcam/image upload + 1-click sample test images, Earth packet export
+- `.agents/skills/pm-agent/` — Autonomous Product Manager (PM) Agent workspace skill (`SKILL.md`), headless Gemini audit runner (`scripts/run-pm-audit.mjs`), GitHub Issues CLI utility (`scripts/gh-pm-issue.mjs`), and Miro Kanban Board CLI utility (`scripts/miro-pm-board.mjs`) for continuous hackathon readiness auditing, issue management, and Miro task synchronization
+- `.github/workflows/pm-agent.yml` — Autonomous GitHub Actions workflow running the PM Agent as `github-actions[bot]` on `push` to `main`, scheduled intervals, and manual `workflow_dispatch`

@@ -5,6 +5,7 @@ Before writing, editing, or refactoring any code, read the relevant files in `/s
 - **Architecture & Stack:** `specs/00-architecture.md`
 - **Data Models, Thresholds & AI JSON:** `specs/01-data-schema.md`
 - **UI Layout, Bio-Map SVG & Demo Controls:** `specs/02-ui-dashboard.md`
+- **Challenge Requirements & Traceability:** `specs/03-requirements.md`
 - **Active Sprint & File Ownership:** `specs/tasks.md`
 
 ## 2. Spec-Driven Development Protocol
