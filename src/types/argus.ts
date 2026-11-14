@@ -60,17 +60,16 @@ export interface SpaceLocation {
   description: string;
 }
 
-/** Local user accounts (specs/01-data-schema.md §9) */
-export type UserRole = 'admin' | 'crew';
+/** User accounts (specs/01-data-schema.md §9, specs/05-data-platform.md §6) */
+export type UserRole = 'admin' | 'astronaut' | 'flight_surgeon';
 
 export interface UserAccount {
   id: string;
   username: string;
   role: UserRole;
   crewId?: string;
-  passwordHash: string;
-  salt: string;
   createdAtIso: string;
+  disabled?: boolean;
 }
 
 /** Emergency protocols (specs/01-data-schema.md §10) */

@@ -13,7 +13,14 @@ export interface HudTabDef {
   id: HudTabId;
   label: string;
   icon: React.ReactNode;
-  adminOnly?: boolean;
+  /** `roster`: admins + flight surgeons. `users`: admins. Unset: health tabs. */
+  needs?: 'roster' | 'users';
+}
+
+export interface TabAccess {
+  canViewHealth: boolean;
+  canManageRoster: boolean;
+  isAdmin: boolean;
 }
 
 export const HUD_TAB_DEFS: HudTabDef[] = [
@@ -23,19 +30,22 @@ export const HUD_TAB_DEFS: HudTabDef[] = [
   { id: 'eyes', label: 'Eyes', icon: <Eye className="w-4 h-4" /> },
   { id: 'ai', label: 'ARGUS AI', icon: <Bot className="w-4 h-4" /> },
   { id: 'emergency', label: 'Emergency', icon: <Siren className="w-4 h-4" /> },
-  { id: 'crew', label: 'Crew', icon: <Users className="w-4 h-4" />, adminOnly: true },
-  { id: 'users', label: 'Users', icon: <UserCog className="w-4 h-4" />, adminOnly: true },
+  { id: 'crew', label: 'Crew', icon: <Users className="w-4 h-4" />, needs: 'roster' },
+  { id: 'users', label: 'Users', icon: <UserCog className="w-4 h-4" />, needs: 'users' },
 ];
 
-export const visibleTabs = (isAdmin: boolean) => HUD_TAB_DEFS.filter((t) => isAdmin || !t.adminOnly);
+export const visibleTabs = (a: TabAccess) =>
+  HUD_TAB_DEFS.filter((t) =>
+    t.needs === 'users' ? a.isAdmin : t.needs === 'roster' ? a.canManageRoster : a.canViewHealth
+  );
 
 export const tabId = (id: HudTabId) => `hud-tab-${id}`;
 export const panelId = (id: HudTabId) => `hud-panel-${id}`;
 
-export const TabBar: React.FC<{ isAdmin: boolean; activeTab: HudTabId }> = ({ isAdmin, activeTab }) => {
+export const TabBar: React.FC<{ access: TabAccess; activeTab: HudTabId }> = ({ access, activeTab }) => {
   const { setActiveTab, zoneStatuses } = useMission();
   const refs = useRef<Record<string, HTMLButtonElement | null>>({});
-  const tabs = visibleTabs(isAdmin);
+  const tabs = visibleTabs(access);
   const redCount = Object.values(zoneStatuses).filter((s) => s === 'red').length;
 
   const badge = (id: HudTabId): React.ReactNode =>

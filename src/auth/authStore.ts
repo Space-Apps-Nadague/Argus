@@ -1,6 +1,8 @@
 /**
- * ARGUS — Local user accounts (specs/01-data-schema.md §9, specs/02-ui-dashboard.md §6)
+ * ARGUS — Offline-demo user accounts (specs/01-data-schema.md §9, specs/05-data-platform.md §6)
  *
+ * Used ONLY when the ARGUS server has no database (offline demo). With a database, accounts are
+ * server-side (`server/routes/auth.ts`, argon2id) and nothing here is used.
  * Accounts live in the browser so each astronaut gets their own view on a shared device.
  * Passwords are PBKDF2-SHA256 hashed with a per-user salt. This is NOT server-side security:
  * anyone with access to the browser's storage can edit it. To move accounts to the backend
@@ -9,14 +11,25 @@
 
 import type { UserAccount, UserRole } from '../types/argus';
 
+/** Browser-stored account: the public `UserAccount` plus its local PBKDF2 hash. */
+export interface LocalUserAccount extends UserAccount {
+  passwordHash: string;
+  salt: string;
+}
+
 export const USERS_STORAGE_KEY = 'argus_users_v1';
 export const SESSION_STORAGE_KEY = 'argus_session_v1';
 export const MIN_PASSWORD_LENGTH = 6;
 const PBKDF2_ITERATIONS = 100_000;
 
 export interface AccountStorage {
-  load(): UserAccount[];
-  save(users: UserAccount[]): void;
+  load(): LocalUserAccount[];
+  save(users: LocalUserAccount[]): void;
+}
+
+/** Accounts saved before the role rename used `'crew'`. */
+function migrateRole(u: LocalUserAccount): LocalUserAccount {
+  return (u.role as string) === 'crew' ? { ...u, role: 'astronaut' } : u;
 }
 
 export const browserAccountStorage: AccountStorage = {
@@ -24,7 +37,7 @@ export const browserAccountStorage: AccountStorage = {
     try {
       const raw = localStorage.getItem(USERS_STORAGE_KEY);
       const parsed = raw ? JSON.parse(raw) : [];
-      return Array.isArray(parsed) ? parsed : [];
+      return Array.isArray(parsed) ? parsed.map(migrateRole) : [];
     } catch {
       return [];
     }
@@ -91,7 +104,7 @@ export function validatePassword(password: string): string | null {
   return null;
 }
 
-export function findUser(users: UserAccount[], username: string): UserAccount | undefined {
+export function findUser(users: LocalUserAccount[], username: string): LocalUserAccount | undefined {
   const key = normalizeUsername(username);
   return users.find((u) => normalizeUsername(u.username) === key);
 }
@@ -103,20 +116,20 @@ export interface NewAccount {
   crewId?: string;
 }
 
-export async function createAccount(users: UserAccount[], input: NewAccount): Promise<UserAccount[]> {
+export async function createAccount(users: LocalUserAccount[], input: NewAccount): Promise<LocalUserAccount[]> {
   const uErr = validateUsername(input.username);
   if (uErr) throw new AuthError(uErr);
   const pErr = validatePassword(input.password);
   if (pErr) throw new AuthError(pErr);
   if (findUser(users, input.username)) throw new AuthError('That username is already taken.');
-  if (input.role === 'crew' && !input.crewId) throw new AuthError('Pick the crew member this account belongs to.');
+  if (input.role === 'astronaut' && !input.crewId) throw new AuthError('Pick the crew member this account belongs to.');
 
   const salt = randomHex(16);
-  const account: UserAccount = {
+  const account: LocalUserAccount = {
     id: `u-${randomHex(6)}`,
     username: input.username.trim(),
     role: input.role,
-    crewId: input.role === 'crew' ? input.crewId : input.crewId || undefined,
+    crewId: input.role === 'astronaut' ? input.crewId : input.crewId || undefined,
     passwordHash: await hashPassword(input.password, salt),
     salt,
     createdAtIso: new Date().toISOString(),
@@ -125,10 +138,10 @@ export async function createAccount(users: UserAccount[], input: NewAccount): Pr
 }
 
 export async function verifyLogin(
-  users: UserAccount[],
+  users: LocalUserAccount[],
   username: string,
   password: string
-): Promise<UserAccount> {
+): Promise<LocalUserAccount> {
   const user = findUser(users, username);
   // Hash even when the user is missing so timing doesn't reveal which usernames exist.
   const hash = await hashPassword(password, user?.salt ?? 'no-such-user');
@@ -138,7 +151,7 @@ export async function verifyLogin(
   return user;
 }
 
-export async function resetPassword(users: UserAccount[], userId: string, password: string): Promise<UserAccount[]> {
+export async function resetPassword(users: LocalUserAccount[], userId: string, password: string): Promise<LocalUserAccount[]> {
   const pErr = validatePassword(password);
   if (pErr) throw new AuthError(pErr);
   const salt = randomHex(16);
@@ -147,7 +160,7 @@ export async function resetPassword(users: UserAccount[], userId: string, passwo
   return users.map((u) => (u.id === userId ? { ...u, salt, passwordHash } : u));
 }
 
-export function deleteAccount(users: UserAccount[], userId: string, actingUserId: string): UserAccount[] {
+export function deleteAccount(users: LocalUserAccount[], userId: string, actingUserId: string): LocalUserAccount[] {
   if (userId === actingUserId) throw new AuthError("You can't delete your own account.");
   const target = users.find((u) => u.id === userId);
   if (!target) throw new AuthError('Account not found.');
@@ -158,12 +171,12 @@ export function deleteAccount(users: UserAccount[], userId: string, actingUserId
 }
 
 /** Removes crew accounts linked to a deleted crew member. */
-export function deleteAccountsForCrew(users: UserAccount[], crewId: string): UserAccount[] {
-  return users.filter((u) => !(u.role === 'crew' && u.crewId === crewId));
+export function deleteAccountsForCrew(users: LocalUserAccount[], crewId: string): LocalUserAccount[] {
+  return users.filter((u) => !(u.role === 'astronaut' && u.crewId === crewId));
 }
 
 /** Public view of an account (no hash or salt) for UI lists. */
-export function publicAccount(u: UserAccount): Omit<UserAccount, 'passwordHash' | 'salt'> {
+export function publicAccount(u: LocalUserAccount): UserAccount {
   const { passwordHash: _h, salt: _s, ...rest } = u;
   return rest;
 }

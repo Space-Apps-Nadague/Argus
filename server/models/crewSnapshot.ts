@@ -20,6 +20,7 @@ import {
   ENVIRONMENT_META,
   evaluateAllZones,
 } from '../../src/utils/triageEngine';
+import { ageBand, currentPrivacy } from '../ai/privacy';
 import { analyzeAllTrends, isFlagged } from './trendModels';
 
 export interface CrewSnapshot {
@@ -54,13 +55,20 @@ export function buildCrewSnapshot(req: CrewContextRequest): CrewSnapshot {
   };
 }
 
-export function describeCrew(crew?: CrewMemberProfile): string {
+/**
+ * Crew description for prompts. Pseudonymized (callsign, age band, no medical notes) unless every
+ * provider that could receive it is local (spec 05 §6, `server/ai/privacy.ts`).
+ */
+export function describeCrew(crew?: CrewMemberProfile, identity = currentPrivacy().identity): string {
   if (!crew) return 'Crew member: standard astronaut Bio-Twin (no individual profile).';
+  const who = identity
+    ? `${crew.name} (callsign "${crew.callsign}"), ${crew.role}, ${crew.sex}, age ${crew.age}`
+    : `callsign "${crew.callsign}", ${crew.role}, ${crew.sex}, age ${ageBand(crew.age)}`;
   return [
-    `Crew member: ${crew.name} (callsign "${crew.callsign}"), ${crew.role}, ${crew.sex}, age ${crew.age}, blood type ${crew.bloodType}.`,
+    `Crew member: ${who}, blood type ${crew.bloodType}.`,
     `Pre-flight baselines: resting HR ${crew.restingHrBaselineBpm} bpm, ONSD ${crew.preFlightOnsdMm} mm.`,
     `Mission days logged: ${crew.missionDaysLogged}; countermeasure streak: ${crew.countermeasureStreakSols} sols.`,
-    crew.medicalNotes ? `Medical notes: ${crew.medicalNotes}` : '',
+    identity && crew.medicalNotes ? `Medical notes: ${crew.medicalNotes}` : '',
   ]
     .filter(Boolean)
     .join('\n');

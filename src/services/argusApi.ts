@@ -19,7 +19,7 @@ import type {
 } from '../types/aiApi';
 import type { FlightSurgeonGuidance, VisualExamAnalysis } from '../types/argus';
 
-const API_BASE = (import.meta.env.VITE_ARGUS_API_BASE as string | undefined)?.replace(/\/$/, '') ?? '';
+export const API_BASE = (import.meta.env.VITE_ARGUS_API_BASE as string | undefined)?.replace(/\/$/, '') ?? '';
 
 export class ArgusApiError extends Error {
   constructor(message: string, readonly status?: number) {
@@ -42,6 +42,7 @@ async function postJson<T>(path: string, body: unknown, runtimeApiKey?: string, 
       headers: headers(runtimeApiKey),
       body: JSON.stringify(body),
       signal,
+      credentials: 'include',
     });
   } catch (err) {
     throw new ArgusApiError(`ARGUS backend unreachable: ${(err as Error).message}`);
@@ -98,6 +99,7 @@ export async function streamCrewChat(
     headers: headers(options.runtimeApiKey),
     body: JSON.stringify(req),
     signal: options.signal,
+    credentials: 'include',
   }).catch((err: Error) => {
     throw new ArgusApiError(`ARGUS backend unreachable: ${err.message}`);
   });

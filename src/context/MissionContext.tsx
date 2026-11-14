@@ -48,6 +48,7 @@ import {
   checkInStreak,
   latestMissionDay,
 } from '../utils/checkIns';
+import { crewApi } from '../services/dataApi';
 import { findMetricLinks } from '../utils/driftAnalytics';
 import { DEFAULT_SPACE_LOCATION, isSpaceLocationId, SPACE_LOCATIONS } from '../data/spaceLocations';
 import {
@@ -177,6 +178,7 @@ interface MissionState {
 
 type MissionAction =
   | { type: 'SELECT_CREW_MEMBER'; payload: string }
+  | { type: 'SET_ROSTER'; payload: { roster: CrewMemberProfile[]; selectId?: string } }
   | { type: 'ADD_CREW_MEMBER'; payload: CrewMemberProfile }
   | { type: 'UPDATE_CREW_SEX'; payload: { crewId: string; sex: BiologicalSex } }
   | { type: 'DELETE_CREW_MEMBER'; payload: string }
@@ -244,6 +246,13 @@ function missionReducer(
     roster.find((c) => c.id === id) || roster[0];
 
   switch (action.type) {
+    case 'SET_ROSTER': {
+      if (action.payload.roster.length === 0) return state;
+      const withRoster = { ...state, crewRoster: action.payload.roster };
+      const keep = action.payload.selectId ?? state.activeCrewId;
+      const target = action.payload.roster.some((c) => c.id === keep) ? keep : action.payload.roster[0].id;
+      return missionReducer(withRoster, { type: 'SELECT_CREW_MEMBER', payload: target });
+    }
     case 'SELECT_CREW_MEMBER': {
       const targetCrew = getActiveCrew(state.crewRoster, action.payload);
       const nextScenario = targetCrew.defaultScenarioId;
@@ -483,9 +492,9 @@ interface MissionContextValue extends MissionState {
   currentZoneReadings: VitalSignReading[];
   readinessScore: number;
   selectCrewMember: (crewId: string) => void;
-  createCrewMember: (
-    newMember: Omit<CrewMemberProfile, 'id' | 'isCustom'>
-  ) => CrewMemberProfile;
+  createCrewMember: (newMember: Omit<CrewMemberProfile, 'id' | 'isCustom'>) => void;
+  /** True when roster, data and chat come from the ARGUS database (specs/05-data-platform.md). */
+  serverBacked: boolean;
   updateCrewMemberSex: (crewId: string, sex: BiologicalSex) => void;
   deleteCrewMember: (crewId: string) => void;
   setCrewModalOpen: (open: boolean) => void;
@@ -511,12 +520,15 @@ interface MissionProviderProps {
   lockedCrewId?: string;
   /** Called after a crew member is deleted (e.g. to remove linked accounts). */
   onCrewDeleted?: (crewId: string) => void;
+  /** Load and save the roster (and later data) through the ARGUS server instead of localStorage. */
+  serverBacked?: boolean;
 }
 
 export const MissionProvider: React.FC<MissionProviderProps> = ({
   children,
   lockedCrewId,
   onCrewDeleted,
+  serverBacked = false,
 }) => {
   const [state, dispatch] = useReducer(missionReducer, initialState, (s) =>
     lockedCrewId && lockedCrewId !== s.activeCrewId && s.crewRoster.some((c) => c.id === lockedCrewId)
@@ -534,12 +546,28 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
   }, [locations]);
 
   useEffect(() => {
+    if (serverBacked) return; // the database is the system of record
     try {
       localStorage.setItem(CREW_STORAGE_KEY, JSON.stringify(state.crewRoster));
     } catch {
       // Ignore storage errors
     }
-  }, [state.crewRoster]);
+  }, [state.crewRoster, serverBacked]);
+
+  // Server mode: the roster comes from the database (pseudonymized per role, spec 05 §6).
+  useEffect(() => {
+    if (!serverBacked) return;
+    let cancelled = false;
+    crewApi
+      .list()
+      .then(({ crew }) => {
+        if (!cancelled) dispatch({ type: 'SET_ROSTER', payload: { roster: crew, selectId: lockedCrewId } });
+      })
+      .catch((err) => console.warn('[ARGUS] could not load crew roster', err));
+    return () => {
+      cancelled = true;
+    };
+  }, [serverBacked, lockedCrewId]);
 
   useEffect(() => {
     try {
@@ -633,32 +661,39 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
 
   const createCrewMember = useCallback(
     (newMember: Omit<CrewMemberProfile, 'id' | 'isCustom'>) => {
-      const created: CrewMemberProfile = {
-        ...newMember,
-        id: `crew-custom-${Date.now()}`,
-        isCustom: true,
-      };
-      dispatch({ type: 'ADD_CREW_MEMBER', payload: created });
-      return created;
+      if (serverBacked) {
+        const { missionDaysLogged: _days, ...profile } = newMember;
+        crewApi
+          .create(profile)
+          .then(({ crewMember }) => dispatch({ type: 'ADD_CREW_MEMBER', payload: crewMember }))
+          .catch((err) => console.warn('[ARGUS] could not create crew member', err));
+        return;
+      }
+      dispatch({
+        type: 'ADD_CREW_MEMBER',
+        payload: { ...newMember, id: `crew-custom-${Date.now()}`, isCustom: true },
+      });
     },
-    []
+    [serverBacked]
   );
 
   const deleteCrewMember = useCallback(
     (crewId: string) => {
       if (lockedCrewId) return; // only admins manage the roster
+      if (serverBacked) void crewApi.archive(crewId).catch((err) => console.warn('[ARGUS] could not archive', err));
       dispatch({ type: 'DELETE_CREW_MEMBER', payload: crewId });
       setLocations(({ [crewId]: _removed, ...rest }) => rest);
       onCrewDeleted?.(crewId);
     },
-    [lockedCrewId, onCrewDeleted]
+    [lockedCrewId, onCrewDeleted, serverBacked]
   );
 
   const updateCrewMemberSex = useCallback(
     (crewId: string, sex: BiologicalSex) => {
+      if (serverBacked) void crewApi.update(crewId, { sex }).catch((err) => console.warn('[ARGUS] could not update', err));
       dispatch({ type: 'UPDATE_CREW_SEX', payload: { crewId, sex } });
     },
-    []
+    [serverBacked]
   );
 
   const setCrewModalOpen = useCallback((open: boolean) => {
@@ -869,6 +904,7 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
       metricLinks,
       setActiveTab,
       isCrewLocked: Boolean(lockedCrewId),
+      serverBacked,
       spaceLocationId,
       spaceLocation,
       setSpaceLocation,
@@ -906,6 +942,7 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
       metricLinks,
       setActiveTab,
       lockedCrewId,
+      serverBacked,
       spaceLocationId,
       spaceLocation,
       setSpaceLocation,

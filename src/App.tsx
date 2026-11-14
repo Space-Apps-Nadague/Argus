@@ -37,18 +37,24 @@ const PANELS: Record<HudTabId, React.FC> = {
 };
 
 const Hud: React.FC = () => {
-  const { isAdmin } = useAuth();
+  const { isAdmin, canManageRoster, canViewHealth, mode } = useAuth();
   const { activeTab: storedTab } = useMission();
-  const tabs = visibleTabs(isAdmin);
-  // A crew user may have a stored admin-only tab; fall back to Bio-Twin.
-  const activeTab: HudTabId = tabs.some((t) => t.id === storedTab) ? storedTab : 'biotwin';
+  const access = { isAdmin, canManageRoster, canViewHealth };
+  const tabs = visibleTabs(access);
+  // A user may have a stored tab their role can't see; fall back to the first visible one.
+  const activeTab: HudTabId = tabs.some((t) => t.id === storedTab) ? storedTab : tabs[0]?.id ?? 'biotwin';
 
   return (
     <div className="min-h-screen bg-hud-bg text-hud-text hud-grid-bg">
       <TopMissionBar />
-      {isAdmin && <CrewManagerModal />}
+      {canManageRoster && <CrewManagerModal />}
+      {mode === 'local' && (
+        <div role="status" className="border-b border-yellow-500/40 bg-yellow-500/10 px-4 py-1 text-center text-[11px] text-yellow-200">
+          Offline demo · no ARGUS database connected, data stays in this browser
+        </div>
+      )}
       <div className="md:flex">
-        <TabBar isAdmin={isAdmin} activeTab={activeTab} />
+        <TabBar access={access} activeTab={activeTab} />
         <main className="mx-auto w-full min-w-0 max-w-[1800px] p-3 md:p-4">
           {tabs.map(({ id }) => {
             const Panel = PANELS[id];
@@ -75,12 +81,13 @@ const Hud: React.FC = () => {
 
 /** Remounts the mission state per signed-in user so crew users are locked to their own astronaut. */
 const SignedInApp: React.FC = () => {
-  const { currentUser, removeAccountsForCrew } = useAuth();
+  const { currentUser, removeAccountsForCrew, lockedCrewId, mode } = useAuth();
   if (!currentUser) return null;
   return (
     <MissionProvider
       key={currentUser.id}
-      lockedCrewId={currentUser.role === 'crew' ? currentUser.crewId : undefined}
+      lockedCrewId={lockedCrewId}
+      serverBacked={mode === 'server'}
       onCrewDeleted={removeAccountsForCrew}
     >
       <Hud />

@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import { Activity, LogIn, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { AuthError, MIN_PASSWORD_LENGTH } from '../auth/authStore';
+import { AuthError } from '../auth/authStore';
 
 const Field: React.FC<{
   id: string;
@@ -31,7 +31,7 @@ const Field: React.FC<{
 );
 
 export const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUser, needsSetup, setupAdmin, login } = useAuth();
+  const { currentUser, needsSetup, setupAdmin, login, minPasswordLength, mode } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -39,6 +39,13 @@ export const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) 
   const [busy, setBusy] = useState(false);
 
   if (currentUser) return <>{children}</>;
+  if (mode === 'loading') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-hud-bg text-xs text-hud-muted" role="status">
+        Connecting to ARGUS…
+      </div>
+    );
+  }
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,7 +92,7 @@ export const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) 
         <Field id="auth-user" label="Username" value={username} onChange={setUsername} autoComplete="username" />
         <Field
           id="auth-pass"
-          label={needsSetup ? `Password (min ${MIN_PASSWORD_LENGTH} characters)` : 'Password'}
+          label={needsSetup ? `Password (min ${minPasswordLength} characters)` : 'Password'}
           type="password"
           value={password}
           onChange={setPassword}

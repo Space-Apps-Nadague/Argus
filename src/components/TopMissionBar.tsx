@@ -9,7 +9,7 @@ import { useMission } from '../context/MissionContext';
 import { useAuth } from '../context/AuthContext';
 import { formatCommDelay, SPACE_LOCATION_ORDER, SPACE_LOCATIONS } from '../data/spaceLocations';
 import { MissionClock } from './MissionClock';
-import { ScenarioId, SpaceLocationId, TriageStatus } from '../types/argus';
+import { ScenarioId, SpaceLocationId, TriageStatus, UserRole } from '../types/argus';
 import { getCrewAdjustedZones, TELEMETRY_SCENARIOS } from '../data/telemetryScenarios';
 import { applyCheckIns } from '../utils/checkIns';
 import { evaluateAllZones } from '../utils/triageEngine';
@@ -32,6 +32,8 @@ const STATUS_BG: Record<TriageStatus, string> = {
   red: 'bg-status-red',
 };
 
+const ROLE_LABELS: Record<UserRole, string> = { admin: 'Admin', astronaut: 'Astronaut', flight_surgeon: 'Flight surgeon' };
+
 export const TopMissionBar: React.FC = () => {
   const {
     crewRoster,
@@ -52,7 +54,7 @@ export const TopMissionBar: React.FC = () => {
     spaceLocationId,
     setSpaceLocation,
   } = useMission();
-  const { currentUser, isAdmin, logout } = useAuth();
+  const { currentUser, isAdmin, seesAllCrew, canViewHealth, logout } = useAuth();
 
   const [showKeyInput, setShowKeyInput] = useState(false);
   const hasKey = hasConfiguredAiKey(runtimeApiKey);
@@ -191,7 +193,7 @@ export const TopMissionBar: React.FC = () => {
             )}
             <div className="leading-tight">
               <div className="text-xs font-semibold text-hud-text">{currentUser?.username}</div>
-              <div className="text-[10px] text-hud-muted">{isAdmin ? 'Admin' : 'Crew'}</div>
+              <div className="text-[10px] text-hud-muted">{ROLE_LABELS[currentUser?.role ?? 'astronaut']}</div>
             </div>
             <button
               type="button"
@@ -206,8 +208,8 @@ export const TopMissionBar: React.FC = () => {
         </div>
       </div>
 
-      {/* Crew strip (admin only) */}
-      {isAdmin && (
+      {/* Crew strip (users who see all crew) */}
+      {seesAllCrew && canViewHealth && (
       <div className="border-t border-hud-line/70 bg-hud-panel/40">
         <div className="max-w-[1800px] mx-auto flex items-center gap-2 px-3 md:px-4 py-1.5">
           <div className="flex min-w-0 flex-1 items-center gap-1.5 no-scrollbar overflow-x-auto py-0.5" role="group" aria-label="Active crew member">

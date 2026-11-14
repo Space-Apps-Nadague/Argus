@@ -1,6 +1,8 @@
 /**
  * ARGUS AI — Chat (specs/02-ui-dashboard.md §2.4, §5)
- * Streams `POST /api/ai/chat`; history is stored per crew member (`argus_chat_v1`).
+ * Streams `POST /api/ai/chat`. With the ARGUS database the server stores every message, linked to the
+ * astronaut and the data the AI saw (specs/05-data-platform.md §3.5); offline, history is kept per crew
+ * member in this browser (`argus_chat_v1`).
  */
 
 import React, { useEffect, useRef, useState } from 'react';
@@ -8,6 +10,7 @@ import { Bot, Eraser, Send, Square, UserRound } from 'lucide-react';
 import { useMission } from '../../context/MissionContext';
 import type { AiResultMeta, CrewChatMessage, WellbeingCheckIn } from '../../types/aiApi';
 import { streamCrewChat } from '../../services/argusApi';
+import { chatHistoryApi } from '../../services/dataApi';
 import { errorText, ErrorNote, SourceTag, useCrewContextRequest, usePerCrewList } from './shared';
 import { WELLBEING_STORAGE_KEY } from './WellbeingPanel';
 
@@ -16,9 +19,38 @@ export const CHAT_STORAGE_KEY = 'argus_chat_v1';
 const SUGGESTIONS = ['How am I doing today?', 'Why is my readiness lower?', 'I feel stressed and tired', 'What should I do about my eyes?'];
 
 export const ChatPanel: React.FC = () => {
-  const { activeCrewMember, runtimeApiKey } = useMission();
+  const { activeCrewMember, runtimeApiKey, serverBacked } = useMission();
   const ctx = useCrewContextRequest();
-  const [messages, setMessages] = usePerCrewList<CrewChatMessage>(CHAT_STORAGE_KEY, activeCrewMember.id);
+  const [localMessages, setLocalMessages] = usePerCrewList<CrewChatMessage>(CHAT_STORAGE_KEY, activeCrewMember.id);
+  const [serverMessages, setServerMessages] = useState<CrewChatMessage[]>([]);
+  const messages = serverBacked ? serverMessages : localMessages;
+  const setMessages = serverBacked
+    ? (fn: (prev: CrewChatMessage[]) => CrewChatMessage[]) => setServerMessages(fn)
+    : setLocalMessages;
+
+  useEffect(() => {
+    if (!serverBacked) return;
+    let alive = true;
+    setServerMessages([]);
+    chatHistoryApi
+      .latest(activeCrewMember.id)
+      .then((r) => alive && setServerMessages(r.messages))
+      .catch((err) => alive && setError(errorText(err)));
+    return () => {
+      alive = false;
+    };
+  }, [serverBacked, activeCrewMember.id]);
+
+  const clearChat = () => {
+    if (serverBacked) {
+      chatHistoryApi
+        .startNew(activeCrewMember.id)
+        .then(() => setServerMessages([]))
+        .catch((err) => setError(errorText(err)));
+      return;
+    }
+    setLocalMessages(() => []);
+  };
   const [checkIns] = usePerCrewList<WellbeingCheckIn>(WELLBEING_STORAGE_KEY, activeCrewMember.id);
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState('');
@@ -79,7 +111,7 @@ export const ChatPanel: React.FC = () => {
         <button
           type="button"
           className="hud-btn ml-auto"
-          onClick={() => setMessages(() => [])}
+          onClick={clearChat}
           disabled={busy || messages.length === 0}
         >
           <Eraser className="h-3.5 w-3.5" aria-hidden="true" />

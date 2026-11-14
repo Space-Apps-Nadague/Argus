@@ -38,7 +38,8 @@ export function openDb(url: string): DbHandle {
     const target = url.slice('pglite:'.length);
     const inMemory = target === '' || target === 'memory';
     if (!inMemory) mkdirSync(resolve(target), { recursive: true });
-    const client = new PGlite(inMemory ? undefined : resolve(target), { extensions: { citext } });
+    // In-memory PGlite only honours options when they are the first argument.
+    const client = inMemory ? new PGlite({ extensions: { citext } }) : new PGlite(resolve(target), { extensions: { citext } });
     const db = drizzlePglite(client, { schema }) as unknown as Db;
     return {
       db,

@@ -7,22 +7,22 @@ import React, { useState } from 'react';
 import { KeyRound, ShieldCheck, Trash2, UserPlus, UserRound } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useMission } from '../context/MissionContext';
-import { AuthError, MIN_PASSWORD_LENGTH } from '../auth/authStore';
+import { AuthError } from '../auth/authStore';
 import type { UserRole } from '../types/argus';
 import { Card } from './ui/Card';
 
 export const UsersTab: React.FC = () => {
-  const { users, currentUser, addAccount, changePassword, removeAccount } = useAuth();
+  const { users, currentUser, addAccount, changePassword, removeAccount, minPasswordLength, mode } = useAuth();
   const { crewRoster } = useMission();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<UserRole>('crew');
+  const [role, setRole] = useState<UserRole>('astronaut');
   const [crewId, setCrewId] = useState('');
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [resetFor, setResetFor] = useState<string | null>(null);
   const [resetPw, setResetPw] = useState('');
 
-  const linkedCrew = new Set(users.filter((u) => u.role === 'crew').map((u) => u.crewId));
+  const linkedCrew = new Set(users.filter((u) => u.crewId).map((u) => u.crewId));
   const crewName = (id?: string) => crewRoster.find((c) => c.id === id);
 
   const run = async (fn: () => Promise<void> | void, success: string) => {
@@ -40,7 +40,7 @@ export const UsersTab: React.FC = () => {
   const create = async (e: React.FormEvent) => {
     e.preventDefault();
     const ok = await run(
-      () => addAccount({ username, password, role, crewId: role === 'crew' ? crewId : undefined }),
+      () => addAccount({ username, password, role, crewId: role === 'astronaut' ? crewId : undefined }),
       `Account "${username.trim()}" created.`
     );
     if (ok) {
@@ -70,7 +70,16 @@ export const UsersTab: React.FC = () => {
                       {u.id === currentUser?.id && <span className="ml-2 text-[11px] font-normal text-hud-muted">(you)</span>}
                     </div>
                     <div className="text-xs text-hud-muted">
-                      {u.role === 'admin' ? 'Admin · sees all crew' : crew ? `Crew · ${crew.callsign} (${crew.name})` : 'Crew · crew member deleted'}
+                      {u.role === 'admin'
+                        ? mode === 'server'
+                          ? 'Admin · manages accounts and roster'
+                          : 'Admin · sees all crew'
+                        : u.role === 'flight_surgeon'
+                          ? 'Flight surgeon · sees all crew'
+                          : crew
+                            ? `Astronaut · ${crew.callsign}${crew.name !== crew.callsign ? ` (${crew.name})` : ''}`
+                            : 'Astronaut · crew member archived'}
+                      {u.disabled && ' · disabled'}
                     </div>
                   </div>
                   <button type="button" className="hud-btn" onClick={() => setResetFor(resetFor === u.id ? null : u.id)}>
@@ -119,14 +128,19 @@ export const UsersTab: React.FC = () => {
       <Card title="New account" icon={<UserPlus className="h-4 w-4" />}>
         <form className="space-y-3" onSubmit={create}>
           <div className="flex rounded-lg border border-hud-line p-0.5" role="group" aria-label="Account type">
-            <button type="button" className="hud-seg flex-1" aria-pressed={role === 'crew'} onClick={() => setRole('crew')}>
-              Crew
+            <button type="button" className="hud-seg flex-1" aria-pressed={role === 'astronaut'} onClick={() => setRole('astronaut')}>
+              Astronaut
             </button>
+            {mode === 'server' && (
+              <button type="button" className="hud-seg flex-1" aria-pressed={role === 'flight_surgeon'} onClick={() => setRole('flight_surgeon')}>
+                Flight surgeon
+              </button>
+            )}
             <button type="button" className="hud-seg flex-1" aria-pressed={role === 'admin'} onClick={() => setRole('admin')}>
               Admin
             </button>
           </div>
-          {role === 'crew' && (
+          {role === 'astronaut' && (
             <label className="block">
               <span className="mb-1 block text-xs text-hud-muted">Astronaut</span>
               <select className="hud-input font-sans" value={crewId} onChange={(e) => setCrewId(e.target.value)} required>
@@ -145,7 +159,7 @@ export const UsersTab: React.FC = () => {
             <input className="hud-input" value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="off" required />
           </label>
           <label className="block">
-            <span className="mb-1 block text-xs text-hud-muted">Password (min {MIN_PASSWORD_LENGTH} characters)</span>
+            <span className="mb-1 block text-xs text-hud-muted">Password (min {minPasswordLength} characters)</span>
             <input type="password" className="hud-input" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" required />
           </label>
           <button type="submit" className="hud-btn-primary w-full">
@@ -158,7 +172,9 @@ export const UsersTab: React.FC = () => {
             </p>
           )}
           <p className="text-[11px] text-hud-muted">
-            Crew accounts only see their own astronaut. Share passwords in person; they are stored hashed in this browser.
+            {mode === 'server'
+              ? 'Astronauts see only their own data; flight surgeons see all crew; admins manage accounts. Passwords are stored hashed (argon2id) on the ARGUS server. Share them in person.'
+              : 'Offline demo: astronauts only see their own data. Passwords are stored hashed in this browser. Share them in person.'}
           </p>
         </form>
       </Card>
