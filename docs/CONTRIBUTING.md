@@ -19,6 +19,7 @@ Before making any code change, walk through these four steps:
    - Mark the task you are working on as `[IN PROGRESS]` so other contributors know which files are actively being edited.
 4. **Verify & Document Completion:**
    - Run `npm test` (deterministic triage unit tests) and `npm run build` (TypeScript + Vite production bundle).
+   - For UI tasks, follow the agent skills in `.agents/skills/` (`frontend-design`, `design-system`, `ux-copy`) and run `accessibility-review` before closing.
    - Mark your task `[DONE]` in `specs/tasks.md`.
 
 ---
@@ -34,10 +35,20 @@ Before making any code change, walk through these four steps:
   3. Analyzing visual self-exam images (retinal fundoscopy, optic nerve sheath ultrasound, skin rash imagery).
 - Every AI feature **must** have an instant, deterministic offline fallback in `src/data/telemetryScenarios.ts` so the HUD operates reliably without network connectivity or an API key.
 
+### Drift, Forecast & Check-ins Are Informational
+- `src/utils/driftAnalytics.ts` (personal-baseline σ, forecast, "Why" links) **never** changes a triage status. Status always comes from `triageEngine.ts` thresholds.
+- Check-ins (`src/utils/checkIns.ts`) only overlay values onto the telemetry series. Triage, readiness and guidance then recompute through the normal deterministic pipeline.
+- Use the drift accent (`hud-drift`, violet) only for drift and links, never for triage status.
+
+### Tabbed HUD & UI Primitives
+- Five tabs (`TabBar.tsx`): Bio-Twin, Trends, Check-in, Flight Surgeon, Crew. New UI goes in the relevant tab, not a new permanent column.
+- Build with `src/components/ui/` (`Card`, `StatTile`, `StatusPill`, `ZoneIcon`) and the tokens in `tailwind.config.js` / `src/index.css`. Put long explanations in `InfoTip`.
+- Status is always color + icon + word. Inputs need visible 3:1 borders (`hud-input`), and every control needs a visible focus ring (`hud-focus`).
+
 ### 3D Bio-Twin (`src/components/BioTwinMap.tsx`)
 - Built with `@react-three/fiber` and `@react-three/drei`.
 - Supports 4 anatomical view layers (`all`, `dermal`, `skeletal`, `organs`) and 5 clickable anatomical zones (`neuro`, `cardio`, `musculo`, `immune`, `behavioral`).
-- Auto-rotates smoothly and pauses rotation when the crew member hovers or drags a body region.
+- Auto-rotates smoothly (off when the OS requests reduced motion) and pauses rotation when the crew member hovers or drags a body region.
 - Includes a resilient 2D/SVG holographic fallback inside an Error Boundary in case WebGL context creation is blocked on headless or restricted hardware.
 
 ### Visual Language

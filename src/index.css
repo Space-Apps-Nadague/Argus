@@ -2,20 +2,99 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Design tokens mirrored as CSS variables (specs/02-ui-dashboard.md §4) */
+:root {
+  --hud-bg: #020617;
+  --hud-panel: #0f172a;
+  --hud-line: #1e293b;
+  --hud-text: #f1f5f9;
+  --hud-muted: #94a3b8;
+  --hud-accent: #22d3ee;
+  --hud-drift: #a78bfa;
+  --status-green: #22c55e;
+  --status-yellow: #eab308;
+  --status-red: #ef4444;
+  color-scheme: dark;
+}
+
 @layer base {
   body {
-    background-color: #020617;
-    color: #f1f5f9;
+    background-color: var(--hud-bg);
+    color: var(--hud-text);
     overflow-x: hidden;
+    font-family: Inter, system-ui, -apple-system, sans-serif;
   }
 }
 
-/* Spacecraft HUD subtle grid and custom scrollbar */
+@layer components {
+  /* Glass card surface */
+  .hud-card {
+    @apply rounded-xl border border-hud-line bg-hud-panel/70 backdrop-blur-sm;
+    box-shadow: 0 1px 0 rgba(34, 211, 238, 0.06) inset, 0 12px 32px rgba(2, 6, 23, 0.55);
+  }
+
+  /* Selectable tile */
+  .hud-tile {
+    @apply rounded-xl border border-hud-line bg-hud-bg/60 transition-colors;
+  }
+  .hud-tile:hover {
+    @apply border-slate-600;
+  }
+  .hud-tile-selected {
+    @apply border-hud-accent/70 bg-hud-panel;
+    box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.25);
+  }
+
+  /* Visible keyboard focus (WCAG 2.4.7) */
+  .hud-focus {
+    @apply outline-none focus-visible:ring-2 focus-visible:ring-hud-accent focus-visible:ring-offset-2 focus-visible:ring-offset-hud-bg;
+  }
+
+  /* Segmented control button */
+  .hud-seg {
+    @apply hud-focus rounded-md px-2.5 py-1 text-xs font-medium text-hud-muted transition-colors hover:text-hud-text;
+  }
+  .hud-seg[aria-pressed='true'] {
+    @apply bg-hud-accent/15 text-hud-accent;
+  }
+
+  .hud-btn {
+    @apply hud-focus inline-flex items-center justify-center gap-1.5 rounded-lg border border-hud-line bg-hud-panel px-3 py-1.5 text-xs font-medium text-hud-text transition-colors hover:border-hud-accent/50 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .hud-btn-primary {
+    @apply hud-focus inline-flex items-center justify-center gap-1.5 rounded-lg bg-hud-accent px-4 py-2 text-sm font-semibold text-hud-bg transition-colors hover:bg-cyan-300 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300;
+  }
+  .hud-input {
+    @apply hud-focus w-full rounded-lg border border-slate-500 bg-hud-bg px-2.5 py-1.5 font-mono text-sm text-hud-text placeholder:text-slate-400/70 focus-visible:ring-offset-0;
+  }
+}
+
+/* Horizontal scrollers (tab strip, chip rows) without a visible scrollbar */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Spacecraft HUD subtle grid */
 .hud-grid-bg {
-  background-image: 
-    linear-gradient(to right, rgba(34, 211, 238, 0.04) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(34, 211, 238, 0.04) 1px, transparent 1px);
+  background-image:
+    linear-gradient(to right, rgba(34, 211, 238, 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(34, 211, 238, 0.035) 1px, transparent 1px);
   background-size: 28px 28px;
+}
+
+/* Respect reduced motion (WCAG 2.3.3) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 ::-webkit-scrollbar {
