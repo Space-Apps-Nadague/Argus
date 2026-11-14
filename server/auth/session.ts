@@ -17,9 +17,19 @@ export const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
 
 export const hashToken = (token: string) => createHash('sha256').update(token).digest('hex');
 
+function requestOrigin(c: Context): string {
+  const url = new URL(c.req.url);
+  const proto = c.req.header('x-forwarded-proto')?.split(',')[0]?.trim();
+  const host = c.req.header('x-forwarded-host')?.split(',')[0]?.trim() || c.req.header('host')?.trim();
+  if (proto && host) return `${proto}://${host}`;
+  if (host && url.protocol) return `${url.protocol}//${host}`;
+  return url.origin;
+}
+
 function isSecureRequest(c: Context): boolean {
-  const host = new URL(c.req.url).hostname;
-  return !(host === 'localhost' || host === '127.0.0.1' || host === '::1');
+  const origin = new URL(requestOrigin(c));
+  const host = origin.hostname;
+  return origin.protocol === 'https:' || !(host === 'localhost' || host === '127.0.0.1' || host === '::1');
 }
 
 export async function createSession(c: Context<AppEnv>, db: Db, userId: string): Promise<void> {
@@ -101,7 +111,7 @@ export function originGuard(allowed: string[]): MiddlewareHandler<AppEnv> {
     if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return next();
     if (c.req.header('authorization')?.startsWith('Bearer ')) return next(); // device ingest, no cookie
     const origin = c.req.header('origin');
-    if (origin && !allowed.includes(origin) && origin !== new URL(c.req.url).origin) {
+    if (origin && !allowed.includes(origin) && origin !== requestOrigin(c)) {
       return c.json({ error: 'Cross-origin request blocked' }, 403);
     }
     return next();

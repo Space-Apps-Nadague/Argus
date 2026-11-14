@@ -9,6 +9,7 @@
     "dev:server": "tsx watch server/index.ts",
     "dev:all": "concurrently -k -n web,api -c cyan,magenta \"npm:dev\" \"npm:dev:server\"",
     "dev:local": "cross-env AI_PROVIDERS=local concurrently -k -n web,api -c cyan,magenta \"npm:dev\" \"npm:dev:server\"",
+    "start": "tsx server/index.ts",
     "start:server": "tsx server/index.ts",
     "ai:local": "tsx scripts/check-local-ai.ts",
     "build": "tsc -b && vite build",
@@ -42,6 +43,7 @@
     "recharts": "^2.15.0",
     "simple-statistics": "^8.0.0",
     "three": "^0.170.0",
+    "tsx": "^4.23.15",
     "zod": "^4.6.7"
   },
   "devDependencies": {
@@ -56,7 +58,6 @@
     "drizzle-kit": "^0.31.11",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
-    "tsx": "^4.23.15",
     "typescript": "^5.7.2",
     "vite": "^6.0.5",
     "vitest": "^2.1.8"

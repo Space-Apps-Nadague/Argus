@@ -10,7 +10,7 @@ A small Node/TypeScript server (`server/`) hosts every AI feature so that:
 
 ## 2. Stack & Layout
 - Hono + `@hono/node-server`, run with `tsx`; `openai` SDK pointed at any OpenAI-compatible `baseURL`; `zod` validates all request bodies and LLM JSON.
-- Port `8787` (`ARGUS_SERVER_PORT`). Vite proxies `/api` → `http://localhost:8787` in dev.
+- Port `8787` (`PORT` or `ARGUS_SERVER_PORT`). Vite proxies `/api` → `http://localhost:8787` in dev; in production (`PORT` set), the server binds `0.0.0.0` and serves the built `dist/` SPA alongside `/api`.
 - The server imports shared code directly from `src/` (`types/argus.ts`, `types/aiApi.ts`, `utils/triageEngine.ts`, `data/telemetryScenarios.ts`) — no duplicated thresholds.
 
 | Path | Role |
@@ -71,4 +71,5 @@ Guardrails enforced in code:
 - `npm run dev:all` — Vite + server (whatever `.env` configures).
 - `npm run dev:local` — same, forcing `AI_PROVIDERS=local` (Ollama).
 - `npm run ai:local` — checks Ollama is up and `AI_LOCAL_MODEL` is pulled.
+- `npm run build && npm start` — production build (`dist/`) served by `tsx server/index.ts`.
 - `docker compose up ollama` — optional Ollama container for teammates without a local install.

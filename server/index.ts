@@ -7,7 +7,8 @@ import { startAnalyticsTimer } from './jobs/analytics';
 
 loadEnv();
 
-const port = Number(process.env.ARGUS_SERVER_PORT) || 8787;
+const port = Number(process.env.PORT || process.env.ARGUS_SERVER_PORT) || 8787;
+const hostname = process.env.ARGUS_SERVER_HOST ?? (process.env.PORT ? '0.0.0.0' : '127.0.0.1');
 const chain = resolveProviderChain(process.env).map(describeProvider);
 
 const dbHandle = getDbHandle();
@@ -20,7 +21,7 @@ if (dbHandle) {
   console.log('[ARGUS server] No DATABASE_URL — stateless mode (HUD runs the offline demo).');
 }
 
-serve({ fetch: createApp().fetch, port, hostname: process.env.ARGUS_SERVER_HOST ?? '127.0.0.1' }, (info) => {
+serve({ fetch: createApp().fetch, port, hostname }, (info) => {
   console.log(`[ARGUS server] listening on http://${info.address}:${info.port}`);
   if (chain.length) {
     console.log(

@@ -1,3 +1,6 @@
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { serveStatic } from '@hono/node-server/serve-static';
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { cors } from 'hono/cors';
@@ -42,6 +45,13 @@ export function createApp(): Hono<AppEnv> {
   ai.route('/', wellbeingRoutes);
   ai.route('/', chatRoutes);
   app.route('/api/ai', ai);
+
+  app.all('/api/*', (c) => c.json({ error: 'Not found' }, 404));
+
+  if (existsSync(resolve(process.cwd(), 'dist', 'index.html'))) {
+    app.use('*', serveStatic({ root: './dist' }));
+    app.get('*', serveStatic({ path: './dist/index.html' }));
+  }
 
   app.notFound((c) => c.json({ error: 'Not found' }, 404));
   app.onError((err, c) => {

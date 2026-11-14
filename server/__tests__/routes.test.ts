@@ -127,4 +127,36 @@ describe('AI routes (offline)', () => {
     expect(events[0]).toMatchObject({ type: 'meta', crisis: true, earthConsultUrgency: 'immediate_emergency_packet' });
     expect(events[1].text).toMatch(/Crew Medical Officer/);
   });
+
+  it('allows same-origin POST behind TLS-terminating proxy and blocks cross-origin POST', async () => {
+    const sameOrigin = await app.request('http://argus-space.azurewebsites.net/api/ai/guidance', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Origin: 'https://argus-space.azurewebsites.net',
+        'X-Forwarded-Proto': 'https',
+        'X-Forwarded-Host': 'argus-space.azurewebsites.net',
+      },
+      body: JSON.stringify({ scenarioId: 'nominal', zoneId: 'neuro', crewMember }),
+    });
+    expect(sameOrigin.status).toBe(200);
+
+    const crossOrigin = await app.request('http://argus-space.azurewebsites.net/api/ai/guidance', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Origin: 'https://evil.example',
+        'X-Forwarded-Proto': 'https',
+        'X-Forwarded-Host': 'argus-space.azurewebsites.net',
+      },
+      body: JSON.stringify({ scenarioId: 'nominal', zoneId: 'neuro', crewMember }),
+    });
+    expect(crossOrigin.status).toBe(403);
+  });
+
+  it('returns 404 JSON for unknown /api/* routes', async () => {
+    const res = await app.request('/api/does-not-exist');
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: 'Not found' });
+  });
 });
