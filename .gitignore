@@ -14,3 +14,7 @@ coverage
 .cursor/
 .codex/
 .gemini/
+
+# WhatsApp bot local session DB & compiled binary
+tools/whatsapp-bot/whatsapp.db*
+tools/whatsapp-bot/argus-wa-bot
