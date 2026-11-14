@@ -113,11 +113,14 @@ A readable version of the prototype's "Thousand Eyes" ring plus the full data/co
   - **Screen-Constrained Popovers:** `TopMissionBar` popovers (Readiness Milestone Badges and Clinical AI key) use viewport-safe positioning (`fixed inset-x-3 top-16` on mobile `< sm`, `absolute right-0` with `max-w-[calc(100vw-1.5rem)]` on desktop) with keyboard Esc dismiss to eliminate horizontal scroll and viewport spillover.
   - The tab rail becomes a horizontal scroll bar below `md`; no page-level horizontal overflow. The Bio-Twin grid stacks on `< lg`, and Trends / Check-in grids stack on `< xl`.
 
-## 5. ARGUS Companion (AI chat)
-Implemented as the **Chat** section of the ARGUS AI tab (§2.4), backed by `POST /api/ai/chat` (`specs/04-ai-backend.md`). Still open from issue #7: a drawer available on every tab and voice in/out.
-- **Offline first:** with no model reachable, the server answers from triage and the onboard protocols.
-- **Red flags:** crisis language gets a fixed escalation message before any model output.
-- **Guardrails:** never sets or overrides a triage status, invents no numbers, conversation stored per crew member locally.
+## 5. ARGUS Companion (AI chat) (`src/components/CompanionDrawer.tsx`, `src/utils/companionBrain.ts`)
+Port of the ARGOS prototype's chat companion (`jv()`, `send()`, `brain()`, `speak()`, `mic()` in `ARGOS_The_Thousand_Eyes.html`). Implemented in the ARGUS AI tab (§2.4) and as a global drawer (issue #7):
+- **Entry point:** `ARGUS Companion` button in the top mission bar (`TopMissionBar.tsx`) opens a right slide-over drawer, accessible across all tabs with keyboard shortcut and Esc dismiss.
+- **Offline brain first:** a deterministic intent engine in `src/utils/companionBrain.ts` (`red_flag`, `status`, `metric`, `symptom`, `forecast`, `why`, `radiation`, `help`) answers from triage, drift, forecast, links, and check-ins with 0 network calls.
+- **Live Clinical AI second:** when the backend / provider is available, replies stream via `streamCrewChat` (`POST /api/ai/chat`, `specs/04-ai-backend.md`) with a structured snapshot context, seamlessly falling back to the offline brain on network error or timeout.
+- **Voice I/O:** optional text-to-speech replies via `window.speechSynthesis` (British voice heuristic) and dictation via browser Web Speech API (`SpeechRecognition`).
+- **Red flags:** critical phrases (chest pain, shortness of breath, faint, self-harm/crisis in English and Hebrew) trigger an immediate urgent fixed protocol pointing to the Flight Surgeon / Earth emergency packet, vital checks, and crewmate notification.
+- **Guardrails:** never sets or overrides a triage status, never lowers urgency, invents no numbers, uses plain language, and conversation history is persisted per crew member in `localStorage`.
 
 ## 6. HUD v2: Sign-in, Location & Clock
 - **Sign-in (`AuthGate.tsx`, `AuthContext.tsx`):** first run shows **Create admin account** (username + password ×2). Afterwards a **Sign in** screen (username + password). Session lasts until sign-out or the tab closes (`sessionStorage`).

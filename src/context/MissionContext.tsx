@@ -209,6 +209,7 @@ interface MissionState {
   activeTab: HudTabId;
   checkIns: Record<string, CheckInEntry[]>;
   crewSymptoms: string;
+  isCompanionOpen: boolean;
 }
 
 type MissionAction =
@@ -237,7 +238,8 @@ type MissionAction =
   | { type: 'SET_ACTIVE_TAB'; payload: HudTabId }
   | { type: 'ADD_CHECK_IN'; payload: CheckInEntry }
   | { type: 'DELETE_CHECK_IN'; payload: { crewId: string; entryId: string } }
-  | { type: 'SET_CREW_SYMPTOMS'; payload: string };
+  | { type: 'SET_CREW_SYMPTOMS'; payload: string }
+  | { type: 'SET_COMPANION_OPEN'; payload: boolean };
 
 const initialRoster = loadInitialCrewRoster();
 const initialCrew = initialRoster[0] || DEFAULT_CREW_ROSTER[0];
@@ -274,6 +276,7 @@ const initialState: MissionState = {
   activeTab: loadInitialTab(),
   checkIns: loadInitialCheckIns(),
   crewSymptoms: '',
+  isCompanionOpen: false,
 };
 
 function missionReducer(
@@ -524,6 +527,11 @@ function missionReducer(
         ...state,
         crewSymptoms: action.payload,
       };
+    case 'SET_COMPANION_OPEN':
+      return {
+        ...state,
+        isCompanionOpen: action.payload,
+      };
     default:
       return state;
   }
@@ -578,6 +586,7 @@ interface MissionContextValue extends MissionState {
   queueEarthPacket: (crewNotes?: string) => EarthTelemetryPacket;
   setRuntimeApiKey: (key: string) => void;
   logVitalReading: (zoneId: BodyZoneId, metricKey: string, value: number) => Promise<void>;
+  setCompanionOpen: (open: boolean) => void;
 }
 
 const MissionContext = createContext<MissionContextValue | undefined>(undefined);
@@ -1100,6 +1109,10 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
     });
   }, []);
 
+  const setCompanionOpen = useCallback((open: boolean) => {
+    dispatch({ type: 'SET_COMPANION_OPEN', payload: open });
+  }, []);
+
   const queueEarthPacket = useCallback(
     (crewNotes: string = 'Autonomous bio-twin telemetry & countermeasure log.') => {
       const envMeta = ENVIRONMENT_META[state.environment];
@@ -1203,6 +1216,7 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
       queueEarthPacket,
       setRuntimeApiKey,
       logVitalReading,
+      setCompanionOpen,
     }),
     [
       state,
@@ -1227,6 +1241,7 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
       addCheckIn,
       deleteCheckIn,
       logVitalReading,
+      setCompanionOpen,
       zoneStatuses,
       currentZoneReadings,
       readinessScore,

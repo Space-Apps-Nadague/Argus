@@ -353,8 +353,21 @@ export interface CheckInEntry {
 
 ---
 
-## 7. ARGUS Companion Chat
-Implemented with the AI backend types in `src/types/aiApi.ts` (`CrewChatMessage`, `ChatRequest`, `ChatStreamEvent`; see `specs/04-ai-backend.md`). Chat history is stored per crew member in `localStorage` (`argus_chat_v1` → `Record<crewId, CrewChatMessage[]>`, last 50 messages).
+## 7. ARGUS Companion Chat (`src/components/CompanionDrawer.tsx`, `src/utils/companionBrain.ts`)
+
+Port of the ARGOS prototype's conversational companion (`jv()`, `send()`, `brain()`, `speak()`, `mic()` in `ARGOS_The_Thousand_Eyes.html`). Fully implemented (issue #7). Also integrates with the AI backend types in `src/types/aiApi.ts` (`CrewChatMessage`, `ChatRequest`, `ChatStreamEvent`; see `specs/04-ai-backend.md`). Chat history is stored per crew member in `localStorage` (`argus_chat_v1` → `Record<crewId, CrewChatMessage[]>`, last 50 messages).
+
+```typescript
+export interface CompanionMessage {
+  id: string;
+  crewId: string;
+  role: 'crew' | 'argus';
+  text: string;
+  timestampIso: string;
+  intent?: CompanionIntent;
+  source?: 'live_ai' | 'offline_brain';
+}
+```
 
 ## 8. Mission Location (`SpaceLocationId`, `src/data/spaceLocations.ts`)
 
@@ -422,6 +435,12 @@ export interface EmergencyRun {
 ```
 Runs are kept in memory for the session and included in the Earth packet notes when the crew taps `Notify Earth`.
 
+
+- **Offline Brain First:** Deterministic pure rule engine (`src/utils/companionBrain.ts`) answering questions on crew readiness, zone statuses, vitals vs personal baseline, drift & forecast, NASA HRP metric links, cumulative radiation, and spaceflight countermeasures with 0 network dependencies.
+- **Live Clinical AI Second:** Streams replies via `streamCrewChat` (`POST /api/ai/chat`) grounded in the crew snapshot when the ARGUS backend / AI provider is reachable; seamlessly falls back to the offline brain on network error or timeout.
+- **Voice I/O:** Optional text-to-speech with natural English voice synthesis (`window.speechSynthesis`) and voice dictation via Web Speech API (`SpeechRecognition`).
+- **Red-Flag Safety Guardrail:** Critical emergency phrases (chest pain, acute dyspnea, loss of consciousness, self-harm/crisis) immediately return an emergency action protocol advising the astronaut to stop activity, alert crewmates, and downlink an emergency packet to the Flight Surgeon. The companion NEVER mutates triage status or lowers urgency.
+- **Persistence:** Local conversation history is preserved per crew member in `localStorage` under `argus_companion_chat_<crewId>`.
 
 ---
 

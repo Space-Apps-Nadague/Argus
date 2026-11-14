@@ -319,3 +319,26 @@ export interface ScheduledRoutineStatus {
   streakDays: number;
 }
 
+/** ARGUS Companion Chat (specs/01-data-schema.md §7) */
+export type CompanionIntent =
+  | 'red_flag'
+  | 'status'
+  | 'metric'
+  | 'symptom'
+  | 'forecast'
+  | 'why'
+  | 'radiation'
+  | 'help'
+  | 'fallback';
+
+export interface CompanionMessage {
+  id: string;
+  crewId: string;
+  role: 'crew' | 'argus';
+  text: string;
+  timestampIso: string;
+  intent?: CompanionIntent;
+  source?: 'live_ai' | 'offline_brain';
+}
+
+
