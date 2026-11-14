@@ -3,6 +3,22 @@
 #   docker compose exec ollama ollama pull qwen3:8b
 # then set AI_LOCAL_MODEL=qwen3:8b in .env and run `npm run dev:local`.
 services:
+  # Local PostgreSQL matching the Azure Flexible Server (PG 17). specs/05-data-platform.md §2
+  #   docker compose up -d postgres
+  #   DATABASE_URL=postgres://argus:argus@localhost:5432/argus
+  # No Docker? Use DATABASE_URL=pglite:./.data/argus (embedded Postgres, nothing to install).
+  postgres:
+    image: pgvector/pgvector:0.8.0-pg17
+    environment:
+      POSTGRES_USER: argus
+      POSTGRES_PASSWORD: argus
+      POSTGRES_DB: argus
+    ports:
+      - "5432:5432"
+    volumes:
+      - argus-pg:/var/lib/postgresql/data
+    restart: unless-stopped
+
   ollama:
     image: ollama/ollama:0.12.6
     ports:
@@ -13,3 +29,4 @@ services:
 
 volumes:
   ollama-models:
+  argus-pg:

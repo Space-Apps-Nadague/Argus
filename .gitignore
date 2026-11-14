@@ -13,3 +13,9 @@ coverage
 .cursor/
 .codex/
 .gemini/
+
+.data/
+data/raw/
+analysis/.venv/
+.ipynb_checkpoints/
+__pycache__/
