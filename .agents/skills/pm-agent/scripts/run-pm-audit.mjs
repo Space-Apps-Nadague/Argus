@@ -108,6 +108,15 @@ function inferKanbanColumn(priorityOrTitle) {
   return 'todo';
 }
 
+function inferPriorityTag(priorityOrTitle) {
+  const text = String(priorityOrTitle || '').toUpperCase();
+  if (text.includes('P0')) return 'P0';
+  if (text.includes('P2')) return 'P2';
+  return 'P1';
+}
+
+const CATEGORY_LABELS = ['ui-ux', 'clinical-ai', 'telemetry-data', 'infra-ci'];
+
 function formatIssueMarkdown(item) {
   const critiqueBullets = (item.pmCritique || [])
     .slice(0, 2)
@@ -168,6 +177,10 @@ async function generateAuditPlan(apiKey, prompt) {
               type: 'string',
               enum: ['human-review', 'agent-task'],
             },
+            newCategory: {
+              type: 'string',
+              enum: ['ui-ux', 'clinical-ai', 'telemetry-data', 'infra-ci'],
+            },
             newKanbanColumn: {
               type: 'string',
               enum: ['backlog', 'todo', 'urgent'],
@@ -178,6 +191,7 @@ async function generateAuditPlan(apiKey, prompt) {
             'number',
             'newPriority',
             'newAssigneeType',
+            'newCategory',
             'newKanbanColumn',
             'comment',
           ],
@@ -193,6 +207,10 @@ async function generateAuditPlan(apiKey, prompt) {
             assigneeType: {
               type: 'string',
               enum: ['human-review', 'agent-task'],
+            },
+            category: {
+              type: 'string',
+              enum: ['ui-ux', 'clinical-ai', 'telemetry-data', 'infra-ci'],
             },
             kanbanColumn: {
               type: 'string',
@@ -215,6 +233,7 @@ async function generateAuditPlan(apiKey, prompt) {
             'slug',
             'priority',
             'assigneeType',
+            'category',
             'kanbanColumn',
             'title',
             'reqRefs',
@@ -319,12 +338,14 @@ async function main() {
       );
       if (!alreadyInProject) {
         const targetStatus = inferKanbanColumn(issue.title);
+        const targetPriority = inferPriorityTag(issue.title);
         if (dryRun) {
           projectBackfilled.push({
             dryRun: true,
             issueNumber: issue.number,
             title: issue.title,
             status: targetStatus,
+            priority: targetPriority,
           });
         } else {
           const syncedItem = runJsonScript(PROJECT_SCRIPT, [
@@ -333,6 +354,8 @@ async function main() {
             String(issue.number),
             '--status',
             targetStatus,
+            '--priority',
+            targetPriority,
           ]);
           projectBackfilled.push(syncedItem);
         }
@@ -384,11 +407,12 @@ ${codebaseSnapshot}
 Instructions:
 1. Check every currently OPEN GitHub issue above. ONLY include an issue in "issuesToClose" if you can verify in the Codebase Snapshot that its requested feature/tasks are now genuinely implemented in src/. Do NOT close an issue if it is still unimplemented.
 2. Review all remaining OPEN issues in "issuesToUpdate":
-   - If an issue is missing a "human-review" or "agent-task" label, or has the wrong label, or its priority (P0/P1/P2) or Kanban column ("urgent"/"todo"/"backlog") is inaccurate given current hackathon urgency, include it in "issuesToUpdate" with the corrected values.
+   - If an issue is missing a "human-review" or "agent-task" label, missing a category label ("ui-ux", "clinical-ai", "telemetry-data", "infra-ci"), or has the wrong label, priority (P0/P1/P2), Project Priority field, or Kanban column ("urgent"/"todo"/"backlog"), include it in "issuesToUpdate" with the corrected values.
    - Use "comment" to post a concise status update, progress note from recent commits, or a ping (e.g., "@YaronL16" for "human-review" blockers or stale P0s) ONLY when meaningful (leave "comment" as "" if nothing new needs to be said).
 3. Propose at most ${maxNewLimit} high-impact new issues in "issuesToCreate" for gaps in REQ-01 through REQ-10 that are NOT already covered by an existing open issue. If existing open issues already cover the top priorities, return an empty array [] for "issuesToCreate".
 4. For each new issue:
    - Set "assigneeType" to "human-review" if it requires a human product/UX/clinical/credential decision or manual review, or "agent-task" if it is a concrete coding/spec/UI task ready for an AI coding agent to implement.
+   - Set "category" to one of: "ui-ux", "clinical-ai", "telemetry-data", or "infra-ci".
    - Set "kanbanColumn" based on urgency: "urgent" for P0 (critical hackathon/demo impact), "todo" for P1 (regular urgency), or "backlog" for P2 (not urgent / polish).`;
 
   const { model, plan } = await generateAuditPlan(geminiApiKey, prompt);
@@ -442,15 +466,23 @@ Instructions:
     if (!existing) continue;
 
     const currentLabels = existing.labels || [];
-    const targetLabel =
+    const targetAssigneeLabel =
       upd.newAssigneeType === 'human-review' ? 'human-review' : 'agent-task';
+    const targetCategoryLabel = CATEGORY_LABELS.includes(upd.newCategory)
+      ? upd.newCategory
+      : 'ui-ux';
     const otherLabels = currentLabels.filter(
-      (l) => l !== 'human-review' && l !== 'agent-task'
+      (l) =>
+        l !== 'human-review' &&
+        l !== 'agent-task' &&
+        !CATEGORY_LABELS.includes(l)
     );
-    const nextLabels = [...otherLabels, targetLabel];
+    const nextLabels = [...otherLabels, targetAssigneeLabel, targetCategoryLabel];
     const labelsChanged =
-      !currentLabels.includes(targetLabel) ||
-      (currentLabels.includes('human-review') && currentLabels.includes('agent-task'));
+      !currentLabels.includes(targetAssigneeLabel) ||
+      !currentLabels.includes(targetCategoryLabel) ||
+      (currentLabels.includes('human-review') && currentLabels.includes('agent-task')) ||
+      currentLabels.filter((l) => CATEGORY_LABELS.includes(l)).length > 1;
 
     const cleanBodyTitle = existing.title
       .replace(/^\[PM(?:\s+Agent)?\]\s*/i, '')
@@ -460,8 +492,12 @@ Instructions:
     const titleChanged = nextTitle !== existing.title;
 
     const targetKanban = upd.newKanbanColumn || inferKanbanColumn(upd.newPriority);
-    const currentKanban = (projectItemByIssue.get(upd.number)?.status || '').toLowerCase();
+    const existingProjectItem = projectItemByIssue.get(upd.number);
+    const currentKanban = (existingProjectItem?.status || '').toLowerCase();
     const kanbanChanged = !currentKanban || !currentKanban.includes(targetKanban);
+    const currentProjectPriority = (existingProjectItem?.priority || '').toUpperCase();
+    const projectPriorityChanged =
+      !currentProjectPriority || currentProjectPriority !== upd.newPriority.toUpperCase();
 
     const commentText = String(upd.comment || '').trim();
     const updatedRecently =
@@ -470,7 +506,13 @@ Instructions:
     const shouldComment =
       Boolean(commentText) && (labelsChanged || titleChanged || kanbanChanged || !updatedRecently);
 
-    if (!labelsChanged && !titleChanged && !kanbanChanged && !shouldComment) {
+    if (
+      !labelsChanged &&
+      !titleChanged &&
+      !kanbanChanged &&
+      !projectPriorityChanged &&
+      !shouldComment
+    ) {
       continue;
     }
 
@@ -484,6 +526,8 @@ Instructions:
         nextLabels: labelsChanged ? nextLabels : undefined,
         kanbanChanged,
         targetKanban,
+        projectPriorityChanged,
+        targetPriority: upd.newPriority,
         comment: shouldComment ? commentText : undefined,
       });
       continue;
@@ -496,7 +540,7 @@ Instructions:
       if (labelsChanged) editArgs.push('--labels', nextLabels.join(','));
       actionRecord.edit = runJsonScript(GH_SCRIPT, editArgs);
     }
-    if (kanbanChanged && projectConfigured) {
+    if ((kanbanChanged || projectPriorityChanged) && projectConfigured) {
       try {
         actionRecord.projectItem = runJsonScript(PROJECT_SCRIPT, [
           'sync-issue',
@@ -504,10 +548,12 @@ Instructions:
           String(upd.number),
           '--status',
           targetKanban,
+          '--priority',
+          upd.newPriority,
         ]);
       } catch (err) {
         console.warn(
-          `[PM Agent] Failed to update Project column for #${upd.number}: ${err.message}`
+          `[PM Agent] Failed to update Project fields for #${upd.number}: ${err.message}`
         );
       }
     }
@@ -561,14 +607,19 @@ Instructions:
       .trim();
     const fullTitle = `[PM Agent] [${item.priority}] ${cleanActionTitle}`;
     const issueLabel = item.assigneeType === 'human-review' ? 'human-review' : 'agent-task';
+    const categoryLabel = CATEGORY_LABELS.includes(item.category)
+      ? item.category
+      : 'ui-ux';
+    const issueLabels = [issueLabel, categoryLabel];
     const kanbanStatus = item.kanbanColumn || inferKanbanColumn(item.priority);
 
     if (dryRun) {
       createdResults.push({
         dryRun: true,
         title: fullTitle,
-        labels: [issueLabel],
+        labels: issueLabels,
         kanbanStatus,
+        priority: item.priority,
         issueFilePath,
         bodyMarkdown,
       });
@@ -580,7 +631,7 @@ Instructions:
       '--title',
       fullTitle,
       '--labels',
-      issueLabel,
+      issueLabels.join(','),
       '--body',
       `@${issueFilePath}`,
     ]);
@@ -594,6 +645,8 @@ Instructions:
           String(createRes.number),
           '--status',
           kanbanStatus,
+          '--priority',
+          item.priority,
         ]);
         createRes.projectItem = projectItem;
       } catch (err) {
