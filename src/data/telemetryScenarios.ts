@@ -170,7 +170,7 @@ function build30DaySeries(
   return points;
 }
 
-export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
+const BASE_TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
   nominal: {
     id: 'nominal',
     label: 'Nominal Deep-Space Cruise',
@@ -763,6 +763,86 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
     },
   },
 };
+
+/**
+ * Challenge core indicators measured by the smartwatch or a glucometer photo (specs/03-requirements.md §2,
+ * specs/05-data-platform.md §4): blood pressure, fasting glucose and nightly wrist-temperature deviation.
+ * They stay inside their nominal bands in every scenario, so the scenario stories are unchanged.
+ */
+const CORE_INDICATORS: Record<ScenarioId, { sys: [number, number]; dia: [number, number]; glu: [number, number]; temp: [number, number] }> = {
+  nominal: { sys: [112, 113], dia: [72, 72], glu: [88, 89], temp: [0.0, 0.1] },
+  sans_alert: { sys: [114, 117], dia: [73, 75], glu: [90, 91], temp: [0.0, 0.1] },
+  high_co2: { sys: [113, 118], dia: [72, 77], glu: [89, 92], temp: [0.1, 0.2] },
+  solar_storm: { sys: [112, 116], dia: [72, 75], glu: [88, 94], temp: [0.0, 0.3] },
+};
+
+function coreIndicatorReadings(id: ScenarioId): { cardio: VitalSignReading[]; immune: VitalSignReading[] } {
+  const c = CORE_INDICATORS[id];
+  return {
+    cardio: [
+      {
+        metricId: 'bp_sys',
+        label: 'Systolic Blood Pressure',
+        unit: 'mmHg',
+        currentValue: c.sys[1],
+        deltaFromBaseline: 'Daily mean of watch readings',
+        flightNormLabel: 'Norm: 90–119 mmHg',
+        plainDescription: 'The top blood-pressure number: pressure while the heart beats. Measured by the watch (cuff-calibrated monthly).',
+        history: build30DaySeries(c.sys[0], c.sys[1], 0, 1.5),
+      },
+      {
+        metricId: 'bp_dia',
+        label: 'Diastolic Blood Pressure',
+        unit: 'mmHg',
+        currentValue: c.dia[1],
+        deltaFromBaseline: 'Daily mean of watch readings',
+        flightNormLabel: 'Norm: 60–79 mmHg',
+        plainDescription: 'The bottom blood-pressure number: pressure while the heart rests between beats.',
+        history: build30DaySeries(c.dia[0], c.dia[1], 0, 1.2),
+      },
+      {
+        metricId: 'glucose',
+        label: 'Fasting Blood Glucose',
+        unit: 'mg/dL',
+        currentValue: c.glu[1],
+        deltaFromBaseline: 'Weekly glucometer photo',
+        flightNormLabel: 'Norm: 70–99 mg/dL',
+        plainDescription: 'Blood sugar before breakfast. Finger-prick on the glucometer, then a photo of the meter is read automatically.',
+        history: build30DaySeries(c.glu[0], c.glu[1], 0, 2),
+      },
+    ],
+    immune: [
+      {
+        metricId: 'wrist_temp_dev',
+        label: 'Body Temperature (wrist, vs baseline)',
+        unit: '°C',
+        currentValue: c.temp[1],
+        deltaFromBaseline: 'Overnight watch reading',
+        flightNormLabel: 'Norm: ±0.5 °C of your baseline',
+        plainDescription: 'How much warmer or cooler your wrist was overnight than your personal normal. A rise can be an early sign of fever or illness.',
+        history: build30DaySeries(c.temp[0], c.temp[1], 2, 0.08),
+      },
+    ],
+  };
+}
+
+export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = Object.fromEntries(
+  (Object.keys(BASE_TELEMETRY_SCENARIOS) as ScenarioId[]).map((id) => {
+    const base = BASE_TELEMETRY_SCENARIOS[id];
+    const extra = coreIndicatorReadings(id);
+    return [
+      id,
+      {
+        ...base,
+        zones: {
+          ...base.zones,
+          cardio: [...base.zones.cardio, ...extra.cardio],
+          immune: [...base.zones.immune, ...extra.immune],
+        },
+      },
+    ];
+  })
+) as Record<ScenarioId, ScenarioDefinition>;
 
 /**
  * Deterministically adjusts a scenario's 5-zone telemetry readings to reflect

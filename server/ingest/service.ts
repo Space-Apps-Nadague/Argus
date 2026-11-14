@@ -74,9 +74,16 @@ export async function ingestReadings(db: Db, input: IngestInput): Promise<Ingest
           },
         });
     }
-    const times = rows.map((r) => r.ts.getTime());
-    const from = times.length ? new Date(Math.min(...times)) : null;
-    const to = times.length ? new Date(Math.max(...times) + 1) : null;
+    // Loop instead of Math.min(...times): a watch batch can hold 100k+ readings (call-stack limit).
+    let minT = Infinity;
+    let maxT = -Infinity;
+    for (const r of rows) {
+      const t = r.ts.getTime();
+      if (t < minT) minT = t;
+      if (t > maxT) maxT = t;
+    }
+    const from = rows.length ? new Date(minT) : null;
+    const to = rows.length ? new Date(maxT + 1) : null;
     let triage = 0;
     if (input.rollup !== false && from && to) {
       await rollupDays(db, input.astronautId, from, to);

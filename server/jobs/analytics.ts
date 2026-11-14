@@ -25,7 +25,7 @@ const DAY_MS = 86_400_000;
 const PREFLIGHT_DAYS = 7;
 const ROLLING_DAYS = 14;
 /** Minute streams that get an hour-of-day (circadian) baseline and robust-z detection. */
-export const CIRCADIAN_METRICS = ['heart_rate', 'core_temp'];
+export const CIRCADIAN_METRICS = ['heart_rate'];
 const ROBUST_WINDOW_H = 48;
 
 type BaselineRow = typeof baselines.$inferInsert;

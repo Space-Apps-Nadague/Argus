@@ -32,7 +32,6 @@ const exports: Record<string, string> = {
   baselines: `select astronaut_id, metric_id, kind, hour, n, mean, sd, median, mad, p05, p95 from baselines order by 1,2,3,4`,
   anomalies: `select astronaut_id, metric_id, detector, severity, score, ts_start, ts_end from anomalies order by 1, ts_start`,
   minute_heart_rate: `select astronaut_id, ts, value from observations where metric_id = 'heart_rate' and quality = 'ok' and ts > now() - interval '14 days' order by 1, 2`,
-  minute_core_temp: `select astronaut_id, ts, value from observations where metric_id = 'core_temp' and quality = 'ok' and ts > now() - interval '14 days' order by 1, 2`,
   ref_radiation_dose_rates: `select * from ref_radiation_dose_rates`,
   ref_thresholds: `select * from ref_thresholds`,
   ref_osdr_lab_values: `select study_id, subject, timepoint, days_from_launch, phase, analyte, value, unit, ref_min, ref_max, source_id from ref_osdr_lab_values order by subject, days_from_launch, analyte`,

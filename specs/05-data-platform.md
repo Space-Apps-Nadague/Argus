@@ -73,37 +73,46 @@ Stores what was said to the AI, which astronaut it was about, and the data the A
 | `conversations` | `id` uuid, `astronaut_id`, `started_by` (user), `started_at` |
 | `messages` | `id` uuid, `conversation_id`, `ts`, `role` (`user` \| `assistant`), `author_user_id` (null for assistant), `content`, `provider`, `model`, `source` (`ai` \| `offline_verified_cache`), `context_snapshot` jsonb (the zone statuses, flagged metrics and wellbeing summary sent with the prompt), `triage_event_id` (nullable: latest triage event at that time), `crisis_flag` bool |
 
-## 4. Passive Data: Assumed Sensor Kit
-No public dataset has per-astronaut, minute-level vitals. NASA LSDA and LSAH data are request-only or restricted [SRC-005, SRC-006]. **ARGUS therefore assumes every astronaut wears the kit below.** Each device class has flown on the ISS, Artemis II or a commercial mission. Data is simulated at the published cadences until real devices are connected.
+## 4. Passive Data: Assumed Kit (watch + dosimeter)
+No public dataset has per-astronaut, minute-level vitals. NASA LSDA and LSAH data are request-only or restricted [SRC-005, SRC-006]. **ARGUS assumes each astronaut wears exactly two devices: a smartwatch and a personal dosimeter.** Everything else arrives without typing. Data is simulated at realistic cadences until real devices are connected.
 
-### 4.1 Devices (`devices.kind`)
-| Kind | Flown precedent | Streams | Cadence stored |
+**Why only two.**
+- A current smartwatch measures heart rate, HRV, SpO₂, breathing rate, sleep, activity, ECG, overnight wrist temperature against a personal baseline [SRC-074] and cuff-calibrated blood pressure [SRC-075].
+- Watches have flown: an Apple Watch on Inspiration4 [SRC-027] and a Garmin on Polaris Dawn [SRC-028]. NASA crews already wear wrist actigraphs continuously [SRC-009, SRC-023, SRC-024].
+- A watch **cannot** measure radiation, so a personal dosimeter stays [SRC-026, SRC-079]. A dosimeter with a wristwatch display is in development [SRC-078].
+- A watch **cannot** measure blood sugar: no non-invasive watch is authorized [SRC-076]. Glucose therefore comes from a weekly finger-prick on a glucometer, read from a **photo** of the meter. The challenge names camera images and blood sugar in mg/dL as an input [SRC-077].
+- A CGM patch flew on Polaris Dawn [SRC-028] but was not adopted. It would be a third device and needs replacing every 10–15 days, while healthy crews' fasting glucose changes slowly.
+
+### 4.1 Sources of data (`devices.kind`)
+| Kind | Worn? | Streams | Cadence stored |
 |---|---|---|---|
-| `smart_shirt` | CSA Bio-Monitor / Astroskin on ISS [SRC-020, SRC-022] | `heart_rate`, `resp_rate`, `spo2`, `skin_temp`, `activity` | 1 Hz on the device [SRC-021], uploaded as **1-minute means**. Raw ECG (250 Hz) stays on the device to save bandwidth. |
-| `bp_cuff` | Astroskin blood-pressure function [SRC-020] | `bp_sys`, `bp_dia` | Every 30 min while awake |
-| `wrist_actigraph` | Actiwatch Spectrum (Standard Measures) [SRC-009, SRC-023]; ARCHeR on Artemis II [SRC-024] | `activity`, `sleep_state`, nightly `sleep_eff` | 30 s epochs on the device, uploaded as 1-min values plus a nightly summary |
-| `ring` | Oura on Ax-4 [SRC-029] | nightly `hrv_rmssd`, nightly `resting_hr` | Once per night |
-| `core_temp_patch` | ESA Double Sensor (Circadian Rhythms) [SRC-025] | `core_temp` | Every 1 min |
-| `dosimeter` | ISS Crew Active Dosimeter [SRC-026] | `dose_rate` (µGy/h) | Every 1 min. The daily `rad_dose` (mSv/d) is derived from it. |
+| `smartwatch` | worn | `heart_rate`, `activity`, `sleep_state` | every 1 min |
+| | | `spo2`, `resp_rate` | every 5 min |
+| | | `resting_hr`, `hrv_rmssd`, `sleep_eff`, `wrist_temp`, `wrist_temp_dev` | nightly, at wake-up |
+| | | `bp_sys`, `bp_dia` | 3 spot readings a day while seated. Cuff calibration every 28 days [SRC-075] |
+| | | `pvt_lapses` (reaction-time app) | daily |
+| | | wellbeing tap-survey | daily |
+| `dosimeter` | worn | `dose_rate` (µGy/h); the daily `rad_dose` is derived from it | every 1 min |
+| `habitat_sensor` | no | `cabin_co2` | automatic |
+| `exercise_device` | no | `ared_load` from the device log | automatic, per session |
+| `clinical_exam` | no | `onsd`, `iop`, `wbc_lymph`, `bmd_delta`. Ultrasound and retina images go through the camera (Eyes tab) | every 3–7 days |
+| `manual` | no | `glucose` from a glucometer photo, fasting | weekly |
 
-Active inputs, which are not passive, come through the same ingest API with `origin = check_in`:
-- the twice-daily wellbeing survey;
-- the PVT cognition test (`pvt_lapses`) [SRC-009];
-- clinical exams (`onsd`, `iop`, `bmd_delta`, `wbc_lymph`) with `origin = clinical`.
+Devices from the earlier kit (`smart_shirt`, `bp_cuff`, `wrist_actigraph`, `ring`, `core_temp_patch`) are retired: `devices.retired_at` is set. Their enum values remain so historic rows stay valid.
 
 ### 4.2 Metric catalog
-The 12 triage metrics from spec 01 §2 keep their ids, units and thresholds. New metrics:
+The triage metrics from spec 01 §2 keep their ids, units and thresholds. Four challenge core indicators are now triaged too: `bp_sys`, `bp_dia`, `glucose`, `wrist_temp_dev`.
 
-| Metric id | Unit | Kind | Plausible range | Feeds |
-|---|---|---|---|---|
-| `heart_rate` | bpm | passive | 25–220 | `resting_hr` (lowest 5-min mean during sleep) |
-| `resp_rate` | breaths/min | passive | 4–60 | AI context |
-| `skin_temp` | °C | passive | 25–42 | AI context |
-| `core_temp` | °C | passive | 34–41.5 | circadian baseline |
-| `activity` | g (vector magnitude) | passive | 0–8 | sleep detection, exercise context |
-| `sleep_state` | 0 = awake, 1 = asleep | passive | 0–1 | `sleep_eff` |
-| `bp_sys` / `bp_dia` | mmHg | passive | 60–250 / 30–150 | AI context |
-| `dose_rate` | µGy/h | passive | 0–10000 | `rad_dose` (daily sum, 1 mGy ≈ 1 mSv for display) |
+Passive minute streams:
+
+| Metric id | Unit | Plausible range | Feeds |
+|---|---|---|---|
+| `heart_rate` | bpm | 25–220 | `resting_hr` fallback, hour-of-day baseline |
+| `resp_rate` | breaths/min | 4–60 | AI context |
+| `activity` | g | 0–8 | sleep detection, exercise context |
+| `sleep_state` | 0 / 1 | 0–1 | `sleep_eff` |
+| `wrist_temp` | °C | 25–42 | `wrist_temp_dev` |
+| `dose_rate` | µGy/h | 0–10000 | `rad_dose` (daily mean × 24 h) |
 
 ## 5. Analytics
 Shared TypeScript lives in `shared/analytics/` and is used by both the server and the HUD. It replaces the duplicated maths in `src/utils/driftAnalytics.ts` and `server/models/trendModels.ts`.
@@ -113,12 +122,13 @@ Shared TypeScript lives in `shared/analytics/` and is used by both the server an
 
 | Metric | Daily value |
 |---|---|
-| `resting_hr` | Ring nightly value if present, otherwise the lowest 5-minute mean of `heart_rate` while asleep |
+| `resting_hr` | Watch nightly value if present, otherwise the 5th percentile of minute `heart_rate` |
 | `spo2` | Median of minute values with `quality = ok` |
 | `rad_dose` | Sum of `dose_rate` × minutes, converted to mSv/d |
 | `sleep_eff` | Night summary if present, otherwise `asleep minutes / in-bed minutes × 100` |
 | `hrv_rmssd` | Nightly value |
-| Clinical and check-in metrics | Latest value that day |
+| `bp_sys`, `bp_dia` | Mean of the day's watch spot readings |
+| `glucose`, `wrist_temp_dev`, clinical metrics | Latest value that day |
 
 Days are UTC calendar days, labelled as mission days (`MD-n`) from `missions.start_at`.
 
@@ -129,7 +139,7 @@ Computed per astronaut × metric.
 |---|---|
 | `preflight` | First 7 mission days, frozen once mission day 8 exists. Mean and SD, with SD floored at `METRIC_TYPICAL_SD`. This is the reference for drift. |
 | `rolling_14d` | The last 14 days of daily values: median, MAD, mean, SD, p05 and p95. This is the "your normal" band in the HUD. |
-| `hour_of_day` | `heart_rate` and `core_temp` minute data over 14 days, grouped by UTC hour: mean and SD. This is the circadian reference, so the 03:00 heart rate is compared with that person's own 03:00. |
+| `hour_of_day` | `heart_rate` minute data over 14 days, grouped by UTC hour. This is the circadian reference, so the 03:00 heart rate is compared with that person's own 03:00. |
 
 ### 5.3 Anomaly detectors (`anomalies`)
 These are informational only: an anomaly never changes a triage status.

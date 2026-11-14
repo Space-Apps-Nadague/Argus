@@ -32,14 +32,15 @@ ARGUS currently assumes a single `0g_transit` microgravity environment until fut
 - `'solar_storm'` — **SPE Radiation Storm Alert**: Acute solar particle event raising cumulative dose rate (`immune` red, lymphocyte drop `1.05 k/µL`, skin erythema risk) and stress response (`cardio` / `behavioral` yellow).
 
 ### Metric Identifiers (`MetricId`)
-The 12 canonical metric IDs tracked across the 5 zones (see §2 catalog):
+The 16 canonical metric IDs tracked across the 5 zones (see §2 catalog). The last four are the challenge's core indicators (spec 03 §2):
 ```typescript
 export type MetricId =
   | 'onsd' | 'iop' | 'cabin_co2'
   | 'resting_hr' | 'hrv_rmssd' | 'spo2'
   | 'bmd_delta' | 'ared_load'
   | 'rad_dose' | 'wbc_lymph'
-  | 'sleep_eff' | 'pvt_lapses';
+  | 'sleep_eff' | 'pvt_lapses'
+  | 'bp_sys' | 'bp_dia' | 'glucose' | 'wrist_temp_dev';
 ```
 `VitalSignReading.metricId` stays typed as `string` for backward compatibility; new code uses `MetricId`.
 
@@ -111,9 +112,13 @@ export interface ThresholdRange {
 | `immune` | `wbc_lymph` | Lymphocyte Count | `k/µL` | `1.5–3.5` (`1.2–4.0`) |
 | `behavioral` | `sleep_eff` | Circadian Sleep Efficiency | `%` | `82–96` (`72–100`) |
 | `behavioral` | `pvt_lapses` | Psychomotor Vigilance Lapses | `lapses` | `0–2` (`0–4`) |
+| `cardio` | `bp_sys` | Systolic Blood Pressure (watch) | `mmHg` | `90–119` (`80–139`) [SRC-070, SRC-071]; the lower yellow bound is an ARGUS assumption |
+| `cardio` | `bp_dia` | Diastolic Blood Pressure (watch) | `mmHg` | `60–79` (`50–89`) [SRC-070, SRC-071]; the lower yellow bound is an ARGUS assumption |
+| `cardio` | `glucose` | Fasting Blood Glucose (glucometer photo) | `mg/dL` | `70–99` (`54–125`) [SRC-072, SRC-073] |
+| `immune` | `wrist_temp_dev` | Body Temperature, wrist vs personal baseline | `°C` | `−0.5–0.5` (`−1.0–1.0`), ARGUS assumption; wrist deviation has no clinical cut-offs [SRC-074] |
 
 ### Passive Wearable Metrics (non-triage)
-Minute-level streams from the assumed sensor kit (`specs/05-data-platform.md` §4.2): `heart_rate` (bpm), `resp_rate` (breaths/min), `skin_temp` (°C), `core_temp` (°C), `activity` (g), `sleep_state` (0/1), `bp_sys`/`bp_dia` (mmHg), `dose_rate` (µGy/h). They have no triage thresholds of their own. They feed the daily values of `resting_hr`, `spo2`, `sleep_eff` and `rad_dose` (§5.1 of spec 05) and the AI context. Timestamps are real UTC `timestamptz`; `missionDay` is derived from the mission start.
+Minute-level streams from the watch and dosimeter (`specs/05-data-platform.md` §4.2): `heart_rate` (bpm), `resp_rate` (breaths/min), `activity` (g), `sleep_state` (0/1), `wrist_temp` (°C), `dose_rate` (µGy/h). They have no triage thresholds of their own. They feed the daily values of `resting_hr`, `spo2`, `sleep_eff`, `wrist_temp_dev` and `rad_dose` (§5.1 of spec 05) and the AI context. Timestamps are real UTC `timestamptz`; `missionDay` is derived from the mission start.
 
 ### Typical Day-to-Day Variability (`METRIC_TYPICAL_SD`) & Check-In Input Ranges (`METRIC_INPUT_RANGES`)
 Both tables live in `src/utils/triageEngine.ts` next to `METRIC_THRESHOLDS`. Neither table affects triage status.
@@ -133,7 +138,11 @@ Both tables live in `src/utils/triageEngine.ts` next to `METRIC_THRESHOLDS`. Nei
 | `rad_dose` | `0.15` | `0` | `50` | Personal dosimeter: last 24 h reading. |
 | `wbc_lymph` | `0.2` | `0.1` | `10` | Point-of-care blood analyzer, finger-prick sample. |
 | `sleep_eff` | `3` | `0` | `100` | Wearable sleep efficiency for last night (%). |
-| `pvt_lapses` | `0.8` | `0` | `50` | 3-minute Psychomotor Vigilance Test on the crew tablet. |
+| `pvt_lapses` | `0.8` | `0` | `50` | 3-minute Psychomotor Vigilance Test on the watch. |
+| `bp_sys` | `5` | `60` | `250` | Watch reading, seated, arm at heart level (cuff-calibrated every 28 days). |
+| `bp_dia` | `4` | `30` | `150` | Watch reading, seated, arm at heart level. |
+| `glucose` | `6` | `20` | `600` | Fasting finger-prick on the glucometer, then a photo of the meter. |
+| `wrist_temp_dev` | `0.15` | `-5` | `5` | Automatic: overnight wrist temperature vs your baseline. |
 
 ---
 

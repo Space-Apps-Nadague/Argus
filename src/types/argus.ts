@@ -25,7 +25,11 @@ export type MetricId =
   | 'rad_dose'
   | 'wbc_lymph'
   | 'sleep_eff'
-  | 'pvt_lapses';
+  | 'pvt_lapses'
+  | 'bp_sys'
+  | 'bp_dia'
+  | 'glucose'
+  | 'wrist_temp_dev';
 
 export type HudTabId =
   | 'biotwin'

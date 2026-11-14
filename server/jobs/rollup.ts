@@ -26,7 +26,12 @@ export const LAST_OF_DAY_METRICS = [
   'pvt_lapses',
   'ared_load',
   'cabin_co2',
+  'glucose',
+  'wrist_temp_dev',
 ];
+
+/** Metrics whose daily value is the mean of the day's spot readings (watch blood pressure). */
+export const MEAN_OF_DAY_METRICS = ['bp_sys', 'bp_dia'];
 
 const DAY_MS = 86_400_000;
 
@@ -57,6 +62,14 @@ export async function rollupDays(db: Db, astronautId: string, from: Date, to: Da
       'median_minute', (array_agg(o.origin))[1], ${ROLLUP_VERSION}
     from observations o where ${window} and o.metric_id = 'spo2'
     group by o.astronaut_id, ${day}
+    ${upsert}`);
+
+  // 2b. Blood pressure: mean of the day's watch readings.
+  await db.execute(sql`
+    insert into daily_metrics (astronaut_id, metric_id, day, value, n, method, origin, pipeline_version)
+    select o.astronaut_id, o.metric_id, ${day}, avg(o.value), count(*), 'mean_of_day', (array_agg(o.origin))[1], ${ROLLUP_VERSION}
+    from observations o where ${window} and o.metric_id in (${sql.join(MEAN_OF_DAY_METRICS.map((m) => sql`${m}`), sql`, `)})
+    group by o.astronaut_id, o.metric_id, ${day}
     ${upsert}`);
 
   // 3. Radiation: mean dose rate (µGy/h) × 24 h → mSv/day (1 mGy ≈ 1 mSv for display, spec 05 §4.2).

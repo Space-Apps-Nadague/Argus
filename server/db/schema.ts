@@ -33,13 +33,17 @@ const tsz = (name: string) => timestamp(name, { withTimezone: true, mode: 'date'
 export const userRole = pgEnum('user_role', ['admin', 'astronaut', 'flight_surgeon']);
 export const metricKind = pgEnum('metric_kind', ['passive', 'clinical', 'self_report', 'environment', 'derived']);
 export const deviceKind = pgEnum('device_kind', [
-  'smart_shirt',
-  'bp_cuff',
-  'wrist_actigraph',
-  'ring',
-  'core_temp_patch',
+  'smart_shirt', // retired kit
+  'bp_cuff', // retired kit
+  'wrist_actigraph', // retired kit
+  'ring', // retired kit
+  'core_temp_patch', // retired kit
   'dosimeter',
   'manual',
+  'smartwatch',
+  'habitat_sensor',
+  'exercise_device',
+  'clinical_exam',
 ]);
 export const observationQuality = pgEnum('observation_quality', ['ok', 'artifact', 'out_of_range']);
 export const observationOrigin = pgEnum('observation_origin', ['wearable', 'check_in', 'clinical', 'simulated']);

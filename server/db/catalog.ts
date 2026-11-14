@@ -7,7 +7,19 @@ import { METRIC_INPUT_RANGES } from '../../src/utils/triageEngine';
 import type { MetricId } from '../../src/types/argus';
 
 export type MetricKind = 'passive' | 'clinical' | 'self_report' | 'environment' | 'derived';
-export type DeviceKind = 'smart_shirt' | 'bp_cuff' | 'wrist_actigraph' | 'ring' | 'core_temp_patch' | 'dosimeter' | 'manual';
+export type DeviceKind =
+  | 'smartwatch'
+  | 'dosimeter'
+  | 'habitat_sensor'
+  | 'exercise_device'
+  | 'clinical_exam'
+  | 'manual'
+  // retired kit (kept so historic rows stay valid)
+  | 'smart_shirt'
+  | 'bp_cuff'
+  | 'wrist_actigraph'
+  | 'ring'
+  | 'core_temp_patch';
 
 export interface MetricDef {
   id: string;
@@ -52,6 +64,11 @@ export const TRIAGE_METRICS: MetricDef[] = [
   triage('wbc_lymph', 'Lymphocyte Count', 'k/µL', 'immune', 'clinical'),
   triage('sleep_eff', 'Circadian Sleep Efficiency', '%', 'behavioral', 'derived', 'SRC-023'),
   triage('pvt_lapses', 'Psychomotor Vigilance Lapses', 'lapses', 'behavioral', 'self_report', 'SRC-009'),
+  // Challenge core indicators (spec 03 §2): watch blood pressure, glucometer photo, overnight wrist temperature.
+  triage('bp_sys', 'Systolic Blood Pressure', 'mmHg', 'cardio', 'passive', 'SRC-075'),
+  triage('bp_dia', 'Diastolic Blood Pressure', 'mmHg', 'cardio', 'passive', 'SRC-075'),
+  triage('glucose', 'Fasting Blood Glucose', 'mg/dL', 'cardio', 'self_report', 'SRC-072'),
+  triage('wrist_temp_dev', 'Wrist Temperature vs Baseline', '°C', 'immune', 'derived', 'SRC-074'),
 ];
 
 /** Minute-level passive streams from the assumed sensor kit (spec 05 §4.2). */
@@ -62,21 +79,30 @@ export const PASSIVE_METRICS: MetricDef[] = [
   { id: 'core_temp', label: 'Core Body Temperature', unit: '°C', zone: 'behavioral', kind: 'passive', plausibleMin: 34, plausibleMax: 41.5, sourceId: 'SRC-025' },
   { id: 'activity', label: 'Activity', unit: 'g', zone: 'musculo', kind: 'passive', plausibleMin: 0, plausibleMax: 8, sourceId: 'SRC-023' },
   { id: 'sleep_state', label: 'Sleep State', unit: '0=awake 1=asleep', zone: 'behavioral', kind: 'passive', plausibleMin: 0, plausibleMax: 1, sourceId: 'SRC-023' },
-  { id: 'bp_sys', label: 'Systolic Blood Pressure', unit: 'mmHg', zone: 'cardio', kind: 'passive', plausibleMin: 60, plausibleMax: 250, sourceId: 'SRC-020' },
-  { id: 'bp_dia', label: 'Diastolic Blood Pressure', unit: 'mmHg', zone: 'cardio', kind: 'passive', plausibleMin: 30, plausibleMax: 150, sourceId: 'SRC-020' },
+  { id: 'wrist_temp', label: 'Wrist Skin Temperature (overnight)', unit: '°C', zone: 'immune', kind: 'passive', plausibleMin: 25, plausibleMax: 42, sourceId: 'SRC-074' },
   { id: 'dose_rate', label: 'Radiation Dose Rate', unit: 'µGy/h', zone: 'immune', kind: 'passive', plausibleMin: 0, plausibleMax: 10000, sourceId: 'SRC-026' },
 ];
 
 export const ALL_METRICS: MetricDef[] = [...TRIAGE_METRICS, ...PASSIVE_METRICS];
 export const METRIC_BY_ID = new Map(ALL_METRICS.map((m) => [m.id, m]));
 
-/** Assumed per-astronaut sensor kit (spec 05 §4.1). */
+/**
+ * Assumed per-astronaut kit (spec 05 §4.1): only TWO worn devices, a smartwatch and a personal dosimeter.
+ * Everything else arrives automatically from the habitat and exercise equipment, from periodic exams, or as
+ * a photo (glucometer). No metric needs typing.
+ */
 export const SENSOR_KIT: Array<{ kind: DeviceKind; model: string; streams: string[]; sourceId: string }> = [
-  { kind: 'smart_shirt', model: 'Astroskin-class smart shirt', streams: ['heart_rate', 'resp_rate', 'spo2', 'skin_temp', 'activity'], sourceId: 'SRC-020' },
-  { kind: 'bp_cuff', model: 'Shirt-integrated BP', streams: ['bp_sys', 'bp_dia'], sourceId: 'SRC-020' },
-  { kind: 'wrist_actigraph', model: 'Actiwatch-class actigraph', streams: ['activity', 'sleep_state', 'sleep_eff'], sourceId: 'SRC-023' },
-  { kind: 'ring', model: 'Oura-class ring', streams: ['hrv_rmssd', 'resting_hr'], sourceId: 'SRC-029' },
-  { kind: 'core_temp_patch', model: 'Double Sensor-class core temp patch', streams: ['core_temp'], sourceId: 'SRC-025' },
-  { kind: 'dosimeter', model: 'Crew Active Dosimeter-class', streams: ['dose_rate'], sourceId: 'SRC-026' },
-  { kind: 'manual', model: 'Crew tablet (check-ins, clinical exams)', streams: ['onsd', 'iop', 'bmd_delta', 'wbc_lymph', 'pvt_lapses', 'ared_load', 'cabin_co2'], sourceId: 'SRC-009' },
+  {
+    kind: 'smartwatch',
+    model: 'Smartwatch (optical HR/SpO₂, ECG, cuff-calibrated BP, skin temperature, accelerometer)',
+    streams: ['heart_rate', 'resp_rate', 'spo2', 'activity', 'sleep_state', 'sleep_eff', 'hrv_rmssd', 'resting_hr', 'wrist_temp', 'wrist_temp_dev', 'bp_sys', 'bp_dia', 'pvt_lapses'],
+    sourceId: 'SRC-027',
+  },
+  { kind: 'dosimeter', model: 'Personal active dosimeter (Crew Active Dosimeter-class)', streams: ['dose_rate'], sourceId: 'SRC-026' },
+  { kind: 'habitat_sensor', model: 'Cabin CO₂ monitor (habitat, not worn)', streams: ['cabin_co2'], sourceId: 'SRC-001' },
+  { kind: 'exercise_device', model: 'Resistive exercise device log (ARED-class, not worn)', streams: ['ared_load'], sourceId: 'SRC-001' },
+  { kind: 'clinical_exam', model: 'Periodic exams: ocular ultrasound, tonometer, blood analyzer, bone scan', streams: ['onsd', 'iop', 'wbc_lymph', 'bmd_delta'], sourceId: 'SRC-009' },
+  { kind: 'manual', model: 'Glucometer read from a photo (camera)', streams: ['glucose'], sourceId: 'SRC-077' },
 ];
+
+export const ACTIVE_DEVICE_KINDS = SENSOR_KIT.map((k) => k.kind);

@@ -5,13 +5,13 @@
  *   npm run simulate -- --live                        # every 60 s, POST the last minute(s) to the ingest API as each device
  *   npm run simulate -- --live --crew crew-lindqvist --scenario solar_storm   # push a crisis now
  *
- * Options: --crew <id> (repeatable), --scenario <id>, --seed <n>, --full (1-min secondary streams),
+ * Options: --reset (delete earlier simulated data first), --crew <id> (repeatable), --scenario <id>, --seed <n>, --full (1-min secondary streams),
  *          --interval <s> (live), --api <url> (live, default http://127.0.0.1:8787)
  */
 
 import { and, eq, isNull } from 'drizzle-orm';
-import type { DeviceKind } from '../server/db/catalog';
-import { openDb } from '../server/db/client';
+import { type DeviceKind, SENSOR_KIT } from '../server/db/catalog';
+import { openDb, sql } from '../server/db/client';
 import { getProfile } from '../server/db/profiles';
 import { astronauts, devices, missions } from '../server/db/schema';
 import { loadEnv } from '../server/env';
@@ -41,15 +41,7 @@ if (!url) {
 const h = openDb(url);
 const db = h.db;
 
-const DEVICE_SOURCE: Record<DeviceKind, string> = {
-  smart_shirt: 'SRC-020',
-  bp_cuff: 'SRC-020',
-  wrist_actigraph: 'SRC-023',
-  ring: 'SRC-029',
-  core_temp_patch: 'SRC-025',
-  dosimeter: 'SRC-026',
-  manual: 'SRC-009',
-};
+const DEVICE_SOURCE: Partial<Record<DeviceKind, string>> = Object.fromEntries(SENSOR_KIT.map((k) => [k.kind, k.sourceId]));
 
 async function crewList() {
   const rows = await db
@@ -68,8 +60,20 @@ async function deviceMap(astronautId: string): Promise<Map<DeviceKind, string>> 
   return new Map(rows.map((r) => [r.kind as DeviceKind, r.id]));
 }
 
+/** --reset: delete simulated observations and everything derived from them for the selected crew. */
+async function resetSimulated(ids: string[]) {
+  for (const id of ids) {
+    await db.execute(sql`delete from observations where astronaut_id = ${id} and origin = 'simulated'`);
+    for (const t of ['daily_metrics', 'baselines', 'anomalies', 'triage_events']) {
+      await db.execute(sql`delete from ${sql.identifier(t)} where astronaut_id = ${id}`);
+    }
+  }
+  console.log(`[simulate] reset simulated data for ${ids.length} astronaut(s)`);
+}
+
 async function backfill(days: number) {
   const now = new Date();
+  if (has('reset')) await resetSimulated((await crewList()).map((c) => c.id));
   for (const { id, missionStart } of await crewList()) {
     const crew = await getProfile(db, id, null, { forceFull: true });
     if (!crew) continue;
@@ -93,7 +97,7 @@ async function backfill(days: number) {
         readings,
         origin: 'simulated',
         kind: 'simulator_backfill',
-        sourceId: DEVICE_SOURCE[kind],
+        sourceId: DEVICE_SOURCE[kind] ?? null,
         script: 'scripts/simulate-wearables.ts --backfill',
         keepRaw: false, // bronze is skipped for bulk synthetic history; live batches keep raw
         rollup: false,

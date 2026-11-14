@@ -68,6 +68,17 @@ export const METRIC_THRESHOLDS: Record<string, ThresholdRange> = {
   wbc_lymph: { nominalMin: 1.5, nominalMax: 3.5, yellowMin: 1.2, yellowMax: 4.0 },
   sleep_eff: { nominalMin: 82, nominalMax: 96, yellowMin: 72, yellowMax: 100 },
   pvt_lapses: { nominalMin: 0, nominalMax: 2, yellowMin: 0, yellowMax: 4 },
+  // Challenge core indicators (specs/01-data-schema.md §2, specs/05-data-platform.md §4).
+  // Source: SRC-070 (AHA categories: normal <120/<80, elevated 120–129, stage 1 130–139/80–89, stage 2 ≥140/≥90)
+  // Source: SRC-071 (AHA: hypotension <90/60). Lower red bounds (80 / 50 mmHg) are an ARGUS assumption.
+  bp_sys: { nominalMin: 90, nominalMax: 119, yellowMin: 80, yellowMax: 139 },
+  bp_dia: { nominalMin: 60, nominalMax: 79, yellowMin: 50, yellowMax: 89 },
+  // Source: SRC-072 (ADA fasting glucose: normal <100, prediabetes 100–125, diabetes ≥126 mg/dL)
+  // Source: SRC-073 (ADA hypoglycemia: level 1 54–69, level 2 <54 mg/dL)
+  glucose: { nominalMin: 70, nominalMax: 99, yellowMin: 54, yellowMax: 125 },
+  // Nightly wrist temperature vs the person's own baseline (Source: SRC-074). No clinical cut-offs exist for
+  // wrist deviation: ±0.5 / ±1.0 °C bands are an ARGUS assumption for fever / illness screening.
+  wrist_temp_dev: { nominalMin: -0.5, nominalMax: 0.5, yellowMin: -1.0, yellowMax: 1.0 },
 };
 
 /**
@@ -87,6 +98,10 @@ export const METRIC_TYPICAL_SD: Record<MetricId, number> = {
   wbc_lymph: 0.2,
   sleep_eff: 3,
   pvt_lapses: 0.8,
+  bp_sys: 5,
+  bp_dia: 4,
+  glucose: 6,
+  wrist_temp_dev: 0.15,
 };
 
 export interface MetricInputRange {
@@ -111,7 +126,11 @@ export const METRIC_INPUT_RANGES: Record<MetricId, MetricInputRange> = {
   rad_dose: { min: 0, max: 50, how: 'Personal dosimeter: last 24 h reading.' },
   wbc_lymph: { min: 0.1, max: 10, how: 'Point-of-care blood analyzer, finger-prick sample.' },
   sleep_eff: { min: 0, max: 100, how: 'Wearable sleep efficiency for last night (%).' },
-  pvt_lapses: { min: 0, max: 50, how: '3-minute Psychomotor Vigilance Test on the crew tablet.' },
+  pvt_lapses: { min: 0, max: 50, how: '3-minute Psychomotor Vigilance Test on the watch.' },
+  bp_sys: { min: 60, max: 250, how: 'Watch blood-pressure reading: sit still, arm at heart level (watch calibrated with a cuff every 28 days).' },
+  bp_dia: { min: 30, max: 150, how: 'Watch blood-pressure reading: sit still, arm at heart level (watch calibrated with a cuff every 28 days).' },
+  glucose: { min: 20, max: 600, how: 'Fasting finger-prick on the glucometer, then photograph the meter screen.' },
+  wrist_temp_dev: { min: -5, max: 5, how: 'Automatic: overnight wrist temperature vs your own baseline (wear the watch to bed).' },
 };
 
 export const METRIC_IDS = Object.keys(METRIC_TYPICAL_SD) as MetricId[];

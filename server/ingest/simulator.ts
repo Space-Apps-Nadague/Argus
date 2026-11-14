@@ -5,11 +5,12 @@
  * (`getCrewAdjustedZones`), so the database-backed HUD tells the same story as the offline demo, while
  * the minute data is realistic enough for baselines and anomaly detection.
  *
- * Built-in spaceflight effects (cited):
- * - Smart-shirt vitals at 1 Hz on device, uploaded as 1-min values (Source: SRC-020, SRC-021)
- * - Actigraphy sleep/wake and nightly sleep efficiency (Source: SRC-023)
- * - Core body temperature rises over the mission and the circadian rhythm drifts ~2 h later (Source: SRC-025)
- * - Nightly HRV and resting HR from a ring (Source: SRC-029)
+ * Kit (spec 05 §4.1): ONE smartwatch + ONE personal dosimeter are worn; habitat CO₂, the exercise-device log
+ * and periodic exams arrive automatically; glucose comes from a weekly glucometer photo.
+ * - Watch: 1-min heart rate, activity, sleep state; SpO₂ and breathing rate every few minutes; nightly HRV,
+ *   resting HR, sleep efficiency and wrist-temperature deviation; spot blood pressure 3×/day; PVT app
+ *   (Source: SRC-027, SRC-074, SRC-075, SRC-023, SRC-029)
+ * - The circadian rhythm drifts ~2 h later over the mission and body temperature rises (Source: SRC-025)
  * - Personal dosimeter dose rate, 1-min (Source: SRC-026)
  * Pure and deterministic for a given seed.
  */
@@ -32,7 +33,7 @@ export interface SimulationOptions {
   /** Day 0 of the scenario template (normally the mission start). */
   templateStart: Date;
   seed?: number;
-  /** Minutes between secondary-stream samples (resp, skin/core temp, SpO₂, dose). 1 = full resolution. */
+  /** Minutes between secondary-stream samples (SpO₂, breathing rate, dose). 1 = full resolution. */
   secondaryEveryMin?: number;
   /** Force template day (e.g. 29 = "crisis now" in live mode). */
   templateDayOverride?: number;
@@ -120,26 +121,32 @@ export function simulate(opts: SimulationOptions): SimulatedBatch {
       // Nightly summaries at wake time, 07:00 + shift (ring + actigraph) (Source: SRC-023, SRC-029).
       const wakeTs = Date.UTC(new Date(ts).getUTCFullYear(), new Date(ts).getUTCMonth(), new Date(ts).getUTCDate()) + (420 + shiftMin) * MIN_MS;
       if (wakeTs >= fromMs && wakeTs < toMs) {
-        push('ring', 'resting_hr', wakeTs, Math.round(target('resting_hr', tDay) + gauss() * 0.8));
-        push('ring', 'hrv_rmssd', wakeTs, Math.round(target('hrv_rmssd', tDay) + gauss() * 2));
-        push('wrist_actigraph', 'sleep_eff', wakeTs, r1(clamp(100 * (1 - awakeCount / 480), 0, 100)));
+        push('smartwatch', 'resting_hr', wakeTs, Math.round(target('resting_hr', tDay) + gauss() * 0.8));
+        push('smartwatch', 'hrv_rmssd', wakeTs, Math.round(target('hrv_rmssd', tDay) + gauss() * 2));
+        push('smartwatch', 'sleep_eff', wakeTs, r1(clamp(100 * (1 - awakeCount / 480), 0, 100)));
+        // Overnight wrist temperature and its deviation from the personal baseline (Source: SRC-074);
+        // body temperature drifts up slightly over the mission (Source: SRC-025).
+        const dev = target('wrist_temp_dev', tDay) + 0.15 * progress + gauss() * 0.07;
+        push('smartwatch', 'wrist_temp_dev', wakeTs, r2(dev));
+        push('smartwatch', 'wrist_temp', wakeTs, r2(34.2 + dev));
       }
-      // Daily manual entries and periodic clinical exams on the crew tablet.
+      // Daily automatic feeds, watch apps, periodic exams and the weekly glucometer photo. Nothing is typed.
       const midnight = wakeTs - (420 + shiftMin) * MIN_MS;
-      const manual: Array<[string, number, number, number]> = [
-        ['pvt_lapses', 8 * 60 + 30, Math.max(0, Math.round(target('pvt_lapses', tDay))), 1],
-        ['cabin_co2', 12 * 60, r1(target('cabin_co2', tDay) + gauss() * 0.1), 1],
-        ['ared_load', 18 * 60 + 45, r1(target('ared_load', tDay) + gauss() * 0.8), 1],
-        ['onsd', 9 * 60, r2(target('onsd', tDay) + gauss() * 0.03), 3],
-        ['iop', 9 * 60 + 5, Math.round(target('iop', tDay) + gauss() * 0.5), 3],
-        ['wbc_lymph', 9 * 60 + 10, r2(target('wbc_lymph', tDay) + gauss() * 0.05), 3],
-        ['bmd_delta', 9 * 60 + 15, r2(target('bmd_delta', tDay)), 7],
+      const daily: Array<[DeviceKind, string, number, number, number]> = [
+        ['smartwatch', 'pvt_lapses', 8 * 60 + 30, Math.max(0, Math.round(target('pvt_lapses', tDay))), 1],
+        ['manual', 'glucose', 7 * 60 + 45 + shiftMin, Math.round(target('glucose', tDay) + gauss() * 3), 7],
+        ['habitat_sensor', 'cabin_co2', 12 * 60, r1(target('cabin_co2', tDay) + gauss() * 0.1), 1],
+        ['exercise_device', 'ared_load', 18 * 60 + 45, r1(target('ared_load', tDay) + gauss() * 0.8), 1],
+        ['clinical_exam', 'onsd', 9 * 60, r2(target('onsd', tDay) + gauss() * 0.03), 3],
+        ['clinical_exam', 'iop', 9 * 60 + 5, Math.round(target('iop', tDay) + gauss() * 0.5), 3],
+        ['clinical_exam', 'wbc_lymph', 9 * 60 + 10, r2(target('wbc_lymph', tDay) + gauss() * 0.05), 3],
+        ['clinical_exam', 'bmd_delta', 9 * 60 + 15, r2(target('bmd_delta', tDay)), 7],
       ];
       const isLastDay = midnight + DAY_MS >= toMs;
-      for (const [metric, minute, value, everyDays] of manual) {
+      for (const [kind, metric, minute, value, everyDays] of daily) {
         const at = midnight + minute * MIN_MS;
         if (!Number.isFinite(value) || at < fromMs || at >= toMs) continue;
-        if (dayIndex % everyDays === 0 || isLastDay) push('manual', metric, at, value);
+        if (dayIndex % everyDays === 0 || isLastDay) push(kind, metric, at, value);
       }
     }
     const plan = dayPlan!;
@@ -158,27 +165,24 @@ export function simulate(opts: SimulationOptions): SimulatedBatch {
       : resting + 12 + 4 * Math.sin(hourAngle - Math.PI / 2) + gauss() * 3;
     if (exercising) hr = resting + 55 + gauss() * 6;
     if (rand() < 0.001) hr *= 1.6; // contact/motion artifact, flagged by normalization
-    push('smart_shirt', 'heart_rate', ts, Math.round(clamp(hr, 30, 210)));
+    push('smartwatch', 'heart_rate', ts, Math.round(clamp(hr, 30, 210)));
 
     const activity = asleep ? 0.02 + rand() * 0.02 : exercising ? 1.2 + gauss() * 0.25 : 0.15 + rand() * 0.1;
-    push('wrist_actigraph', 'activity', ts, r2(Math.max(0, activity)));
-    push('wrist_actigraph', 'sleep_state', ts, asleep ? 1 : 0);
+    push('smartwatch', 'activity', ts, r2(Math.max(0, activity)));
+    push('smartwatch', 'sleep_state', ts, asleep ? 1 : 0);
 
     if (minuteOfDay % every === 0) {
       const spo2 = target('spo2', plan.tDay) - (asleep ? 0.4 : 0) + gauss() * 0.5;
-      push('smart_shirt', 'spo2', ts, r1(clamp(spo2, 80, 100)));
-      push('smart_shirt', 'resp_rate', ts, r1(asleep ? 13 + gauss() : exercising ? 28 + gauss() * 3 : 16 + gauss() * 1.5));
-      push('smart_shirt', 'skin_temp', ts, r1(33.4 + 0.6 * Math.sin(hourAngle - Math.PI / 2) + (exercising ? 0.8 : 0) + gauss() * 0.15));
-      // Core temp: circadian ±0.35 °C, +0.4 °C rise over the mission, exercise +0.6 °C (Source: SRC-025).
-      const core = 36.8 + 0.35 * Math.sin(hourAngle - (17 / 24) * 2 * Math.PI + Math.PI / 2) + 0.4 * plan.progress + (exercising ? 0.6 : 0) + gauss() * 0.06;
-      push('core_temp_patch', 'core_temp', ts, r2(core));
+      push('smartwatch', 'spo2', ts, r1(clamp(spo2, 80, 100)));
+      push('smartwatch', 'resp_rate', ts, r1(asleep ? 13 + gauss() : exercising ? 28 + gauss() * 3 : 16 + gauss() * 1.5));
       // Dose rate (µGy/h) from the daily mSv target, ±8 % (Source: SRC-026).
       const dose = (target('rad_dose', plan.tDay) * 1000) / 24;
       push('dosimeter', 'dose_rate', ts, r1(Math.max(0, dose * (1 + gauss() * 0.08))));
     }
-    if (!asleep && bodyMinute % 30 === 0) {
-      push('bp_cuff', 'bp_sys', ts, Math.round(114 + (resting - 61) * 0.5 + (exercising ? 25 : 0) + gauss() * 5));
-      push('bp_cuff', 'bp_dia', ts, Math.round(74 + gauss() * 4));
+    // Watch blood pressure: spot readings morning, afternoon, evening while seated (Source: SRC-075).
+    if (bodyMinute === 8 * 60 || bodyMinute === 14 * 60 || bodyMinute === 20 * 60) {
+      push('smartwatch', 'bp_sys', ts, Math.round(target('bp_sys', plan.tDay) + gauss() * 4));
+      push('smartwatch', 'bp_dia', ts, Math.round(target('bp_dia', plan.tDay) + gauss() * 3));
     }
   }
   return out;

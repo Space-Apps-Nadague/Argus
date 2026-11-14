@@ -127,8 +127,11 @@ export async function seedDatabase(db: Db, opts: SeedOptions = {}): Promise<void
   }
 }
 
-/** Gives every astronaut without devices the assumed sensor kit (spec 05 §4.1). */
+/** Gives every astronaut the assumed kit (spec 05 §4.1) and retires devices that are no longer part of it. */
 export async function ensureSensorKits(db: Db): Promise<void> {
+  await db.execute(sql`
+    update devices set retired_at = now()
+    where retired_at is null and kind::text not in (${sql.join(SENSOR_KIT.map((k) => sql`${k.kind}`), sql`, `)})`);
   await db.execute(sql`
     insert into devices (astronaut_id, kind, model, source_id)
     select a.id, k.kind::device_kind, k.model, k.source_id
@@ -137,7 +140,7 @@ export async function ensureSensorKits(db: Db): Promise<void> {
       SENSOR_KIT.map((k) => sql`(${k.kind}, ${k.model}, ${k.sourceId})`),
       sql`, `
     )}) as k(kind, model, source_id)
-    where not exists (select 1 from devices d where d.astronaut_id = a.id and d.kind = k.kind::device_kind)
+    where not exists (select 1 from devices d where d.astronaut_id = a.id and d.kind = k.kind::device_kind and d.retired_at is null)
   `);
 }
 
