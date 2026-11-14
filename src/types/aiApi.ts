@@ -8,6 +8,7 @@
 
 import type {
   BodyZoneId,
+  CheckInEntry,
   CrewMemberProfile,
   FlightSurgeonGuidance,
   GravityEnvironment,
@@ -75,6 +76,8 @@ export interface CrewContextRequest {
   environment?: GravityEnvironment;
   /** Mission location (specs/01-data-schema.md §8); added to prompts. */
   locationId?: SpaceLocationId;
+  /** Sprint 7 vital check-ins (specs/01-data-schema.md §6); overlaid via `applyCheckIns` before triage/trends. */
+  telemetryCheckIns?: CheckInEntry[];
 }
 
 export interface GuidanceRequest extends CrewContextRequest {

@@ -42,11 +42,21 @@ export const LocationIdSchema = z.enum([
   'rover',
 ]);
 
+export const CheckInEntrySchema = z.object({
+  id: text(100),
+  crewId: text(100),
+  missionDay: z.number().int().min(1).max(5000),
+  timestampIso: text(40),
+  values: z.record(z.string(), num()),
+  note: text(1000).optional(),
+});
+
 export const CrewContextSchema = z.object({
   crewMember: CrewMemberSchema.optional(),
   scenarioId: ScenarioIdSchema,
   environment: EnvironmentSchema.optional(),
   locationId: LocationIdSchema.optional(),
+  telemetryCheckIns: z.array(CheckInEntrySchema).max(200).optional(),
 });
 
 export const GuidanceRequestSchema = CrewContextSchema.extend({

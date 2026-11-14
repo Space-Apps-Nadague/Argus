@@ -24,8 +24,8 @@ const SECTIONS: Array<{ id: Section; label: string; icon: React.ReactNode }> = [
 ];
 
 export const AiTab: React.FC = () => {
-  const { activeCrewMember } = useMission();
-  const { status, checked } = useAiStatus();
+  const { activeCrewMember, runtimeApiKey } = useMission();
+  const { status, checked } = useAiStatus(runtimeApiKey);
   const [section, setSection] = useState<Section>('chat');
 
   return (

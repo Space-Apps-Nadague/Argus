@@ -12,8 +12,14 @@ import type { WellbeingCheckIn } from '../../types/aiApi';
 
 /** Crew context sent with every AI request. */
 export function useCrewContextRequest(): CrewContextRequest {
-  const { activeCrewMember, scenarioId, environment, spaceLocationId } = useMission();
-  return { crewMember: activeCrewMember, scenarioId, environment, locationId: spaceLocationId };
+  const { activeCrewMember, scenarioId, environment, spaceLocationId, activeCheckIns } = useMission();
+  return {
+    crewMember: activeCrewMember,
+    scenarioId,
+    environment,
+    locationId: spaceLocationId,
+    telemetryCheckIns: activeCheckIns,
+  };
 }
 
 /** `Record<crewId, T[]>` persisted in localStorage, scoped to the active crew member. */
@@ -51,15 +57,15 @@ export function usePerCrewList<T>(storageKey: string, crewId: string, max = 50):
   return [items, update];
 }
 
-export function useAiStatus(): { status: AiProviderStatus | null; checked: boolean; refresh: () => void } {
+export function useAiStatus(runtimeApiKey?: string): { status: AiProviderStatus | null; checked: boolean; refresh: () => void } {
   const [status, setStatus] = useState<AiProviderStatus | null>(null);
   const [checked, setChecked] = useState(false);
   const refresh = useCallback(() => {
-    fetchAiStatus().then((s) => {
+    fetchAiStatus({ runtimeApiKey }).then((s) => {
       setStatus(s);
       setChecked(true);
     });
-  }, []);
+  }, [runtimeApiKey]);
   useEffect(refresh, [refresh]);
   return { status, checked, refresh };
 }

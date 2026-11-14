@@ -75,6 +75,29 @@ describe('diagnostic rules', () => {
     expect(floor).toBe('immediate_emergency_packet');
     expect(maxUrgency('routine_downlink', floor)).toBe('immediate_emergency_packet');
   });
+
+  it('overlays telemetryCheckIns via applyCheckIns before triage and trends', () => {
+    const baseline = buildCrewSnapshot({ scenarioId: 'nominal' });
+    expect(baseline.zoneStatuses.neuro).toBe('green');
+
+    const withCheckIn = buildCrewSnapshot({
+      scenarioId: 'nominal',
+      telemetryCheckIns: [
+        {
+          id: 'ci-test-1',
+          crewId: 'crew-1',
+          missionDay: 30,
+          timestampIso: '2026-11-14T10:00:00.000Z',
+          values: { onsd: 6.4 },
+        },
+      ],
+    });
+    expect(withCheckIn.zoneStatuses.neuro).toBe('red');
+    expect(withCheckIn.readinessScore).toBeLessThan(baseline.readinessScore);
+    const onsdTrend = withCheckIn.trends.find((t) => t.metricId === 'onsd');
+    expect(onsdTrend?.currentValue).toBe(6.4);
+    expect(onsdTrend?.status).toBe('red');
+  });
 });
 
 describe('countermeasure library', () => {

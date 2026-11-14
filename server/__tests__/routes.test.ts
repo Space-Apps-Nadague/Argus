@@ -81,6 +81,27 @@ describe('AI routes (offline)', () => {
     expect(body.result.disclaimer).toMatch(/not a diagnosis/i);
   });
 
+  it('POST /api/ai/diagnostics applies telemetryCheckIns before triage and trends', async () => {
+    const res = await post('/api/ai/diagnostics', {
+      scenarioId: 'nominal',
+      crewMember,
+      telemetryCheckIns: [
+        {
+          id: 'ci-route-1',
+          crewId: crewMember.id,
+          missionDay: 30,
+          timestampIso: '2026-11-14T10:00:00.000Z',
+          values: { onsd: 6.4 },
+        },
+      ],
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as DiagnosticsResponse;
+    expect(body.result.zoneStatuses.neuro).toBe('red');
+    expect(body.result.earthConsultUrgency).toBe('immediate_emergency_packet');
+    expect(body.result.trends.find((t) => t.metricId === 'onsd')?.currentValue).toBe(6.4);
+  });
+
   it('POST /api/ai/recommendations returns a library plan', async () => {
     const res = await post('/api/ai/recommendations', { scenarioId: 'high_co2', crewMember });
     const body = (await res.json()) as RecommendationsResponse;
