@@ -12,14 +12,14 @@ Before making any code change, walk through these four steps:
    - `specs/00-architecture.md` — Tech stack, package boundaries, and file layout.
    - `specs/01-data-schema.md` — Every TypeScript interface, vital metric ID, `0g` microgravity threshold, and AI JSON schema.
    - `specs/02-ui-dashboard.md` — UI layout proportions, 3D Bio-Twin controls, and user interactions.
-   - `specs/tasks.md` — Current task statuses and file ownership.
 2. **Update Specs First:**
    - Need a new vital sign, crisis scenario, or component prop? Document it in `specs/01-data-schema.md` or `specs/02-ui-dashboard.md` **before** editing `.ts` or `.tsx` files.
-3. **Claim Your Task in `specs/tasks.md`:**
-   - Mark the task you are working on as `[IN PROGRESS]` so other contributors know which files are actively being edited.
+3. **Claim Your Task on GitHub:**
+   - Tasks are [GitHub Issues](https://github.com/Space-Apps-Nadague/Argus/issues) tracked on the GitHub Projects kanban. No task file lives in the repo.
+   - Assign yourself to the issue and move its card to `In Progress` so other contributors know which files are being edited. If there is no issue yet, open one and list the files it touches.
 4. **Verify & Document Completion:**
    - Run `npm test` (deterministic triage unit tests) and `npm run build` (TypeScript + Vite production bundle).
-   - Mark your task `[DONE]` in `specs/tasks.md`.
+   - Open a PR that says `Closes #<issue>`; merging it closes the issue and moves the card to `Done`.
 
 ---
 
