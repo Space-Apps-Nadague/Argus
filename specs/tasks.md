@@ -276,3 +276,33 @@
 - **Status:** `[TODO]`
 - **Spec References:** `specs/02-ui-dashboard.md` (§5 Future: ARGUS Companion), `specs/01-data-schema.md` (§7)
 - **Notes:** Port the ARGOS chat from `ARGOS_The_Thousand_Eyes.html` (`jv()`, `send()`, `brain()`, `speak()`): deterministic offline intent brain first, live Clinical AI second, never sets triage status.
+
+---
+
+## Sprint 6: AI Backend (Provider-Agnostic, Free & Local-First)
+
+> Spec: `specs/03-ai-backend.md`. Built on branch `feature/ai-backend` in a git worktree, on top of Sprint 5. It avoided Sprint 5's files; wiring the new endpoints into the tabbed HUD is Task 23.
+
+### Task 18: AI Backend Spec & Shared API Types
+- **Status:** `[DONE]`
+- **Files Owned:** `specs/03-ai-backend.md`, `src/types/aiApi.ts`, `specs/tasks.md` (Sprint 6 block), `AGENTS.md` (§1 spec list)
+
+### Task 19: Server Skeleton, Provider Chain (Local + Cloud) & Health
+- **Status:** `[DONE]`
+- **Files Owned:** `server/index.ts`, `server/app.ts`, `server/env.ts`, `server/ai/*`, `server/routes/health.ts`, `server/tsconfig.json`, `vite.config.ts`, `package.json`, `.env.example`, `docker-compose.yml`, `scripts/check-local-ai.ts`
+
+### Task 20: Port Flight Surgeon Guidance & Vision to the Backend
+- **Status:** `[DONE]`
+- **Files Owned:** `server/routes/guidance.ts`, `server/routes/vision.ts`, `src/services/flightSurgeonAi.ts`, `src/services/argusApi.ts`
+
+### Task 21: Trend Models, Diagnostics & Recommendations
+- **Status:** `[DONE]`
+- **Files Owned:** `server/models/trendModels.ts`, `server/models/crewSnapshot.ts`, `server/models/diagnosticsRules.ts`, `server/models/countermeasureLibrary.ts`, `server/routes/diagnostics.ts`, `server/routes/recommendations.ts`
+
+### Task 22: Wellbeing (Mental Health) Model & Crew Companion Chat API
+- **Status:** `[DONE]`
+- **Files Owned:** `server/models/wellbeingModel.ts`, `server/routes/wellbeing.ts`, `server/routes/chat.ts`, `server/__tests__/*`
+
+### Task 23: Wire AI Endpoints into the Tabbed HUD
+- **Status:** `[TODO]`
+- **Notes:** Send Sprint 5 check-ins (`CheckInEntry`) with AI requests so the server applies them via `applyCheckIns` before triage/trends (today the backend rebuilds zones from the scenario only). Remove `VITE_AI_API_KEY` mentions from `README.md`, `specs/00-architecture.md` and the `TopMissionBar.tsx` key placeholder (Sprint 5 owns them). Swap `trendModels.ts` internals to Sprint 5's `driftAnalytics.ts`; add Diagnostics / Plan / Wellbeing / Companion views to the tabbed HUD; provider badge in `TopMissionBar.tsx`; wellbeing check-ins + chat history in `MissionContext.tsx`.
