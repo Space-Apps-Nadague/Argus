@@ -31,6 +31,18 @@ ARGUS currently assumes a single `0g_transit` microgravity environment until fut
 - `'high_co2'` — **Habitat $\text{CO}_2$ Scrubber Degradation**: Elevated cabin $\text{ppCO}_2$ (`5.8 mmHg`) driving cerebral vasodilation (`neuro` yellow/red), tachycardia (`cardio` yellow), and cognitive fatigue (`behavioral` yellow).
 - `'solar_storm'` — **SPE Radiation Storm Alert**: Acute solar particle event raising cumulative dose rate (`immune` red, lymphocyte drop `1.05 k/µL`, skin erythema risk) and stress response (`cardio` / `behavioral` yellow).
 
+### Metric Identifiers (`MetricId`)
+The 12 canonical metric IDs tracked across the 5 zones (see §2 catalog):
+```typescript
+export type MetricId =
+  | 'onsd' | 'iop' | 'cabin_co2'
+  | 'resting_hr' | 'hrv_rmssd' | 'spo2'
+  | 'bmd_delta' | 'ared_load'
+  | 'rad_dose' | 'wbc_lymph'
+  | 'sleep_eff' | 'pvt_lapses';
+```
+`VitalSignReading.metricId` stays typed as `string` for backward compatibility; new code uses `MetricId`.
+
 ### Crew Member Profile (`CrewMemberProfile`)
 ARGUS tracks a roster of astronauts (`DEFAULT_CREW_ROSTER` + user-created custom crew members persisted in `localStorage`). Each crew member has individualized baseline physiology that deterministically offsets their 30-day telemetry series:
 
@@ -100,6 +112,26 @@ export interface ThresholdRange {
 | `behavioral` | `sleep_eff` | Circadian Sleep Efficiency | `%` | `82–96` (`72–100`) |
 | `behavioral` | `pvt_lapses` | Psychomotor Vigilance Lapses | `lapses` | `0–2` (`0–4`) |
 
+### Typical Day-to-Day Variability (`METRIC_TYPICAL_SD`) & Check-In Input Ranges (`METRIC_INPUT_RANGES`)
+Both tables live in `src/utils/triageEngine.ts` next to `METRIC_THRESHOLDS`. Neither table affects triage status.
+- `METRIC_TYPICAL_SD` is the minimum standard deviation used for personal-baseline drift (§5), so a very flat baseline week does not turn tiny changes into huge σ values.
+- `METRIC_INPUT_RANGES` gives hard plausibility limits for manual check-in entry (§6). Values outside `[min, max]` are rejected as typos or sensor errors before they reach triage. Each entry also carries a one-line `how` measurement instruction for non-physician crew.
+
+| Metric ID | Typical SD | Input min | Input max | How to measure (`how`) |
+|---|---|---|---|---|
+| `onsd` | `0.10` | `3.0` | `8.0` | Ocular ultrasound, transverse plane, 3 mm behind globe; average both eyes. |
+| `iop` | `1.0` | `5` | `40` | Rebound tonometer, seated, average of 3 readings per eye. |
+| `cabin_co2` | `0.3` | `0` | `15` | Read the nearest cabin CO₂ monitor (CDM) at crew head height. |
+| `resting_hr` | `3` | `30` | `180` | On waking, before moving: wearable or 30 s pulse count × 2. |
+| `hrv_rmssd` | `6` | `5` | `250` | Overnight RMSSD from your wearable. |
+| `spo2` | `0.7` | `70` | `100` | Finger oximeter, warm hand, still for 30 s. |
+| `bmd_delta` | `0.15` | `-5` | `3` | Monthly QCT/DXA-equivalent scan result vs previous scan (%). |
+| `ared_load` | `2.5` | `0` | `60` | Total from the ARED/resistance device log for today. |
+| `rad_dose` | `0.15` | `0` | `50` | Personal dosimeter: last 24 h reading. |
+| `wbc_lymph` | `0.2` | `0.1` | `10` | Point-of-care blood analyzer, finger-prick sample. |
+| `sleep_eff` | `3` | `0` | `100` | Wearable sleep efficiency for last night (%). |
+| `pvt_lapses` | `0.8` | `0` | `50` | 3-minute Psychomotor Vigilance Test on the crew tablet. |
+
 ---
 
 ## 3. Longitudinal Telemetry Series & Readiness Score
@@ -109,6 +141,7 @@ export interface TelemetryHistoryPoint {
   missionDay: number; // Day 1 to Day 30 (charts highlight last 14 or full 30 days)
   dateLabel: string;  // e.g., "MD-17" .. "MD-30"
   value: number;
+  source?: 'synthetic' | 'check_in'; // 'check_in' when overlaid from a crew CheckInEntry (§6)
 }
 
 export interface VitalSignReading {
@@ -202,6 +235,94 @@ export interface EarthTelemetryPacket {
   zoneStatuses: Record<BodyZoneId, TriageStatus>;
   completedSteps: string[];
   visualExamAttached?: VisualExamAnalysis | null;
+  recentCheckIns?: CheckInEntry[]; // Up to the 5 most recent check-ins of the active crew member (§6)
   crewNotes: string;
+}
+```
+
+---
+
+## 5. Personal-Baseline Drift, Forecast & Metric Links (`src/utils/driftAnalytics.ts`)
+
+Ported from the ARGOS prototype (`ARGOS_The_Thousand_Eyes.html`). All functions are pure and deterministic. **Drift never changes `TriageStatus`.** It is an early-warning layer that shows when a crew member is trending away from *their own* normal while still inside population thresholds.
+
+```typescript
+export interface PersonalBaseline { mean: number; sd: number; n: number; }      // n = points used
+export type DriftDirection = 'up' | 'down' | 'flat';
+export type DriftLevel = 'steady' | 'watch' | 'drifting';                     // |ewmaZ| < 1 | < 2 | ≥ 2
+export interface DriftResult { baseline: PersonalBaseline; zScore: number; ewmaZ: number; direction: DriftDirection; level: DriftLevel; }
+export interface ForecastPoint { missionDay: number; dateLabel: string; mean: number; lower: number; upper: number; }
+export interface MetricLink {
+  fromMetricId: MetricId; toMetricId: MetricId;
+  lagDays: 0 | 1;           // 1 = "from" today relates to "to" tomorrow
+  r: number;                // Pearson correlation in this crew member's own series
+  n: number;                // paired points
+  expectedSign: 1 | -1;     // direction implied by the mechanism
+  mechanism: string;        // short NASA HRP-grounded rationale
+}
+```
+
+- **Baseline:** mean of mission days 1–7 (the first 7 history points). `sd = max(sample SD, METRIC_TYPICAL_SD[metric])`.
+- **zScore:** `(latest − mean) / sd`. **ewmaZ:** exponentially weighted z over the series, `α = 0.3` (`e₀ = z₀`, `eᵢ = 0.3·zᵢ + 0.7·eᵢ₋₁`).
+- **direction:** `up` if `ewmaZ ≥ 0.5`, `down` if `≤ −0.5`, otherwise `flat`.
+- **Forecast:** ordinary least squares on the last 10 points (needs ≥ 4 points, else `null`). Horizons `+1, +2, +3` days. 90% prediction interval `ŷ ± t(0.95, n−2) · s · √(1 + 1/n + (x−x̄)²/Sxx)`, with residual SD `s` floored at `0.4 · METRIC_TYPICAL_SD`.
+- **Metric links ("Why"):** only physiologically plausible **candidate pairs** (`CANDIDATE_METRIC_LINKS`) grounded in the NASA HRP hazards in `SOURCES.md` are tested. This avoids spurious correlations in synthetic data. For each pair, compute Pearson r at lag 0 and lag 1 and keep the stronger one. Show the pair only if `|r| ≥ 0.6`, `n ≥ 7`, **and the sign of r matches the pair's expected direction** (a link that contradicts the known mechanism is not shown). Return the top 5 by `|r|`. Displayed as an association, never as cause.
+
+| From → To | Expected sign | Mechanism (short) |
+|---|---|---|
+| `cabin_co2` → `onsd` | `+` | CO₂ dilates cerebral vessels, raising intracranial pressure |
+| `cabin_co2` → `pvt_lapses` | `+` | Elevated CO₂ impairs alertness |
+| `onsd` → `iop` | `+` | Headward fluid shift loads the eye |
+| `sleep_eff` → `hrv_rmssd` | `+` | Poor sleep lowers recovery (HRV) |
+| `sleep_eff` → `pvt_lapses` | `−` | Sleep loss increases attention lapses |
+| `resting_hr` → `hrv_rmssd` | `−` | Stress raises HR and lowers HRV |
+| `rad_dose` → `wbc_lymph` | `−` | Radiation suppresses lymphocytes |
+| `ared_load` → `bmd_delta` | `+` | Resistance loading protects bone |
+
+---
+
+## 6. Daily Crew Check-In (`CheckInEntry`, `src/utils/checkIns.ts`)
+
+Ported from the ARGOS prototype's daily check-in. Crew members type real readings, which are overlaid on top of the synthetic 30-day series.
+
+```typescript
+export interface CheckInEntry {
+  id: string;
+  crewId: string;
+  missionDay: number;                               // 1 .. latestDay + 1
+  timestampIso: string;
+  values: Partial<Record<MetricId, number>>;        // only fields the crew filled in
+  note?: string;
+}
+```
+
+- **Validation:** `validateCheckInValue(metricId, value)` rejects non-finite values and values outside `METRIC_INPUT_RANGES`. Empty fields are skipped. An entry needs at least one valid value.
+- **Overlay:** `applyCheckIns(zones, entries)` is pure. Entries are applied in `(missionDay, timestampIso)` order. Each value replaces the history point for that mission day, or is appended (`dateLabel: "MD-<day>"`) if the day is beyond the series. The point gets `source: 'check_in'`. `currentValue` becomes the value at the highest mission day. `deltaFromBaseline` and `flightNormLabel` are left unchanged.
+- **Downstream:** triage (`evaluateAllZones`), readiness score, drift, forecast and links all run on the overlaid zones, so a check-in updates the whole HUD deterministically.
+- **Flight Surgeon guidance follows live status:** offline guidance is keyed by scenario, so a check-in can make it stale. When the live (overlaid) status of the guidance zone differs from `guidance.triageStatus`, ARGUS deterministically re-selects guidance (`resolveLiveGuidance`):
+  1. Use the first offline protocol from the 4 scenarios (`nominal`, `sans_alert`, `high_co2`, `solar_storm`, in that order) whose guidance for the same zone has the live status, keeping the active `scenarioId`.
+  2. If none matches, keep the cached guidance but set `triageStatus` to the live status, escalate `earthConsultUrgency` (`yellow` → `priority_packet`, `red` → `immediate_emergency_packet`), and prefix the headline with `Check-in out of range — `.
+  Live AI guidance (`source: 'live_ai'`) is never replaced.
+- **Streak:** `checkInStreak(entries)` = number of consecutive mission days with ≥ 1 entry, ending at the most recent logged day.
+- **Persistence:** `localStorage` key `argus_checkins_v1` → `Record<crewId, CheckInEntry[]>`. Deleting a crew member deletes their check-ins.
+
+---
+
+## 7. Future: ARGUS Companion Chat (not implemented)
+
+Planned port of the ARGOS prototype's conversational companion (see `specs/02-ui-dashboard.md` §5 and the backlog in `specs/tasks.md`). Draft types only. Do **not** add them to `src/types/argus.ts` until the task is claimed.
+
+```typescript
+export type CompanionIntent =
+  | 'red_flag' | 'status' | 'metric' | 'symptom' | 'forecast' | 'why' | 'radiation' | 'help' | 'fallback';
+
+export interface CompanionMessage {
+  id: string;
+  crewId: string;
+  role: 'crew' | 'argus';
+  text: string;
+  timestampIso: string;
+  intent?: CompanionIntent;
+  source: 'live_ai' | 'offline_brain';
 }
 ```

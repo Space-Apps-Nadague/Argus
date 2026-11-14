@@ -21,3 +21,11 @@ Before writing, editing, or refactoring any code, read the relevant files in `/s
 
 ## 4. Authoritative Reference Sources
 Consult [`SOURCES.md`](./SOURCES.md) for official NASA Human Research Program (HRP) and Canadian Space Agency (CSA) reference links when grounding health indicators, radiation monitoring, hazards, risks, and spaceflight clinical guidance in future tasks.
+
+## 5. Agent Skills (`.agents/skills/`)
+Vendor-neutral skills in the open Agent Skills `SKILL.md` format. Read a skill's `SKILL.md` when its trigger applies. Index: [`.agents/skills/README.md`](./.agents/skills/README.md).
+- **`frontend-design`**: read before building or reshaping any UI (direction, typography, layout, motion). The visual language in §3 always wins.
+- **`design-system`**: read before adding or changing components or tokens. No new hard-coded colors/sizes outside `tailwind.config.js` / `src/index.css`. Reuse `src/components/ui/` primitives.
+- **`ux-copy`**: use for every label, button, tooltip, error and empty state. Keep the HUD low-text and put explanations in `InfoTip`.
+- **`accessibility-review`**: run before marking any UI task `[DONE]` (WCAG 2.2 AA: contrast, keyboard, focus, non-color status cues). Fix critical and major findings first.
+- **`design-critique`**: run on the rendered app after UI changes to prioritize fixes.
