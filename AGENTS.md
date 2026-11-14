@@ -17,3 +17,6 @@ Before writing, editing, or refactoring any code, read the relevant files in `/s
 - **Frontend:** React 18+ (TypeScript, Vite), Tailwind CSS, Lucide Icons, Recharts.
 - **Visual Language:** Dark spacecraft HUD (`bg-slate-950`, `cyan-400` primary accents, `#22c55e` Green, `#eab308` Yellow, `#ef4444` Red).
 - **Spaceflight Context:** Every health indicator must map to NASA's Human Research Program hazards (`0g_transit`, `1_6g_moon`, `3_8g_mars`) and include plain-language instructions for non-physician crew.
+
+## 4. Authoritative Reference Sources
+Consult [`SOURCES.md`](./SOURCES.md) for official NASA Human Research Program (HRP) and Canadian Space Agency (CSA) reference links when grounding health indicators, radiation monitoring, hazards, risks, and spaceflight clinical guidance in future tasks.
