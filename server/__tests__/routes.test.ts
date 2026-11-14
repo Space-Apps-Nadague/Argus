@@ -50,6 +50,20 @@ describe('AI routes (offline)', () => {
     expect(body.result).toMatchObject({ zoneId: 'neuro', triageStatus: 'red' });
   });
 
+  it('POST /api/ai/guidance incorporates crewSymptoms in offline fallback', async () => {
+    const res = await post('/api/ai/guidance', {
+      scenarioId: 'nominal',
+      zoneId: 'cardio',
+      crewMember,
+      crewSymptoms: 'Throbbing headache behind eyes, blurred near vision, optic disc swelling',
+    });
+    const body = (await res.json()) as GuidanceResponse;
+    expect(body.meta.source).toBe('offline_verified_cache');
+    expect(body.result.headline).toContain('Neuro-Ocular & SANS Assessment');
+    expect(body.result.zoneId).toBe('neuro');
+    expect(body.result.guidedSteps.length).toBeGreaterThan(0);
+  });
+
   it('POST /api/ai/vision returns the reference sample finding', async () => {
     const res = await post('/api/ai/vision', { sampleId: 'sans_ultrasound' });
     const body = await res.json();
@@ -61,7 +75,7 @@ describe('AI routes (offline)', () => {
     const res = await post('/api/ai/diagnostics', { scenarioId: 'sans_alert', crewMember });
     const body = (await res.json()) as DiagnosticsResponse;
     expect(body.meta.source).toBe('offline_verified_cache');
-    expect(body.result.trends.length).toBe(METRIC_IDS.length); // 16 incl. the challenge core indicators
+    expect(body.result.trends.length).toBe(METRIC_IDS.length); // 17 incl. the challenge core indicators
     expect(body.result.hypotheses[0].id).toBe('sans');
     expect(body.result.earthConsultUrgency).toBe('immediate_emergency_packet');
     expect(body.result.disclaimer).toMatch(/not a diagnosis/i);

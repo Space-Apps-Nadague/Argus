@@ -64,11 +64,12 @@ export const TRIAGE_METRICS: MetricDef[] = [
   triage('wbc_lymph', 'Lymphocyte Count', 'k/µL', 'immune', 'clinical'),
   triage('sleep_eff', 'Circadian Sleep Efficiency', '%', 'behavioral', 'derived', 'SRC-023'),
   triage('pvt_lapses', 'Psychomotor Vigilance Lapses', 'lapses', 'behavioral', 'self_report', 'SRC-009'),
-  // Challenge core indicators (spec 03 §2): watch blood pressure, glucometer photo, overnight wrist temperature.
-  triage('bp_sys', 'Systolic Blood Pressure', 'mmHg', 'cardio', 'passive', 'SRC-075'),
-  triage('bp_dia', 'Diastolic Blood Pressure', 'mmHg', 'cardio', 'passive', 'SRC-075'),
-  triage('glucose', 'Fasting Blood Glucose', 'mg/dL', 'cardio', 'self_report', 'SRC-072'),
-  triage('wrist_temp_dev', 'Wrist Temperature vs Baseline', '°C', 'immune', 'derived', 'SRC-074'),
+  // Challenge core indicators (spec 03 §2, metric ids from PR #20): watch, glucometer photo, watch tap-survey.
+  triage('systolic_bp', 'Systolic Blood Pressure', 'mmHg', 'cardio', 'passive', 'SRC-075'),
+  triage('blood_glucose', 'Blood Glucose', 'mg/dL', 'musculo', 'self_report', 'SRC-077'),
+  triage('core_temp', 'Body Temperature (watch estimate)', '°C', 'immune', 'derived', 'SRC-074'),
+  triage('daily_sleep_hours', 'Daily Sleep Duration', 'hours', 'behavioral', 'passive', 'SRC-074'),
+  triage('mood_index', 'Mood Index (watch tap)', '/10', 'behavioral', 'self_report', 'SRC-009'),
 ];
 
 /** Minute-level passive streams from the assumed sensor kit (spec 05 §4.2). */
@@ -76,7 +77,7 @@ export const PASSIVE_METRICS: MetricDef[] = [
   { id: 'heart_rate', label: 'Heart Rate', unit: 'bpm', zone: 'cardio', kind: 'passive', plausibleMin: 25, plausibleMax: 220, sourceId: 'SRC-021' },
   { id: 'resp_rate', label: 'Respiration Rate', unit: 'breaths/min', zone: 'cardio', kind: 'passive', plausibleMin: 4, plausibleMax: 60, sourceId: 'SRC-021' },
   { id: 'skin_temp', label: 'Skin Temperature', unit: '°C', zone: 'immune', kind: 'passive', plausibleMin: 25, plausibleMax: 42, sourceId: 'SRC-021' },
-  { id: 'core_temp', label: 'Core Body Temperature', unit: '°C', zone: 'behavioral', kind: 'passive', plausibleMin: 34, plausibleMax: 41.5, sourceId: 'SRC-025' },
+  { id: 'diastolic_bp', label: 'Diastolic Blood Pressure', unit: 'mmHg', zone: 'cardio', kind: 'passive', plausibleMin: 30, plausibleMax: 150, sourceId: 'SRC-075' },
   { id: 'activity', label: 'Activity', unit: 'g', zone: 'musculo', kind: 'passive', plausibleMin: 0, plausibleMax: 8, sourceId: 'SRC-023' },
   { id: 'sleep_state', label: 'Sleep State', unit: '0=awake 1=asleep', zone: 'behavioral', kind: 'passive', plausibleMin: 0, plausibleMax: 1, sourceId: 'SRC-023' },
   { id: 'wrist_temp', label: 'Wrist Skin Temperature (overnight)', unit: '°C', zone: 'immune', kind: 'passive', plausibleMin: 25, plausibleMax: 42, sourceId: 'SRC-074' },
@@ -95,14 +96,14 @@ export const SENSOR_KIT: Array<{ kind: DeviceKind; model: string; streams: strin
   {
     kind: 'smartwatch',
     model: 'Smartwatch (optical HR/SpO₂, ECG, cuff-calibrated BP, skin temperature, accelerometer)',
-    streams: ['heart_rate', 'resp_rate', 'spo2', 'activity', 'sleep_state', 'sleep_eff', 'hrv_rmssd', 'resting_hr', 'wrist_temp', 'wrist_temp_dev', 'bp_sys', 'bp_dia', 'pvt_lapses'],
+    streams: ['heart_rate', 'resp_rate', 'spo2', 'activity', 'sleep_state', 'sleep_eff', 'daily_sleep_hours', 'hrv_rmssd', 'resting_hr', 'wrist_temp', 'core_temp', 'systolic_bp', 'diastolic_bp', 'pvt_lapses', 'mood_index'],
     sourceId: 'SRC-027',
   },
   { kind: 'dosimeter', model: 'Personal active dosimeter (Crew Active Dosimeter-class)', streams: ['dose_rate'], sourceId: 'SRC-026' },
   { kind: 'habitat_sensor', model: 'Cabin CO₂ monitor (habitat, not worn)', streams: ['cabin_co2'], sourceId: 'SRC-001' },
   { kind: 'exercise_device', model: 'Resistive exercise device log (ARED-class, not worn)', streams: ['ared_load'], sourceId: 'SRC-001' },
   { kind: 'clinical_exam', model: 'Periodic exams: ocular ultrasound, tonometer, blood analyzer, bone scan', streams: ['onsd', 'iop', 'wbc_lymph', 'bmd_delta'], sourceId: 'SRC-009' },
-  { kind: 'manual', model: 'Glucometer read from a photo (camera)', streams: ['glucose'], sourceId: 'SRC-077' },
+  { kind: 'manual', model: 'Glucometer read from a photo (camera)', streams: ['blood_glucose'], sourceId: 'SRC-077' },
 ];
 
 export const ACTIVE_DEVICE_KINDS = SENSOR_KIT.map((k) => k.kind);

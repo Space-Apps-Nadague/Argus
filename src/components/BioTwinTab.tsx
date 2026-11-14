@@ -32,11 +32,11 @@ export const BioTwinTab: React.FC = () => {
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-      <div className="lg:col-span-2 flex flex-col">
+      <div className="lg:col-span-2 flex flex-col min-w-0">
         <BioTwinMap />
       </div>
 
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4 min-w-0">
         <Card
           title={
             <span className="flex items-center gap-2">
@@ -46,6 +46,16 @@ export const BioTwinTab: React.FC = () => {
           }
           actions={
             <>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('trends');
+                }}
+                className="hud-focus rounded border border-hud-accent/40 bg-hud-accent/10 px-2 py-1 text-xs font-mono text-hud-accent hover:bg-hud-accent/20 transition-colors"
+                title="Log Vital Reading for this zone"
+              >
+                + Log Vital
+              </button>
               <StatusPill status={zoneStatus} size="md" />
               <InfoTip label={`About ${zone.name}`} align="right">
                 <strong className="block text-hud-text">{zone.name}</strong>

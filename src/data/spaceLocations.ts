@@ -3,7 +3,7 @@
  * Pure data + time helpers; shared by the HUD and the AI backend.
  */
 
-import type { SpaceLocation, SpaceLocationId } from '../types/argus';
+import type { GravityEnvironment, SpaceLocation, SpaceLocationId } from '../types/argus';
 
 export const SPACE_LOCATIONS: Record<SpaceLocationId, SpaceLocation> = {
   earth_pre: {
@@ -101,6 +101,25 @@ export const SPACE_LOCATION_ORDER: SpaceLocationId[] = [
 
 /** Matches the `0g_transit` threshold table and the 14m 22s delay in ENVIRONMENT_META. */
 export const DEFAULT_SPACE_LOCATION: SpaceLocationId = 'mars_transit';
+
+/**
+ * Which threshold set (specs/01-data-schema.md §2, `ENVIRONMENT_METRIC_THRESHOLDS`) applies at a location.
+ * Earth phases use the ISS/LEO set (shielded, closest to clinical norms); open space and transit use 0g.
+ */
+export const LOCATION_ENVIRONMENT: Record<SpaceLocationId, GravityEnvironment> = {
+  earth_pre: 'iss_leo',
+  earth_post: 'iss_leo',
+  leo: 'iss_leo',
+  gateway: '0g_transit',
+  mars_transit: '0g_transit',
+  lunar_surface: 'lunar_base',
+  mars_surface: 'mars_base',
+  rover: 'mars_base',
+};
+
+export function environmentForLocation(id: SpaceLocationId): GravityEnvironment {
+  return LOCATION_ENVIRONMENT[id] ?? '0g_transit';
+}
 
 export function isSpaceLocationId(id: unknown): id is SpaceLocationId {
   return typeof id === 'string' && id in SPACE_LOCATIONS;

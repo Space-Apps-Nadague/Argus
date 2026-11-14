@@ -8,7 +8,7 @@
  * Kit (spec 05 §4.1): ONE smartwatch + ONE personal dosimeter are worn; habitat CO₂, the exercise-device log
  * and periodic exams arrive automatically; glucose comes from a weekly glucometer photo.
  * - Watch: 1-min heart rate, activity, sleep state; SpO₂ and breathing rate every few minutes; nightly HRV,
- *   resting HR, sleep efficiency and wrist-temperature deviation; spot blood pressure 3×/day; PVT app
+ *   resting HR, sleep efficiency, sleep hours and body-temperature estimate; spot blood pressure 3×/day; PVT app
  *   (Source: SRC-027, SRC-074, SRC-075, SRC-023, SRC-029)
  * - The circadian rhythm drifts ~2 h later over the mission and body temperature rises (Source: SRC-025)
  * - Personal dosimeter dose rate, 1-min (Source: SRC-026)
@@ -124,17 +124,19 @@ export function simulate(opts: SimulationOptions): SimulatedBatch {
         push('smartwatch', 'resting_hr', wakeTs, Math.round(target('resting_hr', tDay) + gauss() * 0.8));
         push('smartwatch', 'hrv_rmssd', wakeTs, Math.round(target('hrv_rmssd', tDay) + gauss() * 2));
         push('smartwatch', 'sleep_eff', wakeTs, r1(clamp(100 * (1 - awakeCount / 480), 0, 100)));
-        // Overnight wrist temperature and its deviation from the personal baseline (Source: SRC-074);
+        // Overnight wrist temperature → body-temperature estimate (Source: SRC-074);
         // body temperature drifts up slightly over the mission (Source: SRC-025).
-        const dev = target('wrist_temp_dev', tDay) + 0.15 * progress + gauss() * 0.07;
-        push('smartwatch', 'wrist_temp_dev', wakeTs, r2(dev));
-        push('smartwatch', 'wrist_temp', wakeTs, r2(34.2 + dev));
+        const body = target('core_temp', tDay) + 0.15 * progress + gauss() * 0.07;
+        push('smartwatch', 'core_temp', wakeTs, r2(body));
+        push('smartwatch', 'wrist_temp', wakeTs, r2(body - 2.6));
+        push('smartwatch', 'daily_sleep_hours', wakeTs, r1(target('daily_sleep_hours', tDay) + gauss() * 0.25));
       }
       // Daily automatic feeds, watch apps, periodic exams and the weekly glucometer photo. Nothing is typed.
       const midnight = wakeTs - (420 + shiftMin) * MIN_MS;
       const daily: Array<[DeviceKind, string, number, number, number]> = [
         ['smartwatch', 'pvt_lapses', 8 * 60 + 30, Math.max(0, Math.round(target('pvt_lapses', tDay))), 1],
-        ['manual', 'glucose', 7 * 60 + 45 + shiftMin, Math.round(target('glucose', tDay) + gauss() * 3), 7],
+        ['smartwatch', 'mood_index', 21 * 60, clamp(Math.round(target('mood_index', tDay) + gauss() * 0.5), 1, 10), 1],
+        ['manual', 'blood_glucose', 7 * 60 + 45 + shiftMin, Math.round(target('blood_glucose', tDay) + gauss() * 3), 7],
         ['habitat_sensor', 'cabin_co2', 12 * 60, r1(target('cabin_co2', tDay) + gauss() * 0.1), 1],
         ['exercise_device', 'ared_load', 18 * 60 + 45, r1(target('ared_load', tDay) + gauss() * 0.8), 1],
         ['clinical_exam', 'onsd', 9 * 60, r2(target('onsd', tDay) + gauss() * 0.03), 3],
@@ -181,8 +183,9 @@ export function simulate(opts: SimulationOptions): SimulatedBatch {
     }
     // Watch blood pressure: spot readings morning, afternoon, evening while seated (Source: SRC-075).
     if (bodyMinute === 8 * 60 || bodyMinute === 14 * 60 || bodyMinute === 20 * 60) {
-      push('smartwatch', 'bp_sys', ts, Math.round(target('bp_sys', plan.tDay) + gauss() * 4));
-      push('smartwatch', 'bp_dia', ts, Math.round(target('bp_dia', plan.tDay) + gauss() * 3));
+      const sys = target('systolic_bp', plan.tDay) + gauss() * 4;
+      push('smartwatch', 'systolic_bp', ts, Math.round(sys));
+      push('smartwatch', 'diastolic_bp', ts, Math.round(sys * 0.64 + gauss() * 3));
     }
   }
   return out;

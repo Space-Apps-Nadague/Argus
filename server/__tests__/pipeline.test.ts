@@ -78,8 +78,7 @@ describe('two-device kit (spec 05 §4)', () => {
     const batch = simulate({ crew, scenarioId: 'nominal', from: start, to: new Date(start.getTime() + 8 * 86_400_000), templateStart: start });
     for (const kind of batch.keys()) expect(ACTIVE_DEVICE_KINDS).toContain(kind);
     const metrics = new Set([...batch.values()].flat().map((r) => r.metric));
-    for (const m of ['bp_sys', 'bp_dia', 'glucose', 'wrist_temp_dev', 'dose_rate', 'heart_rate']) expect(metrics.has(m)).toBe(true);
-    expect(metrics.has('core_temp')).toBe(false);
+    for (const m of ['systolic_bp', 'diastolic_bp', 'blood_glucose', 'core_temp', 'daily_sleep_hours', 'mood_index', 'dose_rate', 'heart_rate']) expect(metrics.has(m)).toBe(true);
   });
 });
 
@@ -113,7 +112,7 @@ describe('simulator → database pipeline', () => {
   it('rolls minute data up to daily triage metrics', async () => {
     const rows = await h.db.select().from(dailyMetrics).where(eq(dailyMetrics.astronautId, solaris.id));
     const metrics = new Set(rows.map((r) => r.metricId));
-    for (const m of ['resting_hr', 'spo2', 'rad_dose', 'sleep_eff', 'hrv_rmssd', 'onsd', 'bp_sys', 'glucose', 'wrist_temp_dev']) expect(metrics.has(m)).toBe(true);
+    for (const m of ['resting_hr', 'spo2', 'rad_dose', 'sleep_eff', 'hrv_rmssd', 'onsd', 'systolic_bp', 'blood_glucose', 'core_temp', 'daily_sleep_hours', 'mood_index']) expect(metrics.has(m)).toBe(true);
     const dose = rows.filter((r) => r.metricId === 'rad_dose').sort((a, b) => a.day.localeCompare(b.day));
     expect(dose[dose.length - 1].value).toBeGreaterThan(dose[0].value * 2); // solar storm builds up
   });

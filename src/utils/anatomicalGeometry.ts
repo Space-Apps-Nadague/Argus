@@ -1049,3 +1049,398 @@ export function createLymphaticConduitGeometries(
   return conduits;
 }
 
+/**
+ * 10. SCULPTED VISCERAL ORGAN GEOMETRIES (`neuro`, `cardio`, `immune`)
+ * Replaces primitive spheroids with anatomically contoured, vertex-sculpted BufferGeometries.
+ */
+
+/**
+ * Gyri-sculpted cerebral hemisphere with flat medial longitudinal fissure wall,
+ * temporal lobe protrusion, Sylvian fissure, and frontal/occipital pole shaping.
+ * `side`: -1 = right hemisphere (viewer left, x < 0), +1 = left hemisphere (viewer right, x > 0).
+ */
+export function createBrainHemisphereGeometry(
+  side: -1 | 1
+): THREE.BufferGeometry {
+  const geom = new THREE.SphereGeometry(1, 36, 28);
+  const pos = geom.attributes.position;
+  const v = new THREE.Vector3();
+
+  const rx = 0.098;
+  const ry = 0.118;
+  const rz = 0.148;
+
+  for (let i = 0; i < pos.count; i++) {
+    v.fromBufferAttribute(pos, i);
+    const ux = v.x;
+    const uy = v.y;
+    const uz = v.z;
+
+    const lateralSign = ux * side; // > 0 on outer lateral convexity, < 0 on medial wall
+
+    let x = ux;
+    let y = uy;
+    let z = uz;
+
+    // Flatten medial wall facing the longitudinal fissure
+    if (lateralSign < 0) {
+      x *= 0.16;
+    }
+
+    // Frontal pole taper (anterior +z) and occipital pole projection (posterior -z)
+    if (uz > 0.15) {
+      const frontT = (uz - 0.15) / 0.85;
+      x *= 1 - 0.22 * frontT * frontT;
+      y -= 0.08 * frontT * frontT;
+    } else if (uz < -0.25) {
+      const occT = (-0.25 - uz) / 0.75;
+      x *= 1 - 0.26 * occT * occT;
+      z -= 0.06 * occT;
+    }
+
+    // Temporal lobe ventral-lateral bulge
+    const temporalMask =
+      Math.max(0, lateralSign) *
+      gaussian(uy, -0.32, 0.34) *
+      gaussian(uz, 0.08, 0.38);
+    x += side * 0.16 * temporalMask;
+    y -= 0.14 * temporalMask;
+
+    // Sylvian (lateral) fissure indentation above temporal lobe
+    const sylvianMask =
+      Math.max(0, lateralSign) *
+      gaussian(uy, -0.02, 0.11) *
+      gaussian(uz, 0.14, 0.32);
+    x -= side * 0.11 * sylvianMask;
+
+    // Subtle organic gyri/sulci surface convolutions (attenuated on flat medial wall)
+    const gyriMask = lateralSign > 0 ? Math.min(1, lateralSign * 2.2) : 0.15;
+    const gyri =
+      0.028 *
+      gyriMask *
+      (Math.sin(ux * 12 + uz * 9) * Math.cos(uy * 11 - uz * 8) +
+        0.5 * Math.sin(uy * 16 + ux * 13));
+    const radialLen = Math.sqrt(x * x + y * y + z * z) || 1;
+    x += (x / radialLen) * gyri;
+    y += (y / radialLen) * gyri;
+    z += (z / radialLen) * gyri;
+
+    pos.setXYZ(i, x * rx, y * ry, z * rz);
+  }
+
+  geom.computeVertexNormals();
+  return geom;
+}
+
+/**
+ * Bilobed cerebellum with central vermis notch and subtle horizontal folia ridges.
+ */
+export function createCerebellumGeometry(): THREE.BufferGeometry {
+  const geom = new THREE.SphereGeometry(1, 32, 22);
+  const pos = geom.attributes.position;
+  const v = new THREE.Vector3();
+
+  const rx = 0.092;
+  const ry = 0.054;
+  const rz = 0.062;
+
+  for (let i = 0; i < pos.count; i++) {
+    v.fromBufferAttribute(pos, i);
+    const ux = v.x;
+    const uy = v.y;
+    const uz = v.z;
+
+    // Central vermis indentation (especially posterior-inferior)
+    const vermisNotch = 1 - 0.26 * gaussian(ux, 0, 0.22) * (uz < 0.2 ? 1 : 0.4);
+    // Lateral cerebellar hemisphere fullness
+    const lobeFullness = 1 + 0.14 * gaussian(Math.abs(ux), 0.56, 0.26);
+    // Subtle horizontal folia ridges
+    const folia = 1 + 0.032 * Math.sin(uy * 26);
+
+    const scale = vermisNotch * lobeFullness * folia;
+    pos.setXYZ(i, ux * rx * scale, uy * ry * scale, uz * rz * scale);
+  }
+
+  geom.computeVertexNormals();
+  return geom;
+}
+
+/**
+ * Anatomically tapered, asymmetric 4-chamber heart silhouette:
+ * broad superior-posterior base, oblique left-anterior apex, and coronary/interventricular sulci.
+ */
+export function createHeartGeometry(): THREE.BufferGeometry {
+  const geom = new THREE.SphereGeometry(1, 36, 28);
+  const pos = geom.attributes.position;
+  const v = new THREE.Vector3();
+
+  const rx = 0.072;
+  const ry = 0.096;
+  const rz = 0.068;
+
+  for (let i = 0; i < pos.count; i++) {
+    v.fromBufferAttribute(pos, i);
+    const ux = v.x;
+    const uy = v.y;
+    const uz = v.z;
+
+    // Normalized height: 0 = apex (bottom), 1 = base (top)
+    const h = (uy + 1) * 0.5;
+
+    // Conical taper toward cardiac apex
+    const taper = 0.34 + 0.66 * Math.pow(Math.max(0, h), 0.56);
+
+    // Oblique shift of apex toward anatomical left (+x) and anterior (+z)
+    const apexShiftX = 0.28 * (1 - h) * (1 - h);
+    const apexShiftZ = 0.14 * (1 - h);
+
+    // Coronary (atrioventricular) sulcus around h = 0.68
+    const avSulcus = 1 - 0.08 * gaussian(h, 0.68, 0.065);
+
+    // Anterior interventricular sulcus
+    const ivSulcus =
+      uz > 0.15
+        ? 1 - 0.06 * gaussian(ux - 0.18 * uy, 0.04, 0.13) * Math.min(1, uz * 1.5)
+        : 1;
+
+    // Slightly flatter diaphragmatic (inferior-posterior) surface
+    let y = uy;
+    if (uy < -0.25 && uz < 0.1) {
+      y *= 0.88;
+    }
+
+    // Subtle atrial auricular fullness at superior base
+    const atrialSpread = h > 0.68 ? 1 + 0.12 * gaussian(h, 0.82, 0.12) : 1;
+
+    const rScale = taper * avSulcus * ivSulcus * atrialSpread;
+    pos.setXYZ(
+      i,
+      (ux * rScale + apexShiftX) * rx,
+      y * ry,
+      (uz * rScale + apexShiftZ) * rz
+    );
+  }
+
+  geom.computeVertexNormals();
+  return geom;
+}
+
+/**
+ * Sculpted pulmonary lobe geometry with conical apex, concave diaphragmatic base,
+ * flat mediastinal wall, lobar fissure creases, and left-sided cardiac notch.
+ * `side`: -1 = right lung (3 lobes, x < 0), +1 = left lung (2 lobes + cardiac notch, x > 0).
+ */
+export function createLungGeometry(
+  side: -1 | 1,
+  sex: BiologicalSex
+): THREE.BufferGeometry {
+  const isFemale = sex === 'female';
+  const geom = new THREE.SphereGeometry(1, 36, 28);
+  const pos = geom.attributes.position;
+  const v = new THREE.Vector3();
+
+  const rx = (isFemale ? 0.088 : 0.108) * (side === -1 ? 1.06 : 0.94);
+  const ry = isFemale ? 0.182 : 0.202;
+  const rz = isFemale ? 0.092 : 0.108;
+
+  for (let i = 0; i < pos.count; i++) {
+    v.fromBufferAttribute(pos, i);
+    const ux = v.x;
+    const uy = v.y;
+    const uz = v.z;
+
+    const h = (uy + 1) * 0.5; // 0 = diaphragmatic base, 1 = apex
+    const lateralSign = ux * side; // > 0 outer costal wall, < 0 inner mediastinal wall
+
+    let x = ux;
+    let y = uy;
+    let z = uz;
+
+    // Conical taper toward pulmonary apex
+    const apexTaper = 1 - 0.64 * Math.pow(Math.max(0, h - 0.32) / 0.68, 1.35);
+    x *= apexTaper;
+    z *= 0.45 + 0.55 * apexTaper;
+
+    // Flatten mediastinal (inner) surface facing heart/spine
+    if (lateralSign < 0) {
+      x *= 0.42;
+    }
+
+    // Concave diaphragmatic base (arches upward inferiorly)
+    if (uy < -0.42) {
+      const baseT = (-0.42 - uy) / 0.58;
+      const centerDome = Math.max(0, 1 - 0.45 * (ux * ux + uz * uz));
+      y += 0.26 * Math.pow(baseT, 1.25) * centerDome;
+    }
+
+    // Left lung cardiac notch (anterior-medial-inferior concavity for the heart)
+    if (side === 1) {
+      const notchMask =
+        gaussian(ux, -0.35, 0.55) *
+        gaussian(uy, -0.32, 0.44) *
+        gaussian(uz, 0.48, 0.52);
+      x += 0.36 * notchMask;
+      z -= 0.18 * notchMask;
+    }
+
+    // Lobar fissure indentations
+    const obliqueFissure = 1 - 0.055 * gaussian(uy + 0.42 * uz, -0.04, 0.065);
+    const horizontalFissure =
+      side === -1 && uz > -0.1
+        ? 1 - 0.045 * gaussian(uy, 0.16, 0.055) * Math.min(1, (uz + 0.1) * 2)
+        : 1;
+    const fissureScale = obliqueFissure * horizontalFissure;
+
+    pos.setXYZ(i, x * rx * fissureScale, y * ry, z * rz * fissureScale);
+  }
+
+  geom.computeVertexNormals();
+  return geom;
+}
+
+/**
+ * Trachea & bifurcating left/right primary bronchi (`cardio`).
+ */
+export function createAirwayGeometries(): THREE.BufferGeometry[] {
+  const tracheaCurve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(0, 1.24, 0.025),
+    new THREE.Vector3(0, 1.1, 0.022),
+    new THREE.Vector3(0, 0.96, 0.015), // Carina
+  ]);
+  const rightBronchus = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(0, 0.96, 0.015),
+    new THREE.Vector3(-0.045, 0.92, 0.012),
+    new THREE.Vector3(-0.095, 0.87, 0.01),
+  ]);
+  const leftBronchus = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(0, 0.96, 0.015),
+    new THREE.Vector3(0.05, 0.91, 0.012),
+    new THREE.Vector3(0.1, 0.86, 0.01),
+  ]);
+
+  return [
+    new THREE.TubeGeometry(tracheaCurve, 16, 0.017, 12, false),
+    new THREE.TubeGeometry(rightBronchus, 12, 0.0125, 10, false),
+    new THREE.TubeGeometry(leftBronchus, 12, 0.0115, 10, false),
+  ];
+}
+
+/**
+ * Wedge-shaped asymmetric liver silhouette: large rounded right lobe (x < 0)
+ * tapering across the midline into a thinner pointed left lobe (x > 0).
+ */
+export function createLiverGeometry(sex: BiologicalSex): THREE.BufferGeometry {
+  const isFemale = sex === 'female';
+  const geom = new THREE.SphereGeometry(1, 34, 24);
+  const pos = geom.attributes.position;
+  const v = new THREE.Vector3();
+
+  const rx = isFemale ? 0.145 : 0.172;
+  const ry = 0.082;
+  const rz = isFemale ? 0.092 : 0.108;
+
+  for (let i = 0; i < pos.count; i++) {
+    v.fromBufferAttribute(pos, i);
+    const ux = v.x; // -1 = far right lobe, +1 = far left lobe tip
+    const uy = v.y;
+    const uz = v.z;
+
+    const uNorm = (ux + 1) * 0.5; // 0 (right) -> 1 (left)
+
+    // Thick right lobe tapering smoothly to a thin left lobe
+    const heightProfile = 1.18 - 0.88 * Math.pow(uNorm, 1.35);
+    const depthProfile = 1.06 - 0.58 * Math.pow(uNorm, 1.5);
+
+    // Concave inferior visceral slope (angled up toward anterior-left)
+    let y = uy * heightProfile;
+    if (uy < 0) {
+      y += 0.24 * Math.abs(uy) * (0.35 + 0.65 * uNorm);
+    }
+
+    // Subtle falciform ligament notch between right and left lobes
+    const falciformNotch = 1 - 0.09 * gaussian(ux, 0.18, 0.11);
+
+    pos.setXYZ(
+      i,
+      ux * rx,
+      y * ry * falciformNotch,
+      uz * rz * depthProfile * falciformNotch
+    );
+  }
+
+  geom.computeVertexNormals();
+  return geom;
+}
+
+/**
+ * Crescent/bean-shaped spleen with convex diaphragmatic surface and concave medial hilum.
+ */
+export function createSpleenGeometry(): THREE.BufferGeometry {
+  const geom = new THREE.SphereGeometry(1, 28, 20);
+  const pos = geom.attributes.position;
+  const v = new THREE.Vector3();
+
+  const rx = 0.044;
+  const ry = 0.078;
+  const rz = 0.058;
+
+  for (let i = 0; i < pos.count; i++) {
+    v.fromBufferAttribute(pos, i);
+    const ux = v.x;
+    const uy = v.y;
+    const uz = v.z;
+
+    // Slight crescent curve along vertical axis
+    const poleTaper = 1 - 0.28 * uy * uy;
+    let x = ux * poleTaper;
+    // Indent medial hilum (ux < 0) and bow lateral diaphragmatic face (ux > 0)
+    if (ux < 0) {
+      x *= 0.55;
+    }
+    x += 0.22 * (1 - uy * uy);
+
+    const z = uz * poleTaper - 0.16 * uy * uy;
+
+    pos.setXYZ(i, x * rx, uy * ry, z * rz);
+  }
+
+  geom.computeVertexNormals();
+  return geom;
+}
+
+/**
+ * Bilobed anterior mediastinal thymus gland with central isthmus waist.
+ */
+export function createThymusGeometry(): THREE.BufferGeometry {
+  const geom = new THREE.SphereGeometry(1, 28, 20);
+  const pos = geom.attributes.position;
+  const v = new THREE.Vector3();
+
+  const rx = 0.052;
+  const ry = 0.058;
+  const rz = 0.026;
+
+  for (let i = 0; i < pos.count; i++) {
+    v.fromBufferAttribute(pos, i);
+    const ux = v.x;
+    const uy = v.y;
+    const uz = v.z;
+
+    // Central isthmus pinch separating left and right thymic lobes
+    const poleFactor = 0.35 + 0.65 * Math.min(1, Math.abs(uy) * 1.4);
+    const isthmusPinch = 1 - 0.48 * gaussian(ux, 0, 0.22) * poleFactor;
+    // Taper superiorly into cervical horns
+    const superiorTaper = uy > 0 ? 1 - 0.28 * uy : 1 + 0.08 * Math.abs(uy);
+
+    pos.setXYZ(
+      i,
+      ux * rx * superiorTaper,
+      uy * ry * isthmusPinch,
+      uz * rz * isthmusPinch
+    );
+  }
+
+  geom.computeVertexNormals();
+  return geom;
+}
+

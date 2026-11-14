@@ -49,7 +49,13 @@ import {
   STATUS_LABELS,
 } from '../utils/triageEngine';
 import {
+  createAirwayGeometries,
   createAppendicularSkeletonGeometries,
+  createBrainHemisphereGeometry,
+  createCerebellumGeometry,
+  createHeartGeometry,
+  createLiverGeometry,
+  createLungGeometry,
   createLymphaticConduitGeometries,
   createNeuroVascularGeometries,
   createPelvicGirdleGeometries,
@@ -57,7 +63,9 @@ import {
   createSculptedHeadAndNeckGeometry,
   createSculptedLegGeometry,
   createSculptedTorsoGeometry,
+  createSpleenGeometry,
   createThoracicRibGeometries,
+  createThymusGeometry,
   createVascularTreeGeometries,
 } from '../utils/anatomicalGeometry';
 
@@ -195,6 +203,16 @@ const HolographicHumanModel: React.FC<HolographicHumanProps> = ({
     const vascularTree = createVascularTreeGeometries(sex);
     const neuroVascular = createNeuroVascularGeometries();
     const lymphaticConduits = createLymphaticConduitGeometries(sex);
+    const leftBrainHemisphere = createBrainHemisphereGeometry(1);
+    const rightBrainHemisphere = createBrainHemisphereGeometry(-1);
+    const cerebellum = createCerebellumGeometry();
+    const heart = createHeartGeometry();
+    const rightLung = createLungGeometry(-1, sex);
+    const leftLung = createLungGeometry(1, sex);
+    const airways = createAirwayGeometries();
+    const liver = createLiverGeometry(sex);
+    const spleen = createSpleenGeometry();
+    const thymus = createThymusGeometry();
 
     return {
       headAndNeck,
@@ -209,6 +227,16 @@ const HolographicHumanModel: React.FC<HolographicHumanProps> = ({
       vascularTree,
       neuroVascular,
       lymphaticConduits,
+      leftBrainHemisphere,
+      rightBrainHemisphere,
+      cerebellum,
+      heart,
+      rightLung,
+      leftLung,
+      airways,
+      liver,
+      spleen,
+      thymus,
     };
   }, [sex]);
 
@@ -547,18 +575,24 @@ const HolographicHumanModel: React.FC<HolographicHumanProps> = ({
       {showOrgans && (
         <group {...bindZoneEvents('neuro')}>
           {/* Left & Right Gyri-Sculpted Cerebral Hemispheres */}
-          <mesh position={[-0.068, 1.74, -0.01]} scale={[0.82, 0.95, 1.18]}>
-            <icosahedronGeometry args={[0.135, 3]} />
+          <mesh
+            position={[-0.022, 1.745, -0.01]}
+            geometry={anatomies.rightBrainHemisphere}
+          >
             <meshStandardMaterial {...getZoneMaterialProps('neuro', 0.9)} />
           </mesh>
-          <mesh position={[0.068, 1.74, -0.01]} scale={[0.82, 0.95, 1.18]}>
-            <icosahedronGeometry args={[0.135, 3]} />
+          <mesh
+            position={[0.022, 1.745, -0.01]}
+            geometry={anatomies.leftBrainHemisphere}
+          >
             <meshStandardMaterial {...getZoneMaterialProps('neuro', 0.9)} />
           </mesh>
 
           {/* Cerebellum & Brainstem */}
-          <mesh position={[0, 1.61, -0.095]} scale={[1.15, 0.75, 0.85]}>
-            <sphereGeometry args={[0.075, 18, 18]} />
+          <mesh
+            position={[0, 1.615, -0.095]}
+            geometry={anatomies.cerebellum}
+          >
             <meshStandardMaterial {...getZoneMaterialProps('neuro', 0.85)} />
           </mesh>
           <mesh position={[0, 1.48, -0.04]} rotation={[0.12, 0, 0]}>
@@ -609,52 +643,38 @@ const HolographicHumanModel: React.FC<HolographicHumanProps> = ({
           {/* Beating 4-Chambered Heart (Myocardium) angled anatomically toward left thorax */}
           <group
             ref={heartRef}
-            position={[0.045, 0.76, 0.065]}
-            rotation={[0.15, 0, -0.32]}
+            position={[0.04, 0.75, 0.06]}
+            rotation={[0.12, -0.15, -0.22]}
           >
-            {/* Left & Right Ventricles */}
-            <mesh position={[0, -0.02, 0]} scale={[0.88, 1.22, 0.85]}>
-              <sphereGeometry args={[0.082, 24, 24]} />
+            <mesh geometry={anatomies.heart}>
               <meshStandardMaterial {...getZoneMaterialProps('cardio', 0.96)} />
-            </mesh>
-            {/* Left & Right Atria */}
-            <mesh position={[-0.025, 0.055, -0.01]} scale={[1.1, 0.8, 0.9]}>
-              <sphereGeometry args={[0.062, 20, 20]} />
-              <meshStandardMaterial {...getZoneMaterialProps('cardio', 0.92)} />
             </mesh>
           </group>
 
-          {/* Trachea & Primary Bronchi */}
-          <mesh position={[0, 1.08, 0.02]}>
-            <cylinderGeometry args={[0.018, 0.018, 0.28, 14]} />
-            <meshStandardMaterial {...getZoneMaterialProps('cardio', 0.78)} />
-          </mesh>
+          {/* Trachea & Bifurcating Primary Bronchi */}
+          {anatomies.airways.map((geo, idx) => (
+            <mesh key={`airway-${idx}`} geometry={geo}>
+              <meshStandardMaterial {...getZoneMaterialProps('cardio', 0.78)} />
+            </mesh>
+          ))}
 
-          {/* Breathing Left (2-Lobe) & Right (3-Lobe) Sculpted Lungs */}
+          {/* Breathing Left (2-Lobe + Cardiac Notch) & Right (3-Lobe) Sculpted Lungs */}
           <group ref={lungsRef}>
             {/* Right Lung (anatomical right = viewer left, x < 0) */}
-            <group position={[-0.135, 0.81, 0.015]}>
-              <mesh position={[0, 0.07, 0]} scale={[0.78, 1.05, 0.82]}>
-                <sphereGeometry args={[0.115, 24, 24]} />
-                <meshStandardMaterial {...getZoneMaterialProps('cardio', 0.52)} />
-              </mesh>
-              <mesh position={[-0.01, -0.06, 0.01]} scale={[0.88, 0.95, 0.86]}>
-                <sphereGeometry args={[0.122, 24, 24]} />
-                <meshStandardMaterial {...getZoneMaterialProps('cardio', 0.52)} />
-              </mesh>
-            </group>
+            <mesh
+              position={[isFemale ? -0.115 : -0.145, 0.8, 0.008]}
+              geometry={anatomies.rightLung}
+            >
+              <meshStandardMaterial {...getZoneMaterialProps('cardio', 0.54)} />
+            </mesh>
 
             {/* Left Lung (anatomical left = viewer right, x > 0, with cardiac notch) */}
-            <group position={[0.14, 0.81, 0.015]}>
-              <mesh position={[0, 0.07, 0]} scale={[0.74, 1.05, 0.8]}>
-                <sphereGeometry args={[0.11, 24, 24]} />
-                <meshStandardMaterial {...getZoneMaterialProps('cardio', 0.52)} />
-              </mesh>
-              <mesh position={[0.015, -0.06, 0.01]} scale={[0.82, 0.92, 0.84]}>
-                <sphereGeometry args={[0.115, 24, 24]} />
-                <meshStandardMaterial {...getZoneMaterialProps('cardio', 0.52)} />
-              </mesh>
-            </group>
+            <mesh
+              position={[isFemale ? 0.12 : 0.15, 0.8, 0.008]}
+              geometry={anatomies.leftLung}
+            >
+              <meshStandardMaterial {...getZoneMaterialProps('cardio', 0.54)} />
+            </mesh>
           </group>
 
           {/* 3D Arterial / Venous Vascular Tree (Aortic Arch, Descending Aorta, Iliac/Femoral & Subclavian Vessels) */}
@@ -672,29 +692,26 @@ const HolographicHumanModel: React.FC<HolographicHumanProps> = ({
       {showOrgans && (
         <group {...bindZoneEvents('immune')}>
           {/* Mediastinal Thymus Gland (Bilobed) */}
-          <mesh position={[0, 1.02, 0.085]} scale={[1.1, 1.3, 0.65]}>
-            <octahedronGeometry args={[0.055, 2]} />
+          <mesh position={[0, 1.02, 0.082]} geometry={anatomies.thymus}>
             <meshStandardMaterial {...getZoneMaterialProps('immune', 0.94)} />
           </mesh>
 
-          {/* Spleen (Left Upper Quadrant) */}
+          {/* Spleen (Left Upper Quadrant, crescent-shaped) */}
           <mesh
-            position={[isFemale ? 0.19 : 0.23, 0.46, 0.01]}
-            rotation={[0, 0, -0.35]}
-            scale={[0.75, 1.25, 0.85]}
+            position={[isFemale ? 0.175 : 0.21, 0.46, 0.005]}
+            rotation={[0.08, -0.2, -0.32]}
+            geometry={anatomies.spleen}
           >
-            <sphereGeometry args={[0.072, 20, 20]} />
             <meshStandardMaterial {...getZoneMaterialProps('immune', 0.92)} />
           </mesh>
 
-          {/* Visceral Hepatic / Liver Contour (Right Upper Quadrant, translucent reference) */}
+          {/* Visceral Hepatic / Liver Contour (Right Upper Quadrant, asymmetric wedge) */}
           <mesh
-            position={[-0.08, 0.48, 0.04]}
-            rotation={[0, 0, 0.22]}
-            scale={[1.35, 0.82, 0.85]}
+            position={[isFemale ? -0.055 : -0.065, 0.49, 0.035]}
+            rotation={[0.05, 0, 0.1]}
+            geometry={anatomies.liver}
           >
-            <sphereGeometry args={[0.11, 20, 20]} />
-            <meshStandardMaterial {...getZoneMaterialProps('immune', 0.42)} />
+            <meshStandardMaterial {...getZoneMaterialProps('immune', 0.46)} />
           </mesh>
 
           {/* Interconnected Lymphatic Conduits */}
@@ -914,12 +931,12 @@ export const BioTwinMap: React.FC = () => {
   return (
     <section
       aria-label="3D Holographic Human Bio-Twin Central Stage"
-      className="hud-card flex h-full flex-col overflow-hidden"
+      className="hud-card flex h-full flex-col overflow-hidden min-w-0"
     >
       {/* Stage toolbar: anatomy · scanner · rotate · reset (labels in tooltips) */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-hud-line px-4 py-2.5">
-        <h2 className="flex items-center gap-2 font-display text-[13px] font-semibold tracking-wide text-hud-text">
-          <Sparkles className="h-4 w-4 text-hud-accent" aria-hidden="true" />
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-hud-line px-4 py-2.5 min-w-0">
+        <h2 className="flex flex-wrap items-center gap-2 font-display text-[13px] font-semibold tracking-wide text-hud-text min-w-0">
+          <Sparkles className="h-4 w-4 text-hud-accent shrink-0" aria-hidden="true" />
           Bio-Twin
           <span className="font-mono text-xs font-normal text-hud-accent">{activeCrewMember.callsign}</span>
         </h2>
@@ -974,10 +991,10 @@ export const BioTwinMap: React.FC = () => {
       {/* ============================================================
           SECONDARY BAR: ANATOMICAL LAYER SWITCHER + CAMERA FOCUS PRESETS
          ============================================================ */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-hud-line/70 px-4 py-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-hud-line/70 px-4 py-2 min-w-0">
         {/* Layer Switcher */}
-        <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Anatomy layer">
-          <Layers className="mr-1 h-4 w-4 text-hud-muted" aria-hidden="true" />
+        <div className="flex flex-wrap items-center gap-1 min-w-0" role="group" aria-label="Anatomy layer">
+          <Layers className="mr-1 h-4 w-4 text-hud-muted shrink-0" aria-hidden="true" />
           {LAYER_OPTIONS.map((layer) => {
             const active = anatomicalLayer === layer.id;
             return (
@@ -996,8 +1013,8 @@ export const BioTwinMap: React.FC = () => {
         </div>
 
         {/* Camera Focus Presets */}
-        <div className="flex items-center gap-1" role="group" aria-label="Camera focus">
-          <Crosshair className="mr-1 h-4 w-4 text-hud-muted" aria-hidden="true" />
+        <div className="flex flex-wrap items-center gap-1 min-w-0" role="group" aria-label="Camera focus">
+          <Crosshair className="mr-1 h-4 w-4 text-hud-muted shrink-0" aria-hidden="true" />
           {(Object.keys(CAMERA_PRESETS) as CameraPresetId[]).map((presetKey) => {
             const active = cameraPreset === presetKey;
             return (
@@ -1019,7 +1036,7 @@ export const BioTwinMap: React.FC = () => {
           CENTRAL EXPANSIVE 3D HOLOGRAPHIC VIEWPORT (STAR OF THE DASHBOARD)
          ============================================================ */}
       <div
-        className="relative flex-1 min-h-[500px] lg:min-h-[560px] w-full bg-[radial-gradient(ellipse_at_center,_rgba(8,51,68,0.42)_0%,_rgba(2,6,23,0.96)_72%)]"
+        className="relative flex-1 min-h-[320px] sm:min-h-[380px] md:min-h-[440px] lg:min-h-[480px] xl:min-h-[520px] w-full bg-[radial-gradient(ellipse_at_center,_rgba(8,51,68,0.42)_0%,_rgba(2,6,23,0.96)_72%)]"
         onMouseEnter={() => setIsInteracting(true)}
         onMouseLeave={() => {
           setIsInteracting(false);
@@ -1099,8 +1116,8 @@ export const BioTwinMap: React.FC = () => {
       {/* ============================================================
           BOTTOM QUICK-SELECT 5-ZONE ANATOMICAL MATRIX
          ============================================================ */}
-      <div className="border-t border-hud-line p-3">
-        <div className="grid grid-cols-5 gap-2" role="group" aria-label="Body zones">
+      <div className="border-t border-hud-line p-2 sm:p-3 min-w-0">
+        <div className="grid grid-cols-5 gap-1 sm:gap-2 min-w-0" role="group" aria-label="Body zones">
           {ZONE_ORDER.map((zoneId) => {
             const zone = BODY_ZONES[zoneId];
             const status = zoneStatuses[zoneId];
@@ -1123,18 +1140,18 @@ export const BioTwinMap: React.FC = () => {
                 }}
                 aria-pressed={isSelected}
                 aria-label={`${ZONE_SHORT_NAME[zoneId]}: ${STATUS_WORD[status]}`}
-                className={`hud-focus hud-tile flex flex-col items-center justify-center p-2 text-center ${isSelected ? 'hud-tile-selected' : ''}`}
+                className={`hud-focus hud-tile flex flex-col items-center justify-center p-1 sm:p-2 text-center min-w-0 ${isSelected ? 'hud-tile-selected' : ''}`}
               >
-                <div className="flex items-center gap-1.5 mb-1">
+                <div className="flex items-center gap-1 sm:gap-1.5 mb-0.5 sm:mb-1">
                   <span style={{ color }}>{ZONE_ICONS[zoneId]}</span>
                   <span style={{ color }}>
-                    <StatusIcon status={status} className="h-3 w-3" />
+                    <StatusIcon status={status} className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                   </span>
                 </div>
-                <span className="w-full truncate text-[11px] font-medium leading-tight text-hud-text" title={zone.name}>
+                <span className="w-full truncate text-[10px] sm:text-[11px] font-medium leading-tight text-hud-text" title={zone.name}>
                   {ZONE_SHORT_NAME[zoneId]}
                 </span>
-                <span className="mt-0.5 text-[10px] font-medium" style={{ color }}>
+                <span className="mt-0.5 text-[9px] sm:text-[10px] font-medium" style={{ color }}>
                   {STATUS_WORD[status]}
                 </span>
               </button>

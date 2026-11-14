@@ -24,8 +24,11 @@ import {
   HudTabId,
   SpaceLocation,
   SpaceLocationId,
+  MetricId,
   MetricLink,
+  ReadinessMilestone,
   ScenarioId,
+  ScheduledRoutineStatus,
   TriageStatus,
   VitalSignReading,
   VisualExamAnalysis,
@@ -50,7 +53,12 @@ import {
 } from '../utils/checkIns';
 import { crewApi, dataApi } from '../services/dataApi';
 import { findMetricLinks } from '../utils/driftAnalytics';
-import { DEFAULT_SPACE_LOCATION, isSpaceLocationId, SPACE_LOCATIONS } from '../data/spaceLocations';
+import { DEFAULT_SPACE_LOCATION, environmentForLocation, isSpaceLocationId, SPACE_LOCATIONS } from '../data/spaceLocations';
+import {
+  createQuickRoutineCheckIn,
+  evaluateReadinessMilestones,
+  getScheduledRoutineStatus,
+} from '../utils/routineMilestones';
 import {
   analyzeVisualSelfExam,
   synthesizeFlightSurgeonGuidance,
@@ -69,7 +77,15 @@ export function resolveLiveGuidance(
   environment: GravityEnvironment,
   crewMember: CrewMemberProfile
 ): FlightSurgeonGuidance {
-  if (guidance.source === 'live_ai' || guidance.triageStatus === liveStatus) return guidance;
+  if (
+    guidance.source === 'live_ai' ||
+    guidance.triageStatus === liveStatus ||
+    guidance.headline.startsWith('Autonomous Triage:') ||
+    guidance.headline.startsWith('CRITICAL MEDICAL EMERGENCY:') ||
+    guidance.headline.startsWith('Autonomous Clinical Guidance:')
+  ) {
+    return guidance;
+  }
   for (const sc of GUIDANCE_SCENARIO_ORDER) {
     const g = getOfflineFlightSurgeonGuidance(sc, guidance.zoneId, environment, crewMember);
     if (g.triageStatus === liveStatus) return { ...g, scenarioId: guidance.scenarioId };
@@ -103,6 +119,24 @@ function loadInitialLocations(): Record<string, SpaceLocationId> {
     // Ignore storage errors in restricted environments
   }
   return {};
+}
+
+const ENV_STORAGE_KEY = 'argus_mission_environment_v1';
+const VALID_ENVIRONMENTS: GravityEnvironment[] = [
+  'iss_leo',
+  'lunar_base',
+  '0g_transit',
+  'mars_base',
+];
+
+function loadInitialEnvironment(): GravityEnvironment {
+  try {
+    const raw = localStorage.getItem(ENV_STORAGE_KEY) as GravityEnvironment | null;
+    if (raw && VALID_ENVIRONMENTS.includes(raw)) return raw;
+  } catch {
+    // Ignore storage errors in restricted environments
+  }
+  return '0g_transit';
 }
 
 function loadInitialTab(): HudTabId {
@@ -174,6 +208,7 @@ interface MissionState {
   runtimeApiKey: string;
   activeTab: HudTabId;
   checkIns: Record<string, CheckInEntry[]>;
+  crewSymptoms: string;
 }
 
 type MissionAction =
@@ -198,14 +233,16 @@ type MissionAction =
   | { type: 'SET_ANALYZING_VISUAL'; payload: boolean }
   | { type: 'QUEUE_EARTH_PACKET'; payload: EarthTelemetryPacket }
   | { type: 'SET_RUNTIME_API_KEY'; payload: string }
+  | { type: 'SET_ENVIRONMENT'; payload: GravityEnvironment }
   | { type: 'SET_ACTIVE_TAB'; payload: HudTabId }
   | { type: 'ADD_CHECK_IN'; payload: CheckInEntry }
-  | { type: 'DELETE_CHECK_IN'; payload: { crewId: string; entryId: string } };
+  | { type: 'DELETE_CHECK_IN'; payload: { crewId: string; entryId: string } }
+  | { type: 'SET_CREW_SYMPTOMS'; payload: string };
 
 const initialRoster = loadInitialCrewRoster();
 const initialCrew = initialRoster[0] || DEFAULT_CREW_ROSTER[0];
 const initialScenario: ScenarioId = initialCrew.defaultScenarioId || 'nominal';
-const initialEnvironment: GravityEnvironment = '0g_transit';
+const initialEnvironment: GravityEnvironment = loadInitialEnvironment();
 const initialZone: BodyZoneId =
   TELEMETRY_SCENARIOS[initialScenario].recommendedFocusZone;
 
@@ -236,6 +273,7 @@ const initialState: MissionState = {
   runtimeApiKey: '',
   activeTab: loadInitialTab(),
   checkIns: loadInitialCheckIns(),
+  crewSymptoms: '',
 };
 
 function missionReducer(
@@ -440,6 +478,20 @@ function missionReducer(
         ...state,
         runtimeApiKey: action.payload,
       };
+    case 'SET_ENVIRONMENT': {
+      const activeCrew = getActiveCrew(state.crewRoster, state.activeCrewId);
+      const nextGuidance = getOfflineFlightSurgeonGuidance(
+        state.scenarioId,
+        state.selectedZone,
+        action.payload,
+        activeCrew
+      );
+      return {
+        ...state,
+        environment: action.payload,
+        guidance: nextGuidance,
+      };
+    }
     case 'SET_ACTIVE_TAB':
       return {
         ...state,
@@ -467,6 +519,11 @@ function missionReducer(
         },
       };
     }
+    case 'SET_CREW_SYMPTOMS':
+      return {
+        ...state,
+        crewSymptoms: action.payload,
+      };
     default:
       return state;
   }
@@ -492,6 +549,9 @@ interface MissionContextValue extends MissionState {
   setSpaceLocation: (id: SpaceLocationId) => void;
   addCheckIn: (entry: CheckInEntry) => void;
   deleteCheckIn: (entryId: string) => void;
+  routineStatus: ScheduledRoutineStatus;
+  milestones: ReadinessMilestone[];
+  completeScheduledRoutine: () => void;
   zoneStatuses: Record<BodyZoneId, TriageStatus>;
   currentZoneReadings: VitalSignReading[];
   readinessScore: number;
@@ -503,17 +563,21 @@ interface MissionContextValue extends MissionState {
   deleteCrewMember: (crewId: string) => void;
   setCrewModalOpen: (open: boolean) => void;
   setScenario: (scenario: ScenarioId) => void;
+  setEnvironment: (env: GravityEnvironment) => void;
   setSelectedZone: (zone: BodyZoneId) => void;
   setSelectedMetricId: (metricId: string) => void;
   setAnatomicalLayer: (layer: AnatomicalLayer) => void;
   setChartWindowDays: (days: 14 | 30) => void;
   toggleStepCompleted: (stepId: string) => void;
   requestLiveAiGuidance: () => Promise<void>;
+  setCrewSymptoms: (symptoms: string) => void;
+  consultFlightSurgeon: (symptoms?: string) => Promise<void>;
   runSampleVisualExam: (sample: VisualExamSample) => Promise<void>;
   runUploadedVisualExam: (file: File) => Promise<void>;
   clearVisualExam: () => void;
   queueEarthPacket: (crewNotes?: string) => EarthTelemetryPacket;
   setRuntimeApiKey: (key: string) => void;
+  logVitalReading: (zoneId: BodyZoneId, metricKey: string, value: number) => Promise<void>;
 }
 
 const MissionContext = createContext<MissionContextValue | undefined>(undefined);
@@ -589,6 +653,14 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
     }
   }, [state.activeTab]);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(ENV_STORAGE_KEY, state.environment);
+    } catch {
+      // Ignore storage errors
+    }
+  }, [state.environment]);
+
   const activeCrewMember = useMemo(
     () =>
       state.crewRoster.find((c) => c.id === state.activeCrewId) ||
@@ -598,6 +670,12 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
 
   const spaceLocationId: SpaceLocationId = locations[activeCrewMember.id] ?? DEFAULT_SPACE_LOCATION;
   const spaceLocation = SPACE_LOCATIONS[spaceLocationId];
+
+  // The location selector drives the threshold set (iss_leo / lunar_base / 0g_transit / mars_base).
+  useEffect(() => {
+    const env = environmentForLocation(spaceLocationId);
+    if (env !== state.environment) dispatch({ type: 'SET_ENVIRONMENT', payload: env });
+  }, [spaceLocationId, state.environment]);
 
   const setSpaceLocation = useCallback(
     (id: SpaceLocationId) => setLocations((prev) => ({ ...prev, [activeCrewMember.id]: id })),
@@ -701,6 +779,43 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
     [adjustedZones, state.environment, state.completedStepIds.length]
   );
 
+  const routineStatus = useMemo(
+    () =>
+      getScheduledRoutineStatus({
+        activeCheckIns,
+        latestDay,
+        countermeasureStreakSols: activeCrewMember.countermeasureStreakSols,
+      }),
+    [activeCheckIns, latestDay, activeCrewMember.countermeasureStreakSols]
+  );
+
+  const milestones = useMemo(
+    () =>
+      evaluateReadinessMilestones({
+        activeCheckIns,
+        streakDays: routineStatus.streakDays,
+        readinessScore,
+        completedStepCount: state.completedStepIds.length,
+        crewMember: activeCrewMember,
+      }),
+    [
+      activeCheckIns,
+      routineStatus.streakDays,
+      readinessScore,
+      state.completedStepIds.length,
+      activeCrewMember,
+    ]
+  );
+
+  const completeScheduledRoutine = useCallback(() => {
+    const entry = createQuickRoutineCheckIn({
+      crewId: activeCrewMember.id,
+      missionDay: latestDay || 30,
+      crewProfile: activeCrewMember,
+    });
+    dispatch({ type: 'ADD_CHECK_IN', payload: entry });
+  }, [activeCrewMember, latestDay]);
+
   const selectCrewMember = useCallback((crewId: string) => {
     if (lockedCrewId && crewId !== lockedCrewId) return;
     dispatch({ type: 'SELECT_CREW_MEMBER', payload: crewId });
@@ -749,6 +864,10 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
 
   const setScenario = useCallback((scenario: ScenarioId) => {
     dispatch({ type: 'SET_SCENARIO', payload: scenario });
+  }, []);
+
+  const setEnvironment = useCallback((env: GravityEnvironment) => {
+    dispatch({ type: 'SET_ENVIRONMENT', payload: env });
   }, []);
 
   const setSelectedZone = useCallback((zone: BodyZoneId) => {
@@ -804,6 +923,91 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
     [activeCrewMember.id]
   );
 
+  const logVitalReading = useCallback(
+    async (zoneId: BodyZoneId, metricKey: string, value: number) => {
+      const now = new Date();
+      const targetDay = latestDay || 30;
+      const entry: CheckInEntry = {
+        id: `vital-${now.getTime().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+        crewId: activeCrewMember.id,
+        missionDay: targetDay,
+        timestampIso: now.toISOString(),
+        values: {
+          [metricKey as MetricId]: value,
+        },
+        note: `Interactive vital reading: ${metricKey} = ${value}`,
+      };
+      dispatch({ type: 'ADD_CHECK_IN', payload: entry });
+      dispatch({ type: 'SET_SELECTED_ZONE', payload: zoneId });
+      dispatch({ type: 'SET_SELECTED_METRIC', payload: metricKey });
+
+      dispatch({ type: 'SET_SYNTHESIZING_AI', payload: true });
+      try {
+        const updated = await synthesizeFlightSurgeonGuidance({
+          scenarioId: state.scenarioId,
+          zoneId,
+          environment: state.environment,
+          crewMember: activeCrewMember,
+          runtimeApiKey: state.runtimeApiKey,
+          forceLiveAi: true,
+        });
+        dispatch({ type: 'SET_GUIDANCE', payload: updated });
+      } catch (err) {
+        console.warn('[ARGUS AI] Guidance synthesis failed after vital log:', err);
+      } finally {
+        dispatch({ type: 'SET_SYNTHESIZING_AI', payload: false });
+      }
+    },
+    [
+      activeCrewMember,
+      latestDay,
+      state.scenarioId,
+      state.environment,
+      state.runtimeApiKey,
+    ]
+  );
+
+  const setCrewSymptoms = useCallback((symptoms: string) => {
+    dispatch({ type: 'SET_CREW_SYMPTOMS', payload: symptoms });
+  }, []);
+
+  const consultFlightSurgeon = useCallback(
+    async (customSymptoms?: string) => {
+      const activeSymptoms = customSymptoms !== undefined ? customSymptoms : state.crewSymptoms;
+      if (customSymptoms !== undefined) {
+        dispatch({ type: 'SET_CREW_SYMPTOMS', payload: customSymptoms });
+      }
+      dispatch({ type: 'SET_SYNTHESIZING_AI', payload: true });
+      try {
+        const updated = await synthesizeFlightSurgeonGuidance({
+          scenarioId: state.scenarioId,
+          zoneId: state.selectedZone,
+          environment: state.environment,
+          crewMember: activeCrewMember,
+          runtimeApiKey: state.runtimeApiKey,
+          forceLiveAi: true,
+          crewSymptoms: activeSymptoms,
+        });
+        dispatch({ type: 'SET_GUIDANCE', payload: updated });
+        if (updated.zoneId && updated.zoneId !== state.selectedZone) {
+          dispatch({ type: 'SET_SELECTED_ZONE', payload: updated.zoneId });
+        }
+      } catch (err) {
+        console.warn('[ARGUS AI] Guidance synthesis error:', err);
+      } finally {
+        dispatch({ type: 'SET_SYNTHESIZING_AI', payload: false });
+      }
+    },
+    [
+      state.crewSymptoms,
+      state.scenarioId,
+      state.selectedZone,
+      state.environment,
+      activeCrewMember,
+      state.runtimeApiKey,
+    ]
+  );
+
   const requestLiveAiGuidance = useCallback(async () => {
     dispatch({ type: 'SET_SYNTHESIZING_AI', payload: true });
     try {
@@ -814,6 +1018,7 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
         crewMember: activeCrewMember,
         runtimeApiKey: state.runtimeApiKey,
         forceLiveAi: true,
+        crewSymptoms: state.crewSymptoms,
       });
       dispatch({ type: 'SET_GUIDANCE', payload: updated });
     } finally {
@@ -825,6 +1030,7 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
     state.environment,
     activeCrewMember,
     state.runtimeApiKey,
+    state.crewSymptoms,
   ]);
 
   const runSampleVisualExam = useCallback(
@@ -960,6 +1166,9 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
       checkInStreakDays,
       latestDay,
       metricLinks,
+      routineStatus,
+      milestones,
+      completeScheduledRoutine,
       setActiveTab,
       isCrewLocked: Boolean(lockedCrewId),
       serverBacked,
@@ -979,17 +1188,21 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
       deleteCrewMember,
       setCrewModalOpen,
       setScenario,
+      setEnvironment,
       setSelectedZone,
       setSelectedMetricId,
       setAnatomicalLayer,
       setChartWindowDays,
       toggleStepCompleted,
       requestLiveAiGuidance,
+      setCrewSymptoms,
+      consultFlightSurgeon,
       runSampleVisualExam,
       runUploadedVisualExam,
       clearVisualExam,
       queueEarthPacket,
       setRuntimeApiKey,
+      logVitalReading,
     }),
     [
       state,
@@ -1000,6 +1213,9 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
       checkInStreakDays,
       latestDay,
       metricLinks,
+      routineStatus,
+      milestones,
+      completeScheduledRoutine,
       setActiveTab,
       lockedCrewId,
       serverBacked,
@@ -1010,6 +1226,7 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
       setSpaceLocation,
       addCheckIn,
       deleteCheckIn,
+      logVitalReading,
       zoneStatuses,
       currentZoneReadings,
       readinessScore,
@@ -1019,12 +1236,15 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
       deleteCrewMember,
       setCrewModalOpen,
       setScenario,
+      setEnvironment,
       setSelectedZone,
       setSelectedMetricId,
       setAnatomicalLayer,
       setChartWindowDays,
       toggleStepCompleted,
       requestLiveAiGuidance,
+      setCrewSymptoms,
+      consultFlightSurgeon,
       runSampleVisualExam,
       runUploadedVisualExam,
       clearVisualExam,

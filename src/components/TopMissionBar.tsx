@@ -75,7 +75,12 @@ export const TopMissionBar: React.FC = () => {
               <Activity className="h-5 w-5 text-hud-accent" aria-hidden="true" />
             </span>
             <div className="leading-tight">
-              <h1 className="font-display text-lg font-bold tracking-[0.2em] text-hud-text">ARGUS</h1>
+              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                <h1 className="font-display text-lg font-bold tracking-[0.2em] text-hud-text">ARGUS</h1>
+                <span className="hidden text-[11px] font-medium tracking-wide text-hud-accent/90 lg:inline">
+                  Astronaut Readiness Guidance &amp; Unified Surveillance
+                </span>
+              </div>
               <p className="text-[11px] text-hud-muted">
                 {activeCrewMember.callsign} · {spaceLocation.gravityLabel}
               </p>
@@ -110,7 +115,7 @@ export const TopMissionBar: React.FC = () => {
         </div>
 
         {/* Clock · readiness · scenario · AI key · user */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
           <MissionClock location={spaceLocation} missionDay={latestDay} />
           <div
             className="flex items-center gap-2.5 rounded-lg border border-hud-line bg-hud-panel/80 px-3 py-1.5"

@@ -3,7 +3,19 @@
  * Single Source of Truth: specs/01-data-schema.md
  */
 
-export type GravityEnvironment = '0g_transit';
+export type GravityEnvironment = '0g_transit' | 'iss_leo' | 'lunar_base' | 'mars_base';
+
+export type MissionLocation = GravityEnvironment;
+
+export interface LocationPreset {
+  id: GravityEnvironment;
+  label: string;
+  shortLabel: string;
+  gravityG: string;
+  commDelay: string;
+  missionPhase: string;
+  hazardOverview: string;
+}
 
 export type BodyZoneId = 'neuro' | 'cardio' | 'musculo' | 'immune' | 'behavioral';
 
@@ -20,16 +32,17 @@ export type MetricId =
   | 'resting_hr'
   | 'hrv_rmssd'
   | 'spo2'
+  | 'systolic_bp'
   | 'bmd_delta'
   | 'ared_load'
+  | 'blood_glucose'
   | 'rad_dose'
   | 'wbc_lymph'
+  | 'core_temp'
   | 'sleep_eff'
   | 'pvt_lapses'
-  | 'bp_sys'
-  | 'bp_dia'
-  | 'glucose'
-  | 'wrist_temp_dev';
+  | 'daily_sleep_hours'
+  | 'mood_index';
 
 export type HudTabId =
   | 'biotwin'
@@ -279,3 +292,30 @@ export interface CheckInEntry {
   values: Partial<Record<MetricId, number>>;
   note?: string;
 }
+
+/** Scheduled Mission Routine & Gamification Milestones (specs/01-data-schema.md §8) */
+export type MilestoneCategory = 'streak' | 'readiness' | 'routine';
+
+export interface ReadinessMilestone {
+  id: string;
+  title: string;
+  description: string;
+  category: MilestoneCategory;
+  icon: 'flame' | 'shield' | 'award' | 'zap' | 'check' | 'heart';
+  unlocked: boolean;
+  unlockedAtLabel?: string;
+  progress: {
+    current: number;
+    target: number;
+    unit: string;
+  };
+}
+
+export interface ScheduledRoutineStatus {
+  isDue: boolean;
+  currentDay: number;
+  lastLoggedDay: number | null;
+  coreMetricsDue: MetricId[];
+  streakDays: number;
+}
+

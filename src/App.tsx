@@ -15,6 +15,7 @@ import { HudTabId } from './types/argus';
 import { AuthGate } from './components/AuthGate';
 import { TopMissionBar } from './components/TopMissionBar';
 import { TabBar, panelId, tabId, visibleTabs } from './components/TabBar';
+import { ScheduledRoutineBanner } from './components/ScheduledRoutineBanner';
 import { BioTwinTab } from './components/BioTwinTab';
 import { TrendsTab } from './components/TrendsTab';
 import { ForecastTab } from './components/ForecastTab';
@@ -56,6 +57,7 @@ const Hud: React.FC = () => {
       <div className="md:flex">
         <TabBar access={access} activeTab={activeTab} />
         <main className="mx-auto w-full min-w-0 max-w-[1800px] p-3 md:p-4">
+          {canViewHealth && <ScheduledRoutineBanner />}
           {tabs.map(({ id }) => {
             const Panel = PANELS[id];
             const active = id === activeTab;
@@ -67,7 +69,7 @@ const Hud: React.FC = () => {
                 aria-labelledby={tabId(id)}
                 hidden={!active}
                 tabIndex={0}
-                className="outline-none"
+                className="outline-none min-w-0"
               >
                 {active && <Panel />}
               </div>

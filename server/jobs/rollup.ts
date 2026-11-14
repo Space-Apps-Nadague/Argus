@@ -26,12 +26,14 @@ export const LAST_OF_DAY_METRICS = [
   'pvt_lapses',
   'ared_load',
   'cabin_co2',
-  'glucose',
-  'wrist_temp_dev',
+  'blood_glucose',
+  'core_temp',
+  'daily_sleep_hours',
+  'mood_index',
 ];
 
 /** Metrics whose daily value is the mean of the day's spot readings (watch blood pressure). */
-export const MEAN_OF_DAY_METRICS = ['bp_sys', 'bp_dia'];
+export const MEAN_OF_DAY_METRICS = ['systolic_bp', 'diastolic_bp'];
 
 const DAY_MS = 86_400_000;
 

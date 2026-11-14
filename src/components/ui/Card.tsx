@@ -26,16 +26,16 @@ export const Card: React.FC<CardProps> = ({
   ariaLabel,
   children,
 }) => (
-  <Tag className={`hud-card ${className}`} aria-label={ariaLabel}>
+  <Tag className={`hud-card min-w-0 ${className}`} aria-label={ariaLabel}>
     {(title || actions) && (
-      <header className="flex items-center justify-between gap-2 px-4 pt-3.5 pb-2">
+      <header className="flex flex-wrap items-center justify-between gap-2 px-4 pt-3.5 pb-2 min-w-0">
         {title && (
-          <h2 className="flex items-center gap-2 font-display text-[13px] font-semibold tracking-wide text-hud-text">
-            {icon && <span className="text-hud-accent" aria-hidden="true">{icon}</span>}
+          <h2 className="flex flex-wrap items-center gap-2 font-display text-[13px] font-semibold tracking-wide text-hud-text min-w-0">
+            {icon && <span className="text-hud-accent shrink-0" aria-hidden="true">{icon}</span>}
             {title}
           </h2>
         )}
-        {actions && <div className="flex items-center gap-1.5">{actions}</div>}
+        {actions && <div className="flex flex-wrap items-center gap-1.5">{actions}</div>}
       </header>
     )}
     <div className={bodyClassName}>{children}</div>
