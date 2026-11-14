@@ -72,7 +72,15 @@ export function resolveLiveGuidance(
   environment: GravityEnvironment,
   crewMember: CrewMemberProfile
 ): FlightSurgeonGuidance {
-  if (guidance.source === 'live_ai' || guidance.triageStatus === liveStatus) return guidance;
+  if (
+    guidance.source === 'live_ai' ||
+    guidance.triageStatus === liveStatus ||
+    guidance.headline.startsWith('Autonomous Triage:') ||
+    guidance.headline.startsWith('CRITICAL MEDICAL EMERGENCY:') ||
+    guidance.headline.startsWith('Autonomous Clinical Guidance:')
+  ) {
+    return guidance;
+  }
   for (const sc of GUIDANCE_SCENARIO_ORDER) {
     const g = getOfflineFlightSurgeonGuidance(sc, guidance.zoneId, environment, crewMember);
     if (g.triageStatus === liveStatus) return { ...g, scenarioId: guidance.scenarioId };
@@ -178,6 +186,7 @@ interface MissionState {
   runtimeApiKey: string;
   activeTab: HudTabId;
   checkIns: Record<string, CheckInEntry[]>;
+  crewSymptoms: string;
 }
 
 type MissionAction =
@@ -204,7 +213,8 @@ type MissionAction =
   | { type: 'SET_ENVIRONMENT'; payload: GravityEnvironment }
   | { type: 'SET_ACTIVE_TAB'; payload: HudTabId }
   | { type: 'ADD_CHECK_IN'; payload: CheckInEntry }
-  | { type: 'DELETE_CHECK_IN'; payload: { crewId: string; entryId: string } };
+  | { type: 'DELETE_CHECK_IN'; payload: { crewId: string; entryId: string } }
+  | { type: 'SET_CREW_SYMPTOMS'; payload: string };
 
 const initialRoster = loadInitialCrewRoster();
 const initialCrew = initialRoster[0] || DEFAULT_CREW_ROSTER[0];
@@ -240,6 +250,7 @@ const initialState: MissionState = {
   runtimeApiKey: '',
   activeTab: loadInitialTab(),
   checkIns: loadInitialCheckIns(),
+  crewSymptoms: '',
 };
 
 function missionReducer(
@@ -478,6 +489,11 @@ function missionReducer(
         },
       };
     }
+    case 'SET_CREW_SYMPTOMS':
+      return {
+        ...state,
+        crewSymptoms: action.payload,
+      };
     default:
       return state;
   }
@@ -515,6 +531,8 @@ interface MissionContextValue extends MissionState {
   setChartWindowDays: (days: 14 | 30) => void;
   toggleStepCompleted: (stepId: string) => void;
   requestLiveAiGuidance: () => Promise<void>;
+  setCrewSymptoms: (symptoms: string) => void;
+  consultFlightSurgeon: (symptoms?: string) => Promise<void>;
   runSampleVisualExam: (sample: VisualExamSample) => Promise<void>;
   runUploadedVisualExam: (file: File) => Promise<void>;
   clearVisualExam: () => void;
@@ -786,6 +804,47 @@ export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({
     ]
   );
 
+  const setCrewSymptoms = useCallback((symptoms: string) => {
+    dispatch({ type: 'SET_CREW_SYMPTOMS', payload: symptoms });
+  }, []);
+
+  const consultFlightSurgeon = useCallback(
+    async (customSymptoms?: string) => {
+      const activeSymptoms = customSymptoms !== undefined ? customSymptoms : state.crewSymptoms;
+      if (customSymptoms !== undefined) {
+        dispatch({ type: 'SET_CREW_SYMPTOMS', payload: customSymptoms });
+      }
+      dispatch({ type: 'SET_SYNTHESIZING_AI', payload: true });
+      try {
+        const updated = await synthesizeFlightSurgeonGuidance({
+          scenarioId: state.scenarioId,
+          zoneId: state.selectedZone,
+          environment: state.environment,
+          crewMember: activeCrewMember,
+          runtimeApiKey: state.runtimeApiKey,
+          forceLiveAi: true,
+          crewSymptoms: activeSymptoms,
+        });
+        dispatch({ type: 'SET_GUIDANCE', payload: updated });
+        if (updated.zoneId && updated.zoneId !== state.selectedZone) {
+          dispatch({ type: 'SET_SELECTED_ZONE', payload: updated.zoneId });
+        }
+      } catch (err) {
+        console.warn('[ARGUS AI] Guidance synthesis error:', err);
+      } finally {
+        dispatch({ type: 'SET_SYNTHESIZING_AI', payload: false });
+      }
+    },
+    [
+      state.crewSymptoms,
+      state.scenarioId,
+      state.selectedZone,
+      state.environment,
+      activeCrewMember,
+      state.runtimeApiKey,
+    ]
+  );
+
   const requestLiveAiGuidance = useCallback(async () => {
     dispatch({ type: 'SET_SYNTHESIZING_AI', payload: true });
     try {
@@ -796,6 +855,7 @@ export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({
         crewMember: activeCrewMember,
         runtimeApiKey: state.runtimeApiKey,
         forceLiveAi: true,
+        crewSymptoms: state.crewSymptoms,
       });
       dispatch({ type: 'SET_GUIDANCE', payload: updated });
     } finally {
@@ -807,6 +867,7 @@ export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({
     state.environment,
     activeCrewMember,
     state.runtimeApiKey,
+    state.crewSymptoms,
   ]);
 
   const runSampleVisualExam = useCallback(
@@ -964,6 +1025,8 @@ export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({
       setChartWindowDays,
       toggleStepCompleted,
       requestLiveAiGuidance,
+      setCrewSymptoms,
+      consultFlightSurgeon,
       runSampleVisualExam,
       runUploadedVisualExam,
       clearVisualExam,
@@ -1003,6 +1066,8 @@ export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({
       setChartWindowDays,
       toggleStepCompleted,
       requestLiveAiGuidance,
+      setCrewSymptoms,
+      consultFlightSurgeon,
       runSampleVisualExam,
       runUploadedVisualExam,
       clearVisualExam,

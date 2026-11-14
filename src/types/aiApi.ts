@@ -76,6 +76,7 @@ export interface CrewContextRequest {
 
 export interface GuidanceRequest extends CrewContextRequest {
   zoneId: BodyZoneId;
+  crewSymptoms?: string;
 }
 
 export interface VisionRequest {

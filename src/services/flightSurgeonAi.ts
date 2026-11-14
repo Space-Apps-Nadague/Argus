@@ -44,13 +44,17 @@ export async function synthesizeFlightSurgeonGuidance(params: {
   crewMember?: CrewMemberProfile;
   runtimeApiKey?: string;
   forceLiveAi?: boolean;
+  crewSymptoms?: string;
 }): Promise<FlightSurgeonGuidance> {
-  const { scenarioId, zoneId, environment, crewMember, runtimeApiKey, forceLiveAi } = params;
-  const offline = getOfflineFlightSurgeonGuidance(scenarioId, zoneId, environment, crewMember);
+  const { scenarioId, zoneId, environment, crewMember, runtimeApiKey, forceLiveAi, crewSymptoms } = params;
+  const offline = getOfflineFlightSurgeonGuidance(scenarioId, zoneId, environment, crewMember, crewSymptoms);
   if (!forceLiveAi) return offline;
 
   try {
-    const { result } = await argusApi.guidance({ scenarioId, zoneId, environment, crewMember }, runtimeApiKey);
+    const { result } = await argusApi.guidance(
+      { scenarioId, zoneId, environment, crewMember, crewSymptoms },
+      runtimeApiKey
+    );
     return result;
   } catch (err) {
     console.warn('[ARGUS AI] Backend unavailable — using offline verified NASA HRP guidance:', err);

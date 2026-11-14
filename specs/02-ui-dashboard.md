@@ -64,7 +64,21 @@
 - After submit, a result banner lists zones whose status changed (e.g. `Neuro: Green → Red`) and links to Bio-Twin. Below it, a history list of recent entries (day, # values, time) with delete.
 
 ### 2.4 Flight Surgeon (`FlightSurgeonPanel.tsx`)
-Same content as before, laid out in 2 columns on wide screens: (left) hazard context card with AI source badge + optional *Synthesize with Clinical AI*, numbered self-assessment checklist; (right) visual self-exam (webcam/file + 3 sample images + triage result) and **Queue Telemetry Packet for Earth Flight Surgeon** (packet now includes `recentCheckIns`). Long explanatory paragraphs collapse behind ⓘ / "More".
+Laid out in 2 columns on wide screens:
+- **Left Column: Situation, Symptoms & Countermeasure Checklist:**
+  - **Hazard context card:** Live/Offline status badge, situation headline, triage status pill, consult urgency, expandable "What this means" (NASA HRP mechanism & non-physician explanation), and refresh action.
+  - **Crew Symptom & Clinical Q&A Card:** Free-text input (`crewSymptoms`) allowing astronauts during communication blackouts to report symptoms or ask medical questions. Features one-click rapid symptom presets (e.g., "Throbbing Headache & Blurred Vision", "Palpitations & Short of Breath", "Back Pain & Lumbar Strain", "Skin Rash & Itch"), clear submit action, and synthesizes updated Flight Surgeon guidance deterministically (offline keyword engine) or with live Clinical AI.
+  - **Guided Countermeasure Checklist:** Numbered self-assessment checklist with completion checkboxes, estimated durations, expandable instructions, and hardware requirements.
+- **Right Column: Visual Self-Exam & Earth Telemetry Packet:**
+  - **Visual Self-Exam Card:**
+    - Live optical capture: **Webcam snapshot** via `navigator.mediaDevices.getUserMedia` + `<video>` viewfinder and `<canvas>` frame capture, with clean permission/unavailable handling and stream track termination on capture/cancel.
+    - File upload fallback with `capture="environment"`.
+    - Reference sample presets (`Nominal Retina`, `SANS Ultrasound`, `Cabin Rash`).
+    - AI vision triage result display with clinical summary, non-physician guidance, and recommended action.
+  - **Earth Telemetry Packet Card:**
+    - Summary tags (countermeasure count, visual exam attachment, recent check-ins).
+    - **Editable Crew Notes:** Astronauts can review and edit custom clinical observations, operational notes, and symptom context before dispatching.
+    - **Queue Packet Action:** Packages readiness score, zone statuses, check-ins, visual exam, and edited crew notes, calculates arrival time based on comm delay, and allows JSON inspection / export.
 
 ### 2.5 Crew (`CrewTab.tsx`)
 - Grid of crew cards: callsign, name, role, sex icon, readiness (computed for that member's `defaultScenarioId`, or the active scenario for the active member), 5-dot zone status row, check-in streak, `Set active` button. Custom crew can be deleted.

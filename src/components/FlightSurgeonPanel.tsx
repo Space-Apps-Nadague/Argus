@@ -1,11 +1,13 @@
 /**
  * ARGUS — Flight Surgeon tab (specs/02-ui-dashboard.md §2.4)
- * Hazard context + guided checklist (left) · visual self-exam + Earth packet (right).
+ * Hazard context + symptoms Q&A + guided checklist (left)
+ * Visual self-exam (webcam/upload) + Earth packet with editable notes (right).
  * Long explanations live behind ⓘ / "More" to keep the HUD low-text.
  */
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  AlertTriangle,
   Camera,
   CheckCircle2,
   ChevronDown,
@@ -14,10 +16,13 @@ import {
   Download,
   FileCheck2,
   ListChecks,
+  MessageSquare,
   RefreshCw,
   Send,
   ShieldAlert,
+  Sparkles,
   Upload,
+  VideoOff,
   Wrench,
   X,
 } from 'lucide-react';
@@ -33,6 +38,15 @@ const URGENCY_LABEL = {
   priority_packet: 'Priority packet',
   immediate_emergency_packet: 'Send now',
 } as const;
+
+const SYMPTOM_PRESETS = [
+  { label: 'SANS / Eye Pressure', text: 'Throbbing headache behind eyes, blurred near vision, and optic disc swelling' },
+  { label: 'Hypercapnia / CO₂', text: 'Stuffy cabin air, severe frontal headache, shortness of breath, air hunger' },
+  { label: 'Palpitations', text: 'Racing heart rate, fluttering palpitations, and lightheadedness upon movement' },
+  { label: 'Spine & Back Pain', text: 'Persistent lumbar back ache, spinal elongation tension, and muscle stiffness' },
+  { label: 'Skin Rash & Dosimeter', text: 'Itchy erythematous skin rash on forearms and dosimeter alarm' },
+  { label: 'Insomnia & Fatigue', text: 'Severe insomnia, fragmented sleep, and morning cognitive brain fog' },
+];
 
 export const FlightSurgeonPanel: React.FC = () => {
   const {
@@ -51,6 +65,9 @@ export const FlightSurgeonPanel: React.FC = () => {
     queuedPackets,
     queueEarthPacket,
     activeCheckIns,
+    crewSymptoms,
+    setCrewSymptoms,
+    consultFlightSurgeon,
   } = useMission();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -60,12 +77,113 @@ export const FlightSurgeonPanel: React.FC = () => {
   const [showMore, setShowMore] = useState(false);
   const envMeta = ENVIRONMENT_META[environment];
 
+  // Symptom Q&A input state
+  const [symptomInput, setSymptomInput] = useState(crewSymptoms);
+
+  useEffect(() => {
+    setSymptomInput(crewSymptoms);
+  }, [crewSymptoms]);
+
+  // Live webcam state
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  // Editable Earth Packet crew notes
+  const defaultNotes = useMemo(() => {
+    const parts = [
+      `ARGUS triage packet (${guidance.headline}) — ${completedStepIds.length}/${guidance.guidedSteps.length} countermeasures logged.`,
+    ];
+    if (crewSymptoms.trim()) {
+      parts.push(`Crew reported symptoms: "${crewSymptoms.trim()}".`);
+    }
+    return parts.join(' ');
+  }, [guidance.headline, completedStepIds.length, guidance.guidedSteps.length, crewSymptoms]);
+
+  const [crewNotesInput, setCrewNotesInput] = useState(defaultNotes);
+
+  useEffect(() => {
+    setCrewNotesInput(defaultNotes);
+  }, [defaultNotes]);
+
   useEffect(() => {
     if (!showPacketModal) return;
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setShowPacketModal(false);
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [showPacketModal]);
+
+  // Camera cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isCameraActive && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+      videoRef.current.play().catch(() => {});
+    }
+  }, [isCameraActive]);
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setIsCameraActive(false);
+  };
+
+  const startCamera = async () => {
+    setCameraError(null);
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraError('Webcam access is not supported in this browser environment. Use image upload instead.');
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: 'environment',
+        },
+        audio: false,
+      });
+      streamRef.current = stream;
+      setIsCameraActive(true);
+    } catch (err) {
+      console.warn('[ARGUS Camera] getUserMedia failed:', err);
+      setCameraError('Camera access unavailable or permission denied. Please upload an image file instead.');
+      stopCamera();
+    }
+  };
+
+  const captureSnapshot = async () => {
+    if (!videoRef.current) return;
+    const video = videoRef.current;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    canvas.toBlob(async (blob) => {
+      if (blob) {
+        const file = new File([blob], `Webcam_Exam_${Date.now()}.jpg`, { type: 'image/jpeg' });
+        stopCamera();
+        await runUploadedVisualExam(file);
+      }
+    }, 'image/jpeg', 0.9);
+  };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -75,10 +193,20 @@ export const FlightSurgeonPanel: React.FC = () => {
     }
   };
 
+  const handleSymptomSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!symptomInput.trim()) return;
+    await consultFlightSurgeon(symptomInput.trim());
+  };
+
+  const handleClearSymptoms = async () => {
+    setSymptomInput('');
+    setCrewSymptoms('');
+    await consultFlightSurgeon('');
+  };
+
   const handleQueuePacket = () => {
-    const pkt = queueEarthPacket(
-      `ARGUS triage packet (${guidance.headline}) — ${completedStepIds.length}/${guidance.guidedSteps.length} countermeasures logged.`
-    );
+    const pkt = queueEarthPacket(crewNotesInput.trim() || defaultNotes);
     setPacketConfirmation(`${pkt.packetId} queued · arrives in ${pkt.commDelayLabel.replace(' ONE-WAY', '')}`);
   };
 
@@ -99,7 +227,7 @@ export const FlightSurgeonPanel: React.FC = () => {
 
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-      {/* LEFT: context + checklist */}
+      {/* LEFT: context + symptoms + checklist */}
       <div className="flex flex-col gap-4">
         <Card
           icon={<ShieldAlert className="h-4 w-4" />}
@@ -156,6 +284,67 @@ export const FlightSurgeonPanel: React.FC = () => {
           </div>
         </Card>
 
+        {/* Crew Symptom & Clinical Q&A Card */}
+        <Card
+          icon={<MessageSquare className="h-4 w-4" />}
+          title="Crew symptoms & clinical Q&A"
+          actions={
+            crewSymptoms ? (
+              <button
+                type="button"
+                onClick={handleClearSymptoms}
+                className="hud-focus flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-hud-muted hover:text-hud-text"
+                title="Reset symptoms to scenario baseline"
+              >
+                <X className="h-3 w-3" />
+                Clear
+              </button>
+            ) : undefined
+          }
+          bodyClassName="px-4 pb-4 space-y-3"
+        >
+          <p className="text-xs text-hud-muted">
+            During comm blackouts, report real-time symptoms or clinical queries for deterministic offline triage or live AI guidance.
+          </p>
+          <form onSubmit={handleSymptomSubmit} className="space-y-2">
+            <textarea
+              rows={2}
+              value={symptomInput}
+              onChange={(e) => setSymptomInput(e.target.value)}
+              placeholder="Describe symptoms (e.g., headache behind eyes, blurry vision, palpitations, back ache, skin rash)..."
+              className="hud-focus w-full rounded-lg border border-hud-line bg-hud-bg/80 p-2.5 text-xs text-hud-text placeholder-hud-muted focus:border-hud-accent"
+              aria-label="Astronaut symptoms and clinical questions"
+            />
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap gap-1" role="group" aria-label="Symptom presets">
+                {SYMPTOM_PRESETS.map((preset) => (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    onClick={async () => {
+                      setSymptomInput(preset.text);
+                      await consultFlightSurgeon(preset.text);
+                    }}
+                    disabled={isSynthesizingAi}
+                    className="rounded border border-hud-line bg-hud-panel px-2 py-0.5 text-[10px] text-hud-muted transition-colors hover:border-hud-accent hover:text-hud-accent disabled:opacity-50"
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="submit"
+                disabled={isSynthesizingAi || !symptomInput.trim()}
+                className="hud-btn-primary ml-auto text-xs"
+              >
+                <Sparkles className={`h-3.5 w-3.5 ${isSynthesizingAi ? 'animate-spin' : ''}`} aria-hidden="true" />
+                {isSynthesizingAi ? 'Analyzing…' : 'Consult Surgeon'}
+              </button>
+            </div>
+          </form>
+        </Card>
+
+        {/* Guided Countermeasure Checklist */}
         <Card
           icon={<ListChecks className="h-4 w-4" />}
           title="Steps"
@@ -228,7 +417,28 @@ export const FlightSurgeonPanel: React.FC = () => {
           icon={<Camera className="h-4 w-4" />}
           title="Visual self-exam"
           actions={
-            <>
+            <div className="flex items-center gap-1.5">
+              {isCameraActive ? (
+                <button
+                  type="button"
+                  onClick={stopCamera}
+                  className="hud-btn text-status-yellow hover:text-white"
+                  title="Close webcam video feed"
+                >
+                  <VideoOff className="h-3.5 w-3.5" aria-hidden="true" />
+                  Close Camera
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={startCamera}
+                  className="hud-btn text-hud-accent hover:text-white"
+                  title="Open live camera for real-time exam snapshot"
+                >
+                  <Camera className="h-3.5 w-3.5" aria-hidden="true" />
+                  Live Camera
+                </button>
+              )}
               <button type="button" onClick={() => fileInputRef.current?.click()} className="hud-btn">
                 <Upload className="h-3.5 w-3.5" aria-hidden="true" />
                 Upload
@@ -242,10 +452,55 @@ export const FlightSurgeonPanel: React.FC = () => {
                 className="hidden"
                 aria-label="Upload exam image"
               />
-            </>
+            </div>
           }
           bodyClassName="px-4 pb-4 space-y-3"
         >
+          {cameraError && (
+            <div role="alert" className="flex items-center justify-between gap-2 rounded-lg border border-status-yellow/40 bg-status-yellow/10 px-3 py-2 text-xs text-yellow-200">
+              <span className="flex items-center gap-1.5">
+                <AlertTriangle className="h-4 w-4 shrink-0 text-status-yellow" aria-hidden="true" />
+                {cameraError}
+              </span>
+              <button
+                type="button"
+                onClick={() => setCameraError(null)}
+                className="hud-focus rounded p-1 text-yellow-200 hover:text-white"
+                aria-label="Dismiss camera alert"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+
+          {isCameraActive && (
+            <div className="space-y-2 rounded-lg border border-hud-accent/50 bg-hud-bg/80 p-3">
+              <div className="relative aspect-video w-full overflow-hidden rounded-md border border-hud-line bg-black">
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="h-full w-full object-cover"
+                  aria-label="Live webcam viewfinder"
+                />
+                <div className="absolute top-2 left-2 flex items-center gap-1.5 rounded-full bg-slate-950/80 px-2 py-0.5 text-[10px] font-mono text-status-green">
+                  <span className="h-1.5 w-1.5 rounded-full bg-status-green animate-pulse" />
+                  LIVE OPTICAL FEED
+                </div>
+              </div>
+              <div className="flex items-center justify-end gap-2">
+                <button type="button" onClick={stopCamera} className="hud-btn">
+                  Cancel
+                </button>
+                <button type="button" onClick={captureSnapshot} className="hud-btn-primary">
+                  <Camera className="h-3.5 w-3.5" aria-hidden="true" />
+                  Capture Snapshot
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-3 gap-2" role="group" aria-label="Sample images">
             {VISUAL_EXAM_SAMPLES.map((s) => {
               const sel = visualExamAnalysis?.sampleIdOrFileName === s.title;
@@ -305,12 +560,13 @@ export const FlightSurgeonPanel: React.FC = () => {
           )}
         </Card>
 
+        {/* Earth Packet Card with Editable Crew Notes */}
         <Card
           icon={<Send className="h-4 w-4" />}
           title="Earth packet"
           actions={
             <InfoTip label="About Earth packets" align="right">
-              Bundles readiness, zone status, completed steps, the latest visual exam and recent check-ins for the ground flight
+              Bundles readiness, zone status, completed steps, the latest visual exam, recent check-ins, and editable crew clinical notes for the ground flight
               surgeon. One-way delay: {envMeta.commDelay.replace(' ONE-WAY', '')}.
             </InfoTip>
           }
@@ -321,6 +577,23 @@ export const FlightSurgeonPanel: React.FC = () => {
             <li className="rounded-full border border-hud-line px-2.5 py-1">{visualExamAnalysis ? '1 exam' : 'No exam'}</li>
             <li className="rounded-full border border-hud-line px-2.5 py-1">{Math.min(activeCheckIns.length, 5)} check-ins</li>
           </ul>
+
+          <div className="space-y-1.5">
+            <label htmlFor="crew-notes-input" className="flex items-center justify-between text-xs font-medium text-hud-text">
+              <span>Crew clinical notes & observations</span>
+              <span className="text-[11px] text-hud-muted">Editable before queueing</span>
+            </label>
+            <textarea
+              id="crew-notes-input"
+              rows={3}
+              value={crewNotesInput}
+              onChange={(e) => setCrewNotesInput(e.target.value)}
+              placeholder="Review or edit clinical notes and remarks for the Earth Flight Surgeon..."
+              className="hud-focus w-full rounded-lg border border-hud-line bg-hud-bg/80 p-2.5 font-mono text-xs text-hud-text placeholder-hud-muted focus:border-hud-accent"
+              aria-label="Editable crew notes for Earth telemetry packet"
+            />
+          </div>
+
           {packetConfirmation && (
             <p role="status" className="flex items-center justify-between gap-2 rounded-lg border border-status-green/40 bg-status-green/10 px-3 py-2 text-xs text-green-200">
               <span className="flex items-center gap-1.5">
@@ -332,6 +605,7 @@ export const FlightSurgeonPanel: React.FC = () => {
               </button>
             </p>
           )}
+
           <div className="flex items-center gap-2">
             <button type="button" onClick={handleQueuePacket} className="hud-btn-primary flex-1">
               <Send className="h-4 w-4" aria-hidden="true" />
