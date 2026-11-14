@@ -14,6 +14,7 @@ This repository strictly follows **Spec-Driven Development** (`AGENTS.md`). Ever
    - [`specs/00-architecture.md`](./specs/00-architecture.md) — System architecture, tech stack, and folder layout.
    - [`specs/01-data-schema.md`](./specs/01-data-schema.md) — Domain models, `0g` microgravity vital thresholds, and AI JSON schemas.
    - [`specs/02-ui-dashboard.md`](./specs/02-ui-dashboard.md) — Single-screen HUD grid, 3D Bio-Twin layers/zones, and interactive clinical workflows.
+   - [`specs/03-requirements.md`](./specs/03-requirements.md) — Mission health monitoring challenge requirements, considerations, and traceability matrix.
    - [`specs/tasks.md`](./specs/tasks.md) — Active sprint task board, status tracking (`[TODO]`, `[IN PROGRESS]`, `[DONE]`), and file ownership.
 2. **Spec First:** Never introduce new telemetry fields, status thresholds, or component props in code without updating the corresponding file in `/specs` first.
 3. **Claim Your Task:** Mark your task as `[IN PROGRESS]` in `specs/tasks.md` before modifying files, and `[DONE]` once verified by `npm run build` and `npm test`.

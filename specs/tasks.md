@@ -146,3 +146,44 @@
   - `src/utils/__tests__/triageEngine.test.ts`
   - `README.md`
   - `docs/CONTRIBUTING.md`
+
+---
+
+## Sprint 5: Challenge Requirements & Traceability
+
+### Task 12: Document Challenge Requirements & Traceability Spec
+- **Status:** `[DONE]`
+- **Spec References:** `specs/03-requirements.md`
+- **Files Owned:**
+  - `specs/03-requirements.md`
+  - `specs/tasks.md`
+  - `AGENTS.md`
+  - `README.md`
+
+---
+
+## Sprint 6: Autonomous Product Manager (PM) Agent & Continuous Hackathon Audit
+
+### Task 13: Product Manager Agent Skill, GitHub Issue Utility & Scheduled Automation
+- **Status:** `[DONE]`
+- **Spec References:** `specs/00-architecture.md`, `specs/03-requirements.md`
+- **Files Owned:**
+  - `.agents/skills/pm-agent/SKILL.md`
+  - `.agents/skills/pm-agent/scripts/gh-pm-issue.mjs`
+  - `.agents/skills/pm-agent/scripts/miro-pm-board.mjs`
+  - `.env.example`
+  - `specs/00-architecture.md`
+  - `specs/tasks.md`
+
+### Task 14: GitHub Actions Autonomous PM Bot Workflow & Headless Audit Runner
+- **Status:** `[IN PROGRESS]`
+- **Spec References:** `specs/00-architecture.md`, `specs/03-requirements.md`
+- **Files Owned:**
+  - `.github/workflows/pm-agent.yml`
+  - `.agents/skills/pm-agent/scripts/run-pm-audit.mjs`
+  - `.agents/skills/pm-agent/scripts/gh-pm-issue.mjs`
+  - `.agents/skills/pm-agent/scripts/miro-pm-board.mjs`
+  - `.agents/skills/pm-agent/SKILL.md`
+  - `.env.example`
+  - `specs/00-architecture.md`
+  - `specs/tasks.md`
