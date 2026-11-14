@@ -1,0 +1,15 @@
+# Optional: run a local model server for teammates who don't have Ollama installed.
+#   docker compose up -d ollama
+#   docker compose exec ollama ollama pull qwen3:8b
+# then set AI_LOCAL_MODEL=qwen3:8b in .env and run `npm run dev:local`.
+services:
+  ollama:
+    image: ollama/ollama:0.12.6
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-models:/root/.ollama
+    restart: unless-stopped
+
+volumes:
+  ollama-models:

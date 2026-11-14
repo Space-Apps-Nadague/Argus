@@ -34,6 +34,8 @@ import {
   UserCheck,
 } from 'lucide-react';
 import { useMission } from '../context/MissionContext';
+import { StatusIcon, StatusPill, STATUS_WORD } from './ui/StatusPill';
+import { ZONE_SHORT_NAME } from './ui/ZoneIcon';
 import {
   AnatomicalLayer,
   BiologicalSex,
@@ -854,7 +856,9 @@ export const BioTwinMap: React.FC = () => {
   } = useMission();
 
   const [hoveredZone, setHoveredZone] = useState<BodyZoneId | null>(null);
-  const [autoRotate, setAutoRotate] = useState<boolean>(true);
+  const [autoRotate, setAutoRotate] = useState<boolean>(
+    () => !(typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)
+  );
   const [showScannerBeam, setShowScannerBeam] = useState<boolean>(true);
   const [cameraPreset, setCameraPreset] = useState<CameraPresetId>('full_body');
   const [isInteracting, setIsInteracting] = useState<boolean>(false);
@@ -910,114 +914,59 @@ export const BioTwinMap: React.FC = () => {
   return (
     <section
       aria-label="3D Holographic Human Bio-Twin Central Stage"
-      className="flex flex-col h-full bg-slate-900/75 border border-cyan-400/35 rounded-2xl overflow-hidden shadow-[0_0_45px_rgba(8,145,178,0.18)]"
+      className="hud-card flex h-full flex-col overflow-hidden"
     >
-      {/* ============================================================
-          TOP HERO STAGE HEADER: CREW IDENTITY + SEX ANATOMY SWITCHER + VIEW CONTROLS
-         ============================================================ */}
-      <div className="px-4 py-2.5 border-b border-slate-800/90 flex flex-wrap items-center justify-between gap-2 bg-slate-950/85">
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-lg bg-cyan-500/15 border border-cyan-400/40 text-cyan-300 shadow-[0_0_15px_rgba(34,211,238,0.2)]">
-            <Sparkles className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="font-mono text-xs md:text-sm font-bold uppercase tracking-wider text-slate-100">
-                3D BIO-TWIN STAGE <span className="text-cyan-400">//</span>{' '}
-                {activeCrewMember.callsign}
-              </h2>
-              <span className="px-2 py-0.5 rounded bg-cyan-500/15 border border-cyan-400/40 font-mono text-[10px] font-bold text-cyan-300 uppercase">
-                {activeSex === 'female' ? '♀ Female Anatomy' : '♂ Male Anatomy'}
-              </span>
-            </div>
-            <p className="text-xs text-slate-400">
-              {activeCrewMember.name} • {activeCrewMember.role} • Age{' '}
-              {activeCrewMember.age} • Blood {activeCrewMember.bloodType} • Sol{' '}
-              {activeCrewMember.missionDaysLogged}
-            </p>
-          </div>
-        </div>
-
-        {/* Right Controls: Direct Female/Male Anatomy Toggle + Crew Modal + Auto-Rotate + Reset */}
+      {/* Stage toolbar: anatomy · scanner · rotate · reset (labels in tooltips) */}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-hud-line px-4 py-2.5">
+        <h2 className="flex items-center gap-2 font-display text-[13px] font-semibold tracking-wide text-hud-text">
+          <Sparkles className="h-4 w-4 text-hud-accent" aria-hidden="true" />
+          Bio-Twin
+          <span className="font-mono text-xs font-normal text-hud-accent">{activeCrewMember.callsign}</span>
+        </h2>
         <div className="flex flex-wrap items-center gap-1.5">
-          {/* Instant Female / Male 3D Anatomy Morphology Switcher */}
-          <div
-            className="flex items-center bg-slate-900 p-0.5 rounded-lg border border-slate-700/90"
-            role="group"
-            aria-label="3D Bio-Twin Biological Sex Anatomy Switcher"
-          >
-            {(['female', 'male'] as const).map((sexOpt) => {
-              const isSelectedSex = activeSex === sexOpt;
-              return (
-                <button
-                  key={sexOpt}
-                  type="button"
-                  onClick={() =>
-                    updateCrewMemberSex(activeCrewMember.id, sexOpt)
-                  }
-                  title={`Render ${
-                    sexOpt === 'female' ? 'Female' : 'Male'
-                  } 3D Anatomical Morphology`}
-                  className={`px-2.5 py-1 rounded-md text-[11px] font-mono font-bold uppercase transition-all ${
-                    isSelectedSex
-                      ? 'bg-cyan-500/25 text-cyan-200 border border-cyan-400/60 shadow-[0_0_10px_rgba(34,211,238,0.25)]'
-                      : 'text-slate-400 hover:text-slate-200 border border-transparent'
-                  }`}
-                >
-                  {sexOpt === 'female' ? '♀ Female' : '♂ Male'}
-                </button>
-              );
-            })}
+          <div className="flex items-center rounded-lg border border-hud-line bg-hud-bg p-0.5" role="group" aria-label="3D anatomy">
+            {(['female', 'male'] as const).map((sexOpt) => (
+              <button
+                key={sexOpt}
+                type="button"
+                aria-pressed={activeSex === sexOpt}
+                onClick={() => updateCrewMemberSex(activeCrewMember.id, sexOpt)}
+                aria-label={sexOpt === 'female' ? 'Female anatomy' : 'Male anatomy'}
+                title={sexOpt === 'female' ? 'Female anatomy' : 'Male anatomy'}
+                className="hud-seg px-2 text-base leading-none"
+              >
+                {sexOpt === 'female' ? '♀' : '♂'}
+              </button>
+            ))}
           </div>
-
-          <button
-            type="button"
-            onClick={() => setCrewModalOpen(true)}
-            title="Switch Crew Member or Create Custom Astronaut"
-            className="px-2.5 py-1 rounded-lg text-[11px] font-mono flex items-center gap-1 bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-cyan-500/30 transition-colors"
-          >
-            <UserCheck className="w-3.5 h-3.5" />
-            <span>ROSTER</span>
-          </button>
-
           <button
             type="button"
             onClick={() => setShowScannerBeam((prev) => !prev)}
-            title="Toggle Biometric Laser Scanner Sweep"
-            className={`p-1.5 rounded-lg border transition-colors ${
-              showScannerBeam
-                ? 'bg-cyan-500/15 text-cyan-300 border-cyan-400/40'
-                : 'bg-slate-900 text-slate-400 border-slate-700 hover:text-slate-200'
-            }`}
+            aria-pressed={showScannerBeam}
+            aria-label="Scanner sweep"
+            title="Scanner sweep"
+            className="hud-seg border border-hud-line p-1.5"
           >
-            <ScanLine className="w-3.5 h-3.5" />
+            <ScanLine className="h-4 w-4" aria-hidden="true" />
           </button>
-
           <button
             type="button"
             onClick={() => setAutoRotate((prev) => !prev)}
-            title={autoRotate ? 'Pause 3D Rotation' : 'Resume 3D Rotation'}
-            className={`px-2.5 py-1 rounded-lg text-[11px] font-mono flex items-center gap-1 border transition-colors ${
-              autoRotate
-                ? 'bg-cyan-500/15 text-cyan-300 border-cyan-400/40'
-                : 'bg-slate-900 text-slate-400 border-slate-700 hover:text-slate-200'
-            }`}
+            aria-pressed={autoRotate}
+            aria-label={autoRotate ? 'Pause rotation' : 'Resume rotation'}
+            title={autoRotate ? 'Pause rotation' : 'Resume rotation'}
+            className="hud-seg border border-hud-line p-1.5"
           >
-            {autoRotate ? (
-              <Pause className="w-3 h-3" />
-            ) : (
-              <Play className="w-3 h-3" />
-            )}
-            <span>{autoRotate ? 'ROTATING' : 'PAUSED'}</span>
+            {autoRotate ? <Pause className="h-4 w-4" aria-hidden="true" /> : <Play className="h-4 w-4" aria-hidden="true" />}
           </button>
-
           <button
             type="button"
             onClick={handleResetCamera}
-            title="Reset 3D Camera View"
-            className="p-1.5 rounded-lg bg-slate-900 text-slate-400 hover:text-cyan-300 border border-slate-700 hover:border-cyan-500/40 transition-colors"
+            aria-label="Reset view"
+            title="Reset view"
+            className="hud-seg border border-hud-line p-1.5"
           >
-            <RotateCcw className="w-3.5 h-3.5" />
+            <RotateCcw className="h-4 w-4" aria-hidden="true" />
           </button>
         </div>
       </div>
@@ -1025,13 +974,10 @@ export const BioTwinMap: React.FC = () => {
       {/* ============================================================
           SECONDARY BAR: ANATOMICAL LAYER SWITCHER + CAMERA FOCUS PRESETS
          ============================================================ */}
-      <div className="px-4 py-2 bg-slate-950/65 border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-hud-line/70 px-4 py-2">
         {/* Layer Switcher */}
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 flex items-center gap-1 mr-1">
-            <Layers className="w-3.5 h-3.5 text-cyan-400" />
-            Layer:
-          </span>
+        <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Anatomy layer">
+          <Layers className="mr-1 h-4 w-4 text-hud-muted" aria-hidden="true" />
           {LAYER_OPTIONS.map((layer) => {
             const active = anatomicalLayer === layer.id;
             return (
@@ -1040,11 +986,8 @@ export const BioTwinMap: React.FC = () => {
                 type="button"
                 onClick={() => setAnatomicalLayer(layer.id)}
                 title={layer.label}
-                className={`px-2.5 py-1 rounded-md text-[11px] font-mono font-medium transition-all ${
-                  active
-                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/50 shadow-[0_0_10px_rgba(34,211,238,0.18)]'
-                    : 'bg-slate-900/80 text-slate-400 hover:text-slate-200 border border-slate-800'
-                }`}
+                aria-pressed={active}
+                className="hud-seg"
               >
                 {layer.shortLabel}
               </button>
@@ -1053,11 +996,8 @@ export const BioTwinMap: React.FC = () => {
         </div>
 
         {/* Camera Focus Presets */}
-        <div className="flex items-center gap-1">
-          <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 flex items-center gap-1 mr-1">
-            <Crosshair className="w-3.5 h-3.5 text-cyan-400" />
-            Focus:
-          </span>
+        <div className="flex items-center gap-1" role="group" aria-label="Camera focus">
+          <Crosshair className="mr-1 h-4 w-4 text-hud-muted" aria-hidden="true" />
           {(Object.keys(CAMERA_PRESETS) as CameraPresetId[]).map((presetKey) => {
             const active = cameraPreset === presetKey;
             return (
@@ -1065,11 +1005,8 @@ export const BioTwinMap: React.FC = () => {
                 key={presetKey}
                 type="button"
                 onClick={() => setCameraPreset(presetKey)}
-                className={`px-2 py-1 rounded-md text-[10px] font-mono uppercase transition-all ${
-                  active
-                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/50'
-                    : 'bg-slate-900/70 text-slate-400 hover:text-slate-200 border border-slate-800'
-                }`}
+                aria-pressed={active}
+                className="hud-seg"
               >
                 {CAMERA_PRESETS[presetKey].label}
               </button>
@@ -1094,83 +1031,6 @@ export const BioTwinMap: React.FC = () => {
         <div className="pointer-events-none absolute top-3 right-3 w-5 h-5 border-t-2 border-r-2 border-cyan-400/50" />
         <div className="pointer-events-none absolute bottom-3 left-3 w-5 h-5 border-b-2 border-l-2 border-cyan-400/50" />
         <div className="pointer-events-none absolute bottom-3 right-3 w-5 h-5 border-b-2 border-r-2 border-cyan-400/50" />
-
-        {/* Left Floating HUD Overlay: Astronaut Anthropometrics & Baselines */}
-        <div className="pointer-events-none hidden sm:flex flex-col gap-1.5 absolute top-3.5 left-4 z-10 w-52 p-2.5 rounded-xl bg-slate-950/80 border border-slate-800/90 backdrop-blur-md">
-          <div className="text-[10px] font-mono uppercase tracking-wider text-cyan-400 font-semibold flex items-center justify-between">
-            <span>BIO-TWIN MORPHOLOGY</span>
-            <span>{activeSex === 'female' ? 'XX // ♀' : 'XY // ♂'}</span>
-          </div>
-          <div className="text-[11px] font-mono text-slate-300 space-y-0.5">
-            <div className="flex justify-between">
-              <span className="text-slate-400">Pelvic / Rib Dimorphism:</span>
-              <span className="text-cyan-300 font-semibold uppercase">
-                {activeSex}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-400">HR Baseline:</span>
-              <span className="text-slate-100 font-semibold">
-                {activeCrewMember.restingHrBaselineBpm} bpm
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-400">Pre-Flight ONSD:</span>
-              <span className="text-slate-100 font-semibold">
-                {activeCrewMember.preFlightOnsdMm} mm
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-slate-400">Readiness Index:</span>
-              <span className="text-emerald-400 font-bold">
-                {readinessScore}%
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Right Floating HUD Overlay: Selected Zone Live Vitals Callout */}
-        <div className="hidden sm:flex flex-col gap-1.5 absolute top-3.5 right-4 z-10 w-56 p-2.5 rounded-xl bg-slate-950/80 border border-slate-800/90 backdrop-blur-md">
-          <div className="flex items-center justify-between gap-1">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-cyan-400 font-semibold truncate">
-              {activeZoneMeta.shortLabel} VITALS
-            </span>
-            <span
-              className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold uppercase"
-              style={{
-                backgroundColor: `${STATUS_COLORS[activeZoneStatus]}20`,
-                color: STATUS_COLORS[activeZoneStatus],
-              }}
-            >
-              {activeZoneStatus}
-            </span>
-          </div>
-          <div className="space-y-1">
-            {currentZoneReadings.map((reading) => {
-              const mStatus = evaluateMetricStatus(
-                reading.metricId,
-                reading.currentValue,
-                environment
-              );
-              const mColor = STATUS_COLORS[mStatus];
-              return (
-                <button
-                  key={reading.metricId}
-                  type="button"
-                  onClick={() => setSelectedMetricId(reading.metricId)}
-                  className="w-full text-left px-2 py-1 rounded bg-slate-900/90 hover:bg-slate-800 border border-slate-800 flex items-center justify-between text-[11px] font-mono transition-colors"
-                >
-                  <span className="text-slate-300 truncate pr-1">
-                    {reading.label}
-                  </span>
-                  <span className="font-bold shrink-0" style={{ color: mColor }}>
-                    {reading.currentValue} {reading.unit}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
 
         <WebGLErrorBoundary fallback={fallback2DBioMap}>
           <Canvas
@@ -1226,47 +1086,21 @@ export const BioTwinMap: React.FC = () => {
           </Canvas>
         </WebGLErrorBoundary>
 
-        {/* Bottom Overlay: Active Zone Inspection Readout */}
-        <div className="pointer-events-none absolute bottom-3 inset-x-4 px-3.5 py-2 rounded-xl bg-slate-950/85 border border-slate-800/90 backdrop-blur-md flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-xs font-bold text-cyan-300 flex items-center gap-1.5">
-                <Activity className="w-3.5 h-3.5" />
-                {activeZoneMeta.name}
-              </span>
-              <span className="text-[11px] font-mono text-slate-400 hidden md:inline">
-                — {activeZoneMeta.anatomicalSubtitle}
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-400 mt-0.5 line-clamp-1">
-              {activeCrewMember.medicalNotes}
-            </p>
-          </div>
-
-          <span
-            className="px-2.5 py-0.5 rounded-md text-[10px] font-mono font-bold uppercase shrink-0"
-            style={{
-              backgroundColor: `${STATUS_COLORS[activeZoneStatus]}20`,
-              color: STATUS_COLORS[activeZoneStatus],
-              border: `1px solid ${STATUS_COLORS[activeZoneStatus]}55`,
-            }}
-          >
-            {STATUS_LABELS[activeZoneStatus]}
+        {/* Bottom overlay: hovered/selected zone */}
+        <div className="pointer-events-none absolute inset-x-4 bottom-3 flex items-center justify-between gap-2 rounded-xl border border-hud-line bg-hud-bg/85 px-3.5 py-2 backdrop-blur-md">
+          <span className="flex items-center gap-2 text-sm font-medium text-hud-text">
+            <Activity className="h-4 w-4 text-hud-accent" aria-hidden="true" />
+            {activeZoneMeta.name}
           </span>
+          <StatusPill status={activeZoneStatus} />
         </div>
       </div>
 
       {/* ============================================================
           BOTTOM QUICK-SELECT 5-ZONE ANATOMICAL MATRIX
          ============================================================ */}
-      <div className="p-3 bg-slate-950/90 border-t border-slate-800/90">
-        <div className="text-[10px] font-mono uppercase tracking-wider text-slate-400 mb-2 flex items-center justify-between">
-          <span>Anatomical Bio-Zones (5) — Click 3D Body or Zone Card</span>
-          <span className="text-cyan-400/90">
-            Drag to rotate 360° • Scroll to zoom
-          </span>
-        </div>
-        <div className="grid grid-cols-5 gap-2">
+      <div className="border-t border-hud-line p-3">
+        <div className="grid grid-cols-5 gap-2" role="group" aria-label="Body zones">
           {ZONE_ORDER.map((zoneId) => {
             const zone = BODY_ZONES[zoneId];
             const status = zoneStatuses[zoneId];
@@ -1287,29 +1121,21 @@ export const BioTwinMap: React.FC = () => {
                     setCameraPreset('full_body');
                   }
                 }}
-                className={`flex flex-col items-center justify-center p-2 rounded-xl border text-center transition-all ${
-                  isSelected
-                    ? 'bg-slate-800/95 border-cyan-400 shadow-[0_0_14px_rgba(34,211,238,0.22)]'
-                    : 'bg-slate-900/70 border-slate-800 hover:border-slate-700 hover:bg-slate-800/50'
-                }`}
+                aria-pressed={isSelected}
+                aria-label={`${ZONE_SHORT_NAME[zoneId]}: ${STATUS_WORD[status]}`}
+                className={`hud-focus hud-tile flex flex-col items-center justify-center p-2 text-center ${isSelected ? 'hud-tile-selected' : ''}`}
               >
                 <div className="flex items-center gap-1.5 mb-1">
-                  <span
-                    className={`w-2 h-2 rounded-full ${
-                      status === 'red' ? 'animate-ping' : ''
-                    }`}
-                    style={{ backgroundColor: color }}
-                  />
                   <span style={{ color }}>{ZONE_ICONS[zoneId]}</span>
+                  <span style={{ color }}>
+                    <StatusIcon status={status} className="h-3 w-3" />
+                  </span>
                 </div>
-                <span className="font-mono text-[10px] md:text-[11px] font-bold text-slate-200 leading-tight truncate w-full">
-                  {zone.shortLabel}
+                <span className="w-full truncate text-[11px] font-medium leading-tight text-hud-text" title={zone.name}>
+                  {ZONE_SHORT_NAME[zoneId]}
                 </span>
-                <span
-                  className="font-mono text-[9px] uppercase font-semibold mt-0.5"
-                  style={{ color }}
-                >
-                  {STATUS_LABELS[status]}
+                <span className="mt-0.5 text-[10px] font-medium" style={{ color }}>
+                  {STATUS_WORD[status]}
                 </span>
               </button>
             );

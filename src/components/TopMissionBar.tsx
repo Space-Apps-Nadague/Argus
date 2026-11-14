@@ -1,39 +1,33 @@
 /**
- * ARGUS — Top Mission Control HUD Bar & Crew Roster Strip
- * Single Source of Truth: specs/02-ui-dashboard.md (§1 Top Bar & Crew Roster Strip)
+ * ARGUS — Top Mission Bar & Crew Strip (slim, low-text)
+ * Single Source of Truth: specs/02-ui-dashboard.md §1 Top Bar
  */
 
 import React, { useState } from 'react';
-import {
-  Activity,
-  AlertTriangle,
-  Flame,
-  KeyRound,
-  Radio,
-  ShieldCheck,
-  Sparkles,
-  UserPlus,
-  Users,
-} from 'lucide-react';
+import { Activity, Flame, KeyRound, Radio, UserPlus, X } from 'lucide-react';
 import { useMission } from '../context/MissionContext';
-import { ScenarioId } from '../types/argus';
-import {
-  getCrewAdjustedZones,
-  TELEMETRY_SCENARIOS,
-} from '../data/telemetryScenarios';
-import {
-  ENVIRONMENT_META,
-  evaluateAllZones,
-  STATUS_COLORS,
-} from '../utils/triageEngine';
+import { ScenarioId, TriageStatus } from '../types/argus';
+import { getCrewAdjustedZones, TELEMETRY_SCENARIOS } from '../data/telemetryScenarios';
+import { applyCheckIns } from '../utils/checkIns';
+import { ENVIRONMENT_META, evaluateAllZones } from '../utils/triageEngine';
 import { hasConfiguredAiKey } from '../services/flightSurgeonAi';
+import { StatusIcon, STATUS_WORD } from './ui/StatusPill';
 
-const SCENARIO_ORDER: ScenarioId[] = [
-  'nominal',
-  'sans_alert',
-  'high_co2',
-  'solar_storm',
-];
+const SCENARIO_ORDER: ScenarioId[] = ['nominal', 'sans_alert', 'high_co2', 'solar_storm'];
+
+export const readinessStatus = (score: number): TriageStatus =>
+  score >= 85 ? 'green' : score >= 70 ? 'yellow' : 'red';
+
+const STATUS_TEXT: Record<TriageStatus, string> = {
+  green: 'text-status-green',
+  yellow: 'text-status-yellow',
+  red: 'text-status-red',
+};
+const STATUS_BG: Record<TriageStatus, string> = {
+  green: 'bg-status-green',
+  yellow: 'bg-status-yellow',
+  red: 'bg-status-red',
+};
 
 export const TopMissionBar: React.FC = () => {
   const {
@@ -49,162 +43,113 @@ export const TopMissionBar: React.FC = () => {
     completedStepIds,
     runtimeApiKey,
     setRuntimeApiKey,
+    checkIns,
   } = useMission();
 
   const [showKeyInput, setShowKeyInput] = useState(false);
   const envMeta = ENVIRONMENT_META[environment];
   const hasKey = hasConfiguredAiKey(runtimeApiKey);
-
-  const readinessColor =
-    readinessScore >= 85
-      ? '#22c55e'
-      : readinessScore >= 70
-      ? '#eab308'
-      : '#ef4444';
+  const rStatus = readinessStatus(readinessScore);
+  const streak = countermeasureStreakSols + (completedStepIds.length > 0 ? 1 : 0);
 
   return (
-    <header className="w-full border-b border-cyan-500/20 bg-slate-950/95 backdrop-blur-md sticky top-0 z-30">
-      {/* Primary Top HUD Row */}
-      <div className="max-w-[1800px] mx-auto px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
-        {/* Left: Branding & Simulated Earth Comm Delay Badge */}
-        <div className="flex items-center gap-3">
-          <div className="relative flex items-center justify-center w-10 h-10 rounded-lg bg-cyan-500/10 border border-cyan-400/40 shadow-[0_0_15px_rgba(34,211,238,0.15)]">
-            <Activity className="w-5 h-5 text-cyan-400" />
-            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping opacity-75" />
-            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-cyan-400" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2.5">
-              <h1 className="font-mono text-sm md:text-base font-bold tracking-wider text-slate-100">
-                ARGUS <span className="text-cyan-400">//</span> AUTONOMOUS CREW BIO-TWIN
-              </h1>
-              <span
-                title="Simulated Deep-Space One-Way Light Time to Earth MCC-Houston"
-                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/30"
-              >
-                <Radio className="w-3 h-3 text-amber-400 animate-pulse" />
-                EARTH COMM DELAY: {envMeta.commDelay}
-              </span>
+    <header className="relative z-30 border-b border-hud-line bg-hud-bg/90 backdrop-blur-md">
+      <div className="max-w-[1800px] mx-auto flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-3 md:px-4 py-2.5">
+        {/* Brand + comm delay */}
+        <div className="flex items-center gap-3 min-w-0">
+          <div
+            className="flex items-center gap-2"
+            title="ARGUS — Astronaut Readiness Guidance & Unified Surveillance"
+          >
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-hud-accent/40 bg-hud-accent/10">
+              <Activity className="h-5 w-5 text-hud-accent" aria-hidden="true" />
+            </span>
+            <div className="leading-tight">
+              <h1 className="font-display text-lg font-bold tracking-[0.2em] text-hud-text">ARGUS</h1>
+              <p className="text-[11px] text-hud-muted">Crew Bio-Twin · {envMeta.shortLabel}</p>
             </div>
-            <p className="text-xs text-slate-400 flex items-center gap-2">
-              <span>Astronaut Readiness Guidance &amp; Unified Surveillance</span>
-              <span className="text-slate-600">•</span>
-              <span className="font-mono text-[11px] text-cyan-400/80">
-                {envMeta.missionPhase}
-              </span>
-            </p>
           </div>
+          <span
+            title="One-way signal delay to Earth"
+            className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 font-mono text-[11px] text-amber-300"
+          >
+            <Radio className="h-3.5 w-3.5" aria-hidden="true" />
+            {envMeta.commDelay.replace(' ONE-WAY', '')}
+            <span className="font-sans text-amber-200/80">to Earth</span>
+          </span>
         </div>
 
-        {/* Right: Crew Readiness Score + Simulate Medical Event Dropdown */}
-        <div className="flex items-center gap-3">
-          {/* Crew Readiness Score & Streak */}
-          <div className="flex items-center gap-3 bg-slate-900/80 border border-slate-800 rounded-lg px-3 py-1.5">
-            <div className="flex items-center gap-2">
-              <ShieldCheck
-                className="w-4 h-4"
-                style={{ color: readinessColor }}
-              />
-              <div>
-                <div className="text-[10px] font-mono uppercase tracking-wider text-slate-400">
-                  {activeCrewMember.callsign} Readiness
-                </div>
-                <div className="flex items-baseline gap-1.5">
-                  <span
-                    className="font-mono text-base font-bold leading-none"
-                    style={{ color: readinessColor }}
-                  >
-                    {readinessScore}%
-                  </span>
-                  <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-0.5">
-                    <Flame className="w-3 h-3 text-amber-400 inline" />
-                    {countermeasureStreakSols + (completedStepIds.length > 0 ? 1 : 0)}d STREAK
-                  </span>
-                </div>
-              </div>
+        {/* Readiness · scenario · AI key */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div
+            className="flex items-center gap-2.5 rounded-lg border border-hud-line bg-hud-panel/80 px-3 py-1.5"
+            aria-label={`${activeCrewMember.callsign} readiness ${readinessScore} percent, ${STATUS_WORD[rStatus]}`}
+          >
+            <StatusIcon status={rStatus} className={`h-4 w-4 ${STATUS_TEXT[rStatus]}`} />
+            <div className="leading-tight">
+              <div className="text-[11px] text-hud-muted">Readiness</div>
+              <div className={`font-mono text-base font-semibold ${STATUS_TEXT[rStatus]}`}>{readinessScore}%</div>
             </div>
+            <span
+              className="ml-1 flex items-center gap-0.5 font-mono text-[11px] text-amber-300"
+              title="Countermeasure streak (days)"
+            >
+              <Flame className="h-3.5 w-3.5" aria-hidden="true" />
+              {streak}d
+            </span>
           </div>
 
-          {/* Simulate Medical Event Dropdown */}
-          <div className="flex items-center gap-2 bg-slate-900/90 border border-slate-800 rounded-lg px-2.5 py-1.5">
-            <AlertTriangle
-              className={`w-4 h-4 ${
-                scenarioId === 'nominal'
-                  ? 'text-cyan-400'
-                  : 'text-red-400 animate-bounce'
-              }`}
-            />
-            <div className="flex flex-col">
-              <label
-                htmlFor="scenario-select"
-                className="text-[10px] font-mono uppercase tracking-wider text-slate-400"
-              >
-                Simulate Medical Event
-              </label>
-              <select
-                id="scenario-select"
-                value={scenarioId}
-                onChange={(e) => setScenario(e.target.value as ScenarioId)}
-                className="bg-transparent text-xs font-mono font-semibold text-slate-100 focus:outline-none cursor-pointer pr-2"
-              >
-                {SCENARIO_ORDER.map((id) => {
-                  const sc = TELEMETRY_SCENARIOS[id];
-                  return (
-                    <option
-                      key={id}
-                      value={id}
-                      className="bg-slate-900 text-slate-100"
-                    >
-                      {sc.shortTag} — {sc.label}
-                    </option>
-                  );
-                })}
-              </select>
-            </div>
-          </div>
+          <label className="flex items-center gap-2 rounded-lg border border-hud-line bg-hud-panel/80 px-2.5 py-1.5">
+            <span className="text-[11px] text-hud-muted">Scenario</span>
+            <select
+              value={scenarioId}
+              onChange={(e) => setScenario(e.target.value as ScenarioId)}
+              className="hud-focus cursor-pointer rounded bg-transparent text-xs font-medium text-hud-text"
+            >
+              {SCENARIO_ORDER.map((id) => (
+                <option key={id} value={id} className="bg-hud-panel text-hud-text">
+                  {TELEMETRY_SCENARIOS[id].label}
+                </option>
+              ))}
+            </select>
+          </label>
 
-          {/* Optional Runtime Clinical AI API Key Button */}
           <div className="relative">
             <button
               type="button"
-              onClick={() => setShowKeyInput((prev) => !prev)}
-              title="Configure Optional Clinical AI API Key (Offline Fallback Always Active)"
-              className={`p-2 rounded-lg border text-xs font-mono flex items-center gap-1 transition-colors ${
+              onClick={() => setShowKeyInput((p) => !p)}
+              aria-expanded={showKeyInput}
+              aria-label={hasKey ? 'Clinical AI connected. Change key' : 'Add Clinical AI key (optional)'}
+              title={hasKey ? 'Clinical AI connected' : 'Optional Clinical AI key'}
+              className={`hud-focus flex h-9 w-9 items-center justify-center rounded-lg border transition-colors ${
                 hasKey
-                  ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-300'
-                  : 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-cyan-300 hover:border-cyan-500/40'
+                  ? 'border-status-green/50 bg-status-green/10 text-status-green'
+                  : 'border-hud-line bg-hud-panel/80 text-hud-muted hover:text-hud-accent'
               }`}
             >
-              <KeyRound className="w-3.5 h-3.5" />
-              <span className="hidden xl:inline">
-                {hasKey ? 'AI LIVE' : 'AI KEY'}
-              </span>
+              <KeyRound className="h-4 w-4" aria-hidden="true" />
             </button>
-
             {showKeyInput && (
-              <div className="absolute right-0 mt-2 w-80 p-3 rounded-xl bg-slate-900 border border-cyan-500/30 shadow-2xl z-50">
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-xs font-mono font-semibold text-cyan-300 flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5" />
-                    Clinical AI API Key
-                  </span>
+              <div className="absolute right-0 z-50 mt-2 w-72 rounded-xl border border-hud-line bg-hud-panel p-3 shadow-2xl">
+                <div className="mb-1.5 flex items-center justify-between">
+                  <span className="text-xs font-semibold text-hud-text">Clinical AI key</span>
                   <button
                     type="button"
                     onClick={() => setShowKeyInput(false)}
-                    className="text-[11px] font-mono text-slate-400 hover:text-slate-200"
+                    aria-label="Close"
+                    className="hud-focus rounded p-0.5 text-hud-muted hover:text-hud-text"
                   >
-                    CLOSE
+                    <X className="h-4 w-4" />
                   </button>
                 </div>
-                <p className="text-[11px] text-slate-400 mb-2">
-                  ARGUS runs 100% offline by default. Enter an API key to enable live clinical AI guidance &amp; vision triage.
-                </p>
+                <p className="mb-2 text-[11px] text-hud-muted">Optional. ARGUS works fully offline.</p>
                 <input
                   type="password"
                   value={runtimeApiKey}
                   onChange={(e) => setRuntimeApiKey(e.target.value)}
-                  placeholder="Enter API key (or set VITE_AI_API_KEY)"
-                  className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-slate-700 text-xs font-mono text-slate-100 focus:outline-none focus:border-cyan-400"
+                  placeholder="API key"
+                  aria-label="Clinical AI API key"
+                  className="hud-input text-xs"
                 />
               </div>
             )}
@@ -212,69 +157,41 @@ export const TopMissionBar: React.FC = () => {
         </div>
       </div>
 
-      {/* Secondary Row: Interactive Crew Member Roster Strip & "+ Add / Manage Crew" Button */}
-      <div className="border-t border-slate-800/80 bg-slate-900/60 px-4 py-1.5">
-        <div className="max-w-[1800px] mx-auto flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2 overflow-x-auto py-0.5">
-            <span className="text-[11px] font-mono uppercase tracking-wider text-cyan-400 flex items-center gap-1.5 shrink-0 mr-1">
-              <Users className="w-3.5 h-3.5" />
-              Crew Roster ({crewRoster.length}):
-            </span>
-
+      {/* Crew strip */}
+      <div className="border-t border-hud-line/70 bg-hud-panel/40">
+        <div className="max-w-[1800px] mx-auto flex items-center gap-2 px-3 md:px-4 py-1.5">
+          <div className="flex min-w-0 flex-1 items-center gap-1.5 no-scrollbar overflow-x-auto py-0.5" role="group" aria-label="Active crew member">
             {crewRoster.map((member) => {
               const isSelected = member.id === activeCrewMember.id;
-              const effectiveScenario = isSelected
-                ? scenarioId
-                : member.defaultScenarioId;
-              const memberZones = getCrewAdjustedZones(
-                effectiveScenario,
-                member
-              );
-              const statuses = evaluateAllZones(memberZones, environment);
-              const hasRed = Object.values(statuses).includes('red');
-              const hasYellow = Object.values(statuses).includes('yellow');
-              const dotColor = hasRed
-                ? STATUS_COLORS.red
-                : hasYellow
-                ? STATUS_COLORS.yellow
-                : STATUS_COLORS.green;
-
+              const sc = isSelected ? scenarioId : member.defaultScenarioId;
+              const zones = applyCheckIns(getCrewAdjustedZones(sc, member), checkIns[member.id] || []);
+              const st = Object.values(evaluateAllZones(zones, environment));
+              const worst: TriageStatus = st.includes('red') ? 'red' : st.includes('yellow') ? 'yellow' : 'green';
               return (
                 <button
                   key={member.id}
                   type="button"
                   onClick={() => selectCrewMember(member.id)}
-                  className={`px-2.5 py-1 rounded-lg border text-xs font-mono flex items-center gap-2 transition-all shrink-0 ${
+                  aria-pressed={isSelected}
+                  title={`${member.name} · ${member.role} · ${STATUS_WORD[worst]}`}
+                  className={`hud-focus flex shrink-0 items-center gap-2 rounded-full border px-3 py-1 text-xs transition-colors ${
                     isSelected
-                      ? 'bg-cyan-500/20 border-cyan-400 text-slate-100 shadow-[0_0_12px_rgba(34,211,238,0.2)]'
-                      : 'bg-slate-950/70 border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                      ? 'border-hud-accent/70 bg-hud-accent/15 text-hud-text'
+                      : 'border-hud-line bg-hud-bg/60 text-hud-muted hover:text-hud-text'
                   }`}
                 >
-                  <span
-                    className={`w-2 h-2 rounded-full ${
-                      hasRed ? 'animate-ping' : ''
-                    }`}
-                    style={{ backgroundColor: dotColor }}
-                  />
-                  <span className="font-bold text-cyan-300">
-                    {member.callsign}
-                  </span>
-                  <span className="text-slate-200">{member.name}</span>
-                  <span className="hidden md:inline text-[10px] text-slate-400">
-                    ({member.sex === 'male' ? '♂' : '♀'} • {member.role} • {member.bloodType})
-                  </span>
+                  <span className={`h-2 w-2 rounded-full ${STATUS_BG[worst]}`} aria-hidden="true" />
+                  <span className="font-mono font-semibold text-hud-accent">{member.callsign}</span>
+                  <span className="hidden md:inline">{member.name}</span>
+                  <span className="sr-only">, {STATUS_WORD[worst]}</span>
                 </button>
               );
             })}
           </div>
-
-          <button
-            type="button"
-            onClick={() => setCrewModalOpen(true)}
-            className="px-3 py-1 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-400/50 text-cyan-300 font-mono text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0 shadow-[0_0_12px_rgba(34,211,238,0.15)]"
-          >
-            <UserPlus className="w-3.5 h-3.5" />
-            <span>+ Create / Manage Crew</span>
+          <button type="button" onClick={() => setCrewModalOpen(true)} className="hud-btn shrink-0">
+            <UserPlus className="h-3.5 w-3.5" aria-hidden="true" />
+            <span className="hidden sm:inline">Add crew</span>
+            <span className="sr-only sm:hidden">Add crew</span>
           </button>
         </div>
       </div>

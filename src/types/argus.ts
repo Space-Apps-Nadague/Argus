@@ -13,6 +13,22 @@ export type TriageStatus = 'green' | 'yellow' | 'red';
 
 export type ScenarioId = 'nominal' | 'sans_alert' | 'high_co2' | 'solar_storm';
 
+export type MetricId =
+  | 'onsd'
+  | 'iop'
+  | 'cabin_co2'
+  | 'resting_hr'
+  | 'hrv_rmssd'
+  | 'spo2'
+  | 'bmd_delta'
+  | 'ared_load'
+  | 'rad_dose'
+  | 'wbc_lymph'
+  | 'sleep_eff'
+  | 'pvt_lapses';
+
+export type HudTabId = 'biotwin' | 'trends' | 'checkin' | 'surgeon' | 'crew';
+
 export type BloodType = 'O+' | 'O-' | 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-';
 
 export type BiologicalSex = 'female' | 'male';
@@ -52,6 +68,7 @@ export interface TelemetryHistoryPoint {
   missionDay: number;
   dateLabel: string;
   value: number;
+  source?: 'synthetic' | 'check_in';
 }
 
 export interface VitalSignReading {
@@ -138,6 +155,7 @@ export interface EarthTelemetryPacket {
   zoneStatuses: Record<BodyZoneId, TriageStatus>;
   completedSteps: string[];
   visualExamAttached?: VisualExamAnalysis | null;
+  recentCheckIns?: CheckInEntry[];
   crewNotes: string;
 }
 
@@ -148,4 +166,51 @@ export interface ScenarioDefinition {
   description: string;
   recommendedFocusZone: BodyZoneId;
   zones: Record<BodyZoneId, VitalSignReading[]>;
+}
+
+/** Personal-baseline drift & forecast (specs/01-data-schema.md §5) */
+export interface PersonalBaseline {
+  mean: number;
+  sd: number;
+  n: number;
+}
+
+export type DriftDirection = 'up' | 'down' | 'flat';
+
+export type DriftLevel = 'steady' | 'watch' | 'drifting';
+
+export interface DriftResult {
+  baseline: PersonalBaseline;
+  zScore: number;
+  ewmaZ: number;
+  direction: DriftDirection;
+  level: DriftLevel;
+}
+
+export interface ForecastPoint {
+  missionDay: number;
+  dateLabel: string;
+  mean: number;
+  lower: number;
+  upper: number;
+}
+
+export interface MetricLink {
+  fromMetricId: MetricId;
+  toMetricId: MetricId;
+  lagDays: 0 | 1;
+  r: number;
+  n: number;
+  expectedSign: 1 | -1;
+  mechanism: string;
+}
+
+/** Daily crew check-in (specs/01-data-schema.md §6) */
+export interface CheckInEntry {
+  id: string;
+  crewId: string;
+  missionDay: number;
+  timestampIso: string;
+  values: Partial<Record<MetricId, number>>;
+  note?: string;
 }

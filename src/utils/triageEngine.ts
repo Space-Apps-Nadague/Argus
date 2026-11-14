@@ -10,6 +10,7 @@
 import {
   BodyZoneId,
   GravityEnvironment,
+  MetricId,
   ThresholdRange,
   TriageStatus,
   VitalSignReading,
@@ -68,6 +69,56 @@ export const METRIC_THRESHOLDS: Record<string, ThresholdRange> = {
   sleep_eff: { nominalMin: 82, nominalMax: 96, yellowMin: 72, yellowMax: 100 },
   pvt_lapses: { nominalMin: 0, nominalMax: 2, yellowMin: 0, yellowMax: 4 },
 };
+
+/**
+ * Minimum day-to-day SD per metric used by personal-baseline drift
+ * (specs/01-data-schema.md §2 & §5). Never affects triage status.
+ */
+export const METRIC_TYPICAL_SD: Record<MetricId, number> = {
+  onsd: 0.1,
+  iop: 1.0,
+  cabin_co2: 0.3,
+  resting_hr: 3,
+  hrv_rmssd: 6,
+  spo2: 0.7,
+  bmd_delta: 0.15,
+  ared_load: 2.5,
+  rad_dose: 0.15,
+  wbc_lymph: 0.2,
+  sleep_eff: 3,
+  pvt_lapses: 0.8,
+};
+
+export interface MetricInputRange {
+  min: number;
+  max: number;
+  how: string;
+}
+
+/**
+ * Hard plausibility limits + measurement instructions for manual check-in
+ * entry (specs/01-data-schema.md §2 & §6). Never affects triage status.
+ */
+export const METRIC_INPUT_RANGES: Record<MetricId, MetricInputRange> = {
+  onsd: { min: 3.0, max: 8.0, how: 'Ocular ultrasound, transverse plane, 3 mm behind globe; average both eyes.' },
+  iop: { min: 5, max: 40, how: 'Rebound tonometer, seated, average of 3 readings per eye.' },
+  cabin_co2: { min: 0, max: 15, how: 'Read the nearest cabin CO₂ monitor (CDM) at crew head height.' },
+  resting_hr: { min: 30, max: 180, how: 'On waking, before moving: wearable or 30 s pulse count × 2.' },
+  hrv_rmssd: { min: 5, max: 250, how: 'Overnight RMSSD from your wearable.' },
+  spo2: { min: 70, max: 100, how: 'Finger oximeter, warm hand, still for 30 s.' },
+  bmd_delta: { min: -5, max: 3, how: 'Monthly QCT/DXA-equivalent scan result vs previous scan (%).' },
+  ared_load: { min: 0, max: 60, how: 'Total from the ARED/resistance device log for today.' },
+  rad_dose: { min: 0, max: 50, how: 'Personal dosimeter: last 24 h reading.' },
+  wbc_lymph: { min: 0.1, max: 10, how: 'Point-of-care blood analyzer, finger-prick sample.' },
+  sleep_eff: { min: 0, max: 100, how: 'Wearable sleep efficiency for last night (%).' },
+  pvt_lapses: { min: 0, max: 50, how: '3-minute Psychomotor Vigilance Test on the crew tablet.' },
+};
+
+export const METRIC_IDS = Object.keys(METRIC_TYPICAL_SD) as MetricId[];
+
+export function isMetricId(id: string): id is MetricId {
+  return Object.prototype.hasOwnProperty.call(METRIC_TYPICAL_SD, id);
+}
 
 export function getMetricThreshold(
   metricId: string,
