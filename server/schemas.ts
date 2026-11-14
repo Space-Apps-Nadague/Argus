@@ -10,7 +10,7 @@ const num = () => z.coerce.number().refine(Number.isFinite, 'must be a finite nu
 
 export const ScenarioIdSchema = z.enum(['nominal', 'sans_alert', 'high_co2', 'solar_storm']);
 export const ZoneIdSchema = z.enum(['neuro', 'cardio', 'musculo', 'immune', 'behavioral']);
-export const EnvironmentSchema = z.enum(['0g_transit', 'iss_leo', 'lunar_base', 'mars_base']);
+export const EnvironmentSchema = z.enum(['0g_transit', 'iss_leo', 'lunar_base', 'mars_base', 'earth_1g']);
 export const TriageStatusSchema = z.enum(['green', 'yellow', 'red']);
 export const UrgencySchema = z.enum(['routine_downlink', 'priority_packet', 'immediate_emergency_packet']);
 

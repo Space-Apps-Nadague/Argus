@@ -207,7 +207,12 @@ export const FlightSurgeonPanel: React.FC = () => {
 
   const handleQueuePacket = () => {
     const pkt = queueEarthPacket(crewNotesInput.trim() || defaultNotes);
-    setPacketConfirmation(`${pkt.packetId} queued · arrives in ${pkt.commDelayLabel.replace(' ONE-WAY', '')}`);
+    const delay = pkt.commDelayLabel.replace(' ONE-WAY', '');
+    const confirmText =
+      environment === 'earth_1g'
+        ? `${pkt.packetId} logged · On-Site consult`
+        : `${pkt.packetId} queued · arrives in ${delay}`;
+    setPacketConfirmation(confirmText);
   };
 
   const handleDownloadLatestPacket = () => {
@@ -563,11 +568,12 @@ export const FlightSurgeonPanel: React.FC = () => {
         {/* Earth Packet Card with Editable Crew Notes */}
         <Card
           icon={<Send className="h-4 w-4" />}
-          title="Earth packet"
+          title={environment === 'earth_1g' ? 'On-site consult' : 'Earth packet'}
           actions={
-            <InfoTip label="About Earth packets" align="right">
-              Bundles readiness, zone status, completed steps, the latest visual exam, recent check-ins, and editable crew clinical notes for the ground flight
-              surgeon. One-way delay: {envMeta.commDelay.replace(' ONE-WAY', '')}.
+            <InfoTip label={environment === 'earth_1g' ? 'About clinical consults' : 'About Earth packets'} align="right">
+              {environment === 'earth_1g'
+                ? 'Bundles readiness, zone status, completed steps, the latest visual exam, recent check-ins, and editable crew clinical notes for the on-site flight surgeon.'
+                : `Bundles readiness, zone status, completed steps, the latest visual exam, recent check-ins, and editable crew clinical notes for the ground flight surgeon. One-way delay: ${envMeta.commDelay.replace(' ONE-WAY', '')}.`}
             </InfoTip>
           }
           bodyClassName="px-4 pb-4 space-y-3"
@@ -588,9 +594,17 @@ export const FlightSurgeonPanel: React.FC = () => {
               rows={3}
               value={crewNotesInput}
               onChange={(e) => setCrewNotesInput(e.target.value)}
-              placeholder="Review or edit clinical notes and remarks for the Earth Flight Surgeon..."
+              placeholder={
+                environment === 'earth_1g'
+                  ? 'Review or edit clinical notes and remarks for the on-site Flight Surgeon...'
+                  : 'Review or edit clinical notes and remarks for the Earth Flight Surgeon...'
+              }
               className="hud-focus w-full rounded-lg border border-hud-line bg-hud-bg/80 p-2.5 font-mono text-xs text-hud-text placeholder-hud-muted focus:border-hud-accent"
-              aria-label="Editable crew notes for Earth telemetry packet"
+              aria-label={
+                environment === 'earth_1g'
+                  ? 'Editable crew notes for on-site consult'
+                  : 'Editable crew notes for Earth telemetry packet'
+              }
             />
           </div>
 
@@ -609,7 +623,7 @@ export const FlightSurgeonPanel: React.FC = () => {
           <div className="flex items-center gap-2">
             <button type="button" onClick={handleQueuePacket} className="hud-btn-primary flex-1">
               <Send className="h-4 w-4" aria-hidden="true" />
-              Queue packet
+              {environment === 'earth_1g' ? 'Log on-site consult' : 'Queue packet'}
             </button>
             {queuedPackets.length > 0 && (
               <button type="button" onClick={() => setShowPacketModal(true)} className="hud-btn" aria-label={`Inspect ${queuedPackets.length} queued packets`}>

@@ -127,6 +127,7 @@ const VALID_ENVIRONMENTS: GravityEnvironment[] = [
   'lunar_base',
   '0g_transit',
   'mars_base',
+  'earth_1g',
 ];
 
 function loadInitialEnvironment(): GravityEnvironment {

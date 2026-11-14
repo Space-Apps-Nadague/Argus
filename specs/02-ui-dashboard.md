@@ -22,9 +22,9 @@
 
 - **Top Bar (`TopMissionBar.tsx`) — slim, low-text:**
   - Brand `ARGUS` (display font) + expanded abbreviation `Astronaut Readiness Guidance & Unified Surveillance` + small `Crew Bio-Twin · <Location> (<Gravity>)`.
-  - Dynamic **Signal Comm Delay to Earth** badge (`Real-time to Earth`, `1.3s to Earth`, `14m 22s to Earth`, `18m 10s to Earth`).
-  - Dynamic **Surface/Orbital Gravity** badge (`0.00g`, `0.16g`, `0.38g`).
-  - **Location / Habitat Selector** dropdown (`iss_leo`, `lunar_base`, `0g_transit`, `mars_base` presets) dynamically updating comm delay, gravity thresholds, Earth packet metadata, and autonomous urgency.
+  - Dynamic **Signal Comm Delay to Earth** badge (`On-Site`, `Real-time to Earth`, `1.3s to Earth`, `14m 22s to Earth`, `18m 10s to Earth`).
+  - Dynamic **Surface/Orbital Gravity** badge (`1.00g`, `0.00g`, `0.16g`, `0.38g`).
+  - **Location / Habitat Selector** dropdown (`earth_pre`, `earth_post`, `iss_leo`, `lunar_base`, `0g_transit`, `mars_base` presets) dynamically updating comm delay, gravity thresholds (`earth_1g`, `0g_transit`, etc.), Earth packet metadata, and autonomous urgency.
   - **Crew Readiness Score** `0–100%` with status color + daily countermeasure streak.
   - **Milestone Badges Trigger**: Interactive badge chip (`🏆 <n> Badges`) with popover/modal to inspect unlocked readiness milestones and streak progress (`REQ-09`).
   - **Simulate Medical Event** dropdown (`nominal`, `sans_alert`, `high_co2`, `solar_storm`).
@@ -72,8 +72,9 @@ Readable 3-day outlook built only from deterministic models (`forecastMetric`, `
 
 ### 2.4 ARGUS AI (`AiTab.tsx`) — all Flight Surgeon tools live here
 - Header: provider badge from `GET /api/health` (`Local · qwen3.6`, `OpenRouter free`, or `Offline`).
-- Sub-sections (segmented control): **Chat** (default; streaming companion via `POST /api/ai/chat`, history kept per crew member), **Flight Surgeon** (the former Flight Surgeon tab: situation + steps, visual self-exam, Earth packet — `FlightSurgeonPanel.tsx`), **Diagnostics** (`POST /api/ai/diagnostics`: ranked hypotheses with supporting metrics), **Plan** (`POST /api/ai/recommendations`), **Wellbeing** (1–5 mood check-in → `POST /api/ai/wellbeing`).
+- Sub-sections (segmented control): **Chat** (default; streaming companion via `POST /api/ai/chat`, history kept per crew member), **Flight Surgeon** (the former Flight Surgeon tab: situation + steps, visual self-exam, Earth packet / On-site consult — `FlightSurgeonPanel.tsx`), **Diagnostics** (`POST /api/ai/diagnostics`: ranked hypotheses with supporting metrics), **Plan** (`POST /api/ai/recommendations`), **Wellbeing** (1–5 mood check-in → `POST /api/ai/wellbeing`).
 - Every AI result shows its source (`live_ai` / offline) and the disclaimer. The AI never sets a triage status.
+- **Flight Surgeon Earth Packet & On-Site Consult:** When in deep space or partial-gravity flight, queues an Earth consult packet (`Queue packet`). In `earth_1g` (pre/post-flight), the CTA adapts to `Log on-site consult`, reflecting direct zero-delay ground medical support.
 - **Crew Symptom & Clinical Q&A (PR #27)** lives in the Flight Surgeon section (`FlightSurgeonPanel.tsx`):
   - Free-text symptoms with one-click presets, answered by the AI or the offline `symptomFallback.ts`.
   - Live webcam capture for the visual self-exam.

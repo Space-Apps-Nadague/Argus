@@ -77,6 +77,15 @@ export const ENVIRONMENT_META: Record<
     hazardOverview:
       'Partial Martian gravity (3/8g) mitigates SANS risk and provides axial loading; substantial comm latency requires autonomous crew health surveillance and delayed tele-consultation.',
   },
+  'earth_1g': {
+    label: 'Earth Surface (1.00g)',
+    shortLabel: 'Earth (1.00g)',
+    gravityG: '1.00g',
+    commDelay: 'On-Site',
+    missionPhase: 'PRE/POST-FLIGHT BASELINE // TERRESTRIAL',
+    hazardOverview:
+      'Terrestrial 1.00g gravity provides normal hydrostatic pressure gradients and musculoskeletal loading, eliminating cephalad fluid shifts and microgravity bone deconditioning.',
+  },
 };
 
 export const ENVIRONMENT_ORDER: GravityEnvironment[] = [
@@ -84,6 +93,7 @@ export const ENVIRONMENT_ORDER: GravityEnvironment[] = [
   'lunar_base',
   '0g_transit',
   'mars_base',
+  'earth_1g',
 ];
 
 /**
@@ -148,6 +158,17 @@ export const ENVIRONMENT_METRIC_THRESHOLDS: Record<
     bmd_delta: { nominalMin: -0.4, nominalMax: 0.3, yellowMin: -0.8, yellowMax: 0.6 },
     ared_load: { nominalMin: 12, nominalMax: 24, yellowMin: 8, yellowMax: 28 },
     rad_dose: { nominalMin: 0.3, nominalMax: 0.8, yellowMin: 0.0, yellowMax: 1.8 },
+  },
+  // Grounding: NASA LSAH (Source: SRC-006) and Spaceflight Standard Measures (Source: SRC-009) terrestrial clinical baseline.
+  'earth_1g': {
+    ...METRIC_THRESHOLDS_0G,
+    onsd: { nominalMin: 4.0, nominalMax: 5.0, yellowMin: 3.8, yellowMax: 5.3 },
+    iop: { nominalMin: 12, nominalMax: 20, yellowMin: 10, yellowMax: 22 },
+    cabin_co2: { nominalMin: 0.0, nominalMax: 1.0, yellowMin: 0.0, yellowMax: 2.0 },
+    resting_hr: { nominalMin: 55, nominalMax: 80, yellowMin: 50, yellowMax: 90 },
+    bmd_delta: { nominalMin: -0.2, nominalMax: 0.2, yellowMin: -0.5, yellowMax: 0.5 },
+    ared_load: { nominalMin: 0, nominalMax: 16, yellowMin: 0, yellowMax: 24 },
+    rad_dose: { nominalMin: 0.0, nominalMax: 0.05, yellowMin: 0.0, yellowMax: 0.1 },
   },
 };
 

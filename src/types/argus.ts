@@ -3,7 +3,7 @@
  * Single Source of Truth: specs/01-data-schema.md
  */
 
-export type GravityEnvironment = '0g_transit' | 'iss_leo' | 'lunar_base' | 'mars_base';
+export type GravityEnvironment = '0g_transit' | 'iss_leo' | 'lunar_base' | 'mars_base' | 'earth_1g';
 
 export type MissionLocation = GravityEnvironment;
 
