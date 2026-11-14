@@ -108,13 +108,12 @@
   - `src/components/TopMissionBar.tsx`
   - `src/utils/__tests__/triageEngine.test.ts`
 
-### Task 9: Remove Gemini Product Branding & Standardize Clinical AI Naming
+### Task 10: Remove Gemini Product Branding & Standardize Clinical AI Naming
 - **Status:** `[DONE]`
 - **Spec References:** `specs/00-architecture.md`, `specs/01-data-schema.md` (§4), `specs/02-ui-dashboard.md` (§1)
 - **Files Owned:**
   - `specs/00-architecture.md`
   - `specs/01-data-schema.md`
-  - `specs/01-ui-dashboard.md`
   - `specs/02-ui-dashboard.md`
   - `specs/tasks.md`
   - `src/types/argus.ts`
