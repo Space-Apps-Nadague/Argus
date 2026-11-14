@@ -49,7 +49,13 @@ import {
   STATUS_LABELS,
 } from '../utils/triageEngine';
 import {
+  createAirwayGeometries,
   createAppendicularSkeletonGeometries,
+  createBrainHemisphereGeometry,
+  createCerebellumGeometry,
+  createHeartGeometry,
+  createLiverGeometry,
+  createLungGeometry,
   createLymphaticConduitGeometries,
   createNeuroVascularGeometries,
   createPelvicGirdleGeometries,
@@ -57,7 +63,9 @@ import {
   createSculptedHeadAndNeckGeometry,
   createSculptedLegGeometry,
   createSculptedTorsoGeometry,
+  createSpleenGeometry,
   createThoracicRibGeometries,
+  createThymusGeometry,
   createVascularTreeGeometries,
 } from '../utils/anatomicalGeometry';
 
@@ -195,6 +203,16 @@ const HolographicHumanModel: React.FC<HolographicHumanProps> = ({
     const vascularTree = createVascularTreeGeometries(sex);
     const neuroVascular = createNeuroVascularGeometries();
     const lymphaticConduits = createLymphaticConduitGeometries(sex);
+    const leftBrainHemisphere = createBrainHemisphereGeometry(1);
+    const rightBrainHemisphere = createBrainHemisphereGeometry(-1);
+    const cerebellum = createCerebellumGeometry();
+    const heart = createHeartGeometry();
+    const rightLung = createLungGeometry(-1, sex);
+    const leftLung = createLungGeometry(1, sex);
+    const airways = createAirwayGeometries();
+    const liver = createLiverGeometry(sex);
+    const spleen = createSpleenGeometry();
+    const thymus = createThymusGeometry();
 
     return {
       headAndNeck,
@@ -209,6 +227,16 @@ const HolographicHumanModel: React.FC<HolographicHumanProps> = ({
       vascularTree,
       neuroVascular,
       lymphaticConduits,
+      leftBrainHemisphere,
+      rightBrainHemisphere,
+      cerebellum,
+      heart,
+      rightLung,
+      leftLung,
+      airways,
+      liver,
+      spleen,
+      thymus,
     };
   }, [sex]);
 
@@ -547,18 +575,24 @@ const HolographicHumanModel: React.FC<HolographicHumanProps> = ({
       {showOrgans && (
         <group {...bindZoneEvents('neuro')}>
           {/* Left & Right Gyri-Sculpted Cerebral Hemispheres */}
-          <mesh position={[-0.068, 1.74, -0.01]} scale={[0.82, 0.95, 1.18]}>
-            <icosahedronGeometry args={[0.135, 3]} />
+          <mesh
+            position={[-0.022, 1.745, -0.01]}
+            geometry={anatomies.rightBrainHemisphere}
+          >
             <meshStandardMaterial {...getZoneMaterialProps('neuro', 0.9)} />
           </mesh>
-          <mesh position={[0.068, 1.74, -0.01]} scale={[0.82, 0.95, 1.18]}>
-            <icosahedronGeometry args={[0.135, 3]} />
+          <mesh
+            position={[0.022, 1.745, -0.01]}
+            geometry={anatomies.leftBrainHemisphere}
+          >
             <meshStandardMaterial {...getZoneMaterialProps('neuro', 0.9)} />
           </mesh>
 
           {/* Cerebellum & Brainstem */}
-          <mesh position={[0, 1.61, -0.095]} scale={[1.15, 0.75, 0.85]}>
-            <sphereGeometry args={[0.075, 18, 18]} />
+          <mesh
+            position={[0, 1.615, -0.095]}
+            geometry={anatomies.cerebellum}
+          >
             <meshStandardMaterial {...getZoneMaterialProps('neuro', 0.85)} />
           </mesh>
           <mesh position={[0, 1.48, -0.04]} rotation={[0.12, 0, 0]}>
@@ -609,52 +643,38 @@ const HolographicHumanModel: React.FC<HolographicHumanProps> = ({
           {/* Beating 4-Chambered Heart (Myocardium) angled anatomically toward left thorax */}
           <group
             ref={heartRef}
-            position={[0.045, 0.76, 0.065]}
-            rotation={[0.15, 0, -0.32]}
+            position={[0.04, 0.75, 0.06]}
+            rotation={[0.12, -0.15, -0.22]}
           >
-            {/* Left & Right Ventricles */}
-            <mesh position={[0, -0.02, 0]} scale={[0.88, 1.22, 0.85]}>
-              <sphereGeometry args={[0.082, 24, 24]} />
+            <mesh geometry={anatomies.heart}>
               <meshStandardMaterial {...getZoneMaterialProps('cardio', 0.96)} />
-            </mesh>
-            {/* Left & Right Atria */}
-            <mesh position={[-0.025, 0.055, -0.01]} scale={[1.1, 0.8, 0.9]}>
-              <sphereGeometry args={[0.062, 20, 20]} />
-              <meshStandardMaterial {...getZoneMaterialProps('cardio', 0.92)} />
             </mesh>
           </group>
 
-          {/* Trachea & Primary Bronchi */}
-          <mesh position={[0, 1.08, 0.02]}>
-            <cylinderGeometry args={[0.018, 0.018, 0.28, 14]} />
-            <meshStandardMaterial {...getZoneMaterialProps('cardio', 0.78)} />
-          </mesh>
+          {/* Trachea & Bifurcating Primary Bronchi */}
+          {anatomies.airways.map((geo, idx) => (
+            <mesh key={`airway-${idx}`} geometry={geo}>
+              <meshStandardMaterial {...getZoneMaterialProps('cardio', 0.78)} />
+            </mesh>
+          ))}
 
-          {/* Breathing Left (2-Lobe) & Right (3-Lobe) Sculpted Lungs */}
+          {/* Breathing Left (2-Lobe + Cardiac Notch) & Right (3-Lobe) Sculpted Lungs */}
           <group ref={lungsRef}>
             {/* Right Lung (anatomical right = viewer left, x < 0) */}
-            <group position={[-0.135, 0.81, 0.015]}>
-              <mesh position={[0, 0.07, 0]} scale={[0.78, 1.05, 0.82]}>
-                <sphereGeometry args={[0.115, 24, 24]} />
-                <meshStandardMaterial {...getZoneMaterialProps('cardio', 0.52)} />
-              </mesh>
-              <mesh position={[-0.01, -0.06, 0.01]} scale={[0.88, 0.95, 0.86]}>
-                <sphereGeometry args={[0.122, 24, 24]} />
-                <meshStandardMaterial {...getZoneMaterialProps('cardio', 0.52)} />
-              </mesh>
-            </group>
+            <mesh
+              position={[isFemale ? -0.115 : -0.145, 0.8, 0.008]}
+              geometry={anatomies.rightLung}
+            >
+              <meshStandardMaterial {...getZoneMaterialProps('cardio', 0.54)} />
+            </mesh>
 
             {/* Left Lung (anatomical left = viewer right, x > 0, with cardiac notch) */}
-            <group position={[0.14, 0.81, 0.015]}>
-              <mesh position={[0, 0.07, 0]} scale={[0.74, 1.05, 0.8]}>
-                <sphereGeometry args={[0.11, 24, 24]} />
-                <meshStandardMaterial {...getZoneMaterialProps('cardio', 0.52)} />
-              </mesh>
-              <mesh position={[0.015, -0.06, 0.01]} scale={[0.82, 0.92, 0.84]}>
-                <sphereGeometry args={[0.115, 24, 24]} />
-                <meshStandardMaterial {...getZoneMaterialProps('cardio', 0.52)} />
-              </mesh>
-            </group>
+            <mesh
+              position={[isFemale ? 0.12 : 0.15, 0.8, 0.008]}
+              geometry={anatomies.leftLung}
+            >
+              <meshStandardMaterial {...getZoneMaterialProps('cardio', 0.54)} />
+            </mesh>
           </group>
 
           {/* 3D Arterial / Venous Vascular Tree (Aortic Arch, Descending Aorta, Iliac/Femoral & Subclavian Vessels) */}
@@ -672,29 +692,26 @@ const HolographicHumanModel: React.FC<HolographicHumanProps> = ({
       {showOrgans && (
         <group {...bindZoneEvents('immune')}>
           {/* Mediastinal Thymus Gland (Bilobed) */}
-          <mesh position={[0, 1.02, 0.085]} scale={[1.1, 1.3, 0.65]}>
-            <octahedronGeometry args={[0.055, 2]} />
+          <mesh position={[0, 1.02, 0.082]} geometry={anatomies.thymus}>
             <meshStandardMaterial {...getZoneMaterialProps('immune', 0.94)} />
           </mesh>
 
-          {/* Spleen (Left Upper Quadrant) */}
+          {/* Spleen (Left Upper Quadrant, crescent-shaped) */}
           <mesh
-            position={[isFemale ? 0.19 : 0.23, 0.46, 0.01]}
-            rotation={[0, 0, -0.35]}
-            scale={[0.75, 1.25, 0.85]}
+            position={[isFemale ? 0.175 : 0.21, 0.46, 0.005]}
+            rotation={[0.08, -0.2, -0.32]}
+            geometry={anatomies.spleen}
           >
-            <sphereGeometry args={[0.072, 20, 20]} />
             <meshStandardMaterial {...getZoneMaterialProps('immune', 0.92)} />
           </mesh>
 
-          {/* Visceral Hepatic / Liver Contour (Right Upper Quadrant, translucent reference) */}
+          {/* Visceral Hepatic / Liver Contour (Right Upper Quadrant, asymmetric wedge) */}
           <mesh
-            position={[-0.08, 0.48, 0.04]}
-            rotation={[0, 0, 0.22]}
-            scale={[1.35, 0.82, 0.85]}
+            position={[isFemale ? -0.055 : -0.065, 0.49, 0.035]}
+            rotation={[0.05, 0, 0.1]}
+            geometry={anatomies.liver}
           >
-            <sphereGeometry args={[0.11, 20, 20]} />
-            <meshStandardMaterial {...getZoneMaterialProps('immune', 0.42)} />
+            <meshStandardMaterial {...getZoneMaterialProps('immune', 0.46)} />
           </mesh>
 
           {/* Interconnected Lymphatic Conduits */}
