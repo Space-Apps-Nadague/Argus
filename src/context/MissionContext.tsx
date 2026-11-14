@@ -91,6 +91,23 @@ export function resolveLiveGuidance(
 }
 const TAB_STORAGE_KEY = 'argus_active_tab_v1';
 const HUD_TABS: HudTabId[] = ['biotwin', 'trends', 'checkin', 'surgeon', 'crew'];
+const ENV_STORAGE_KEY = 'argus_mission_environment_v1';
+const VALID_ENVIRONMENTS: GravityEnvironment[] = [
+  'iss_leo',
+  'lunar_base',
+  '0g_transit',
+  'mars_base',
+];
+
+function loadInitialEnvironment(): GravityEnvironment {
+  try {
+    const raw = localStorage.getItem(ENV_STORAGE_KEY) as GravityEnvironment | null;
+    if (raw && VALID_ENVIRONMENTS.includes(raw)) return raw;
+  } catch {
+    // Ignore storage errors in restricted environments
+  }
+  return '0g_transit';
+}
 
 function loadInitialTab(): HudTabId {
   try {
@@ -184,6 +201,7 @@ type MissionAction =
   | { type: 'SET_ANALYZING_VISUAL'; payload: boolean }
   | { type: 'QUEUE_EARTH_PACKET'; payload: EarthTelemetryPacket }
   | { type: 'SET_RUNTIME_API_KEY'; payload: string }
+  | { type: 'SET_ENVIRONMENT'; payload: GravityEnvironment }
   | { type: 'SET_ACTIVE_TAB'; payload: HudTabId }
   | { type: 'ADD_CHECK_IN'; payload: CheckInEntry }
   | { type: 'DELETE_CHECK_IN'; payload: { crewId: string; entryId: string } };
@@ -191,7 +209,7 @@ type MissionAction =
 const initialRoster = loadInitialCrewRoster();
 const initialCrew = initialRoster[0] || DEFAULT_CREW_ROSTER[0];
 const initialScenario: ScenarioId = initialCrew.defaultScenarioId || 'nominal';
-const initialEnvironment: GravityEnvironment = '0g_transit';
+const initialEnvironment: GravityEnvironment = loadInitialEnvironment();
 const initialZone: BodyZoneId =
   TELEMETRY_SCENARIOS[initialScenario].recommendedFocusZone;
 
@@ -419,6 +437,20 @@ function missionReducer(
         ...state,
         runtimeApiKey: action.payload,
       };
+    case 'SET_ENVIRONMENT': {
+      const activeCrew = getActiveCrew(state.crewRoster, state.activeCrewId);
+      const nextGuidance = getOfflineFlightSurgeonGuidance(
+        state.scenarioId,
+        state.selectedZone,
+        action.payload,
+        activeCrew
+      );
+      return {
+        ...state,
+        environment: action.payload,
+        guidance: nextGuidance,
+      };
+    }
     case 'SET_ACTIVE_TAB':
       return {
         ...state,
@@ -476,6 +508,7 @@ interface MissionContextValue extends MissionState {
   deleteCrewMember: (crewId: string) => void;
   setCrewModalOpen: (open: boolean) => void;
   setScenario: (scenario: ScenarioId) => void;
+  setEnvironment: (env: GravityEnvironment) => void;
   setSelectedZone: (zone: BodyZoneId) => void;
   setSelectedMetricId: (metricId: string) => void;
   setAnatomicalLayer: (layer: AnatomicalLayer) => void;
@@ -520,6 +553,14 @@ export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({
       // Ignore storage errors
     }
   }, [state.activeTab]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(ENV_STORAGE_KEY, state.environment);
+    } catch {
+      // Ignore storage errors
+    }
+  }, [state.environment]);
 
   const activeCrewMember = useMemo(
     () =>
@@ -653,6 +694,10 @@ export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const setScenario = useCallback((scenario: ScenarioId) => {
     dispatch({ type: 'SET_SCENARIO', payload: scenario });
+  }, []);
+
+  const setEnvironment = useCallback((env: GravityEnvironment) => {
+    dispatch({ type: 'SET_ENVIRONMENT', payload: env });
   }, []);
 
   const setSelectedZone = useCallback((zone: BodyZoneId) => {
@@ -912,6 +957,7 @@ export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({
       deleteCrewMember,
       setCrewModalOpen,
       setScenario,
+      setEnvironment,
       setSelectedZone,
       setSelectedMetricId,
       setAnatomicalLayer,
@@ -950,6 +996,7 @@ export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({
       deleteCrewMember,
       setCrewModalOpen,
       setScenario,
+      setEnvironment,
       setSelectedZone,
       setSelectedMetricId,
       setAnatomicalLayer,

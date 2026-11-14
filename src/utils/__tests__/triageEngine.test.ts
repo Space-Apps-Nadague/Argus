@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   calculateCrewReadinessScore,
+  ENVIRONMENT_META,
+  ENVIRONMENT_ORDER,
   evaluateAllZones,
   evaluateMetricStatus,
+  formatFlightNormBadge,
+  getMetricThreshold,
 } from '../triageEngine';
 import {
   DEFAULT_CREW_ROSTER,
@@ -222,6 +226,127 @@ describe('ARGUS Deterministic Triage Engine (specs/01-data-schema.md)', () => {
           expect(scenarioMetricIds).toContain(expectedId);
         }
       }
+    });
+  });
+
+  describe('Issue #21: Multi-environment support & dynamic location/gravity presets (REQ-07)', () => {
+    it('defines all 4 canonical location presets in ENVIRONMENT_META and ENVIRONMENT_ORDER', () => {
+      expect(ENVIRONMENT_ORDER).toEqual([
+        'iss_leo',
+        'lunar_base',
+        '0g_transit',
+        'mars_base',
+      ]);
+
+      expect(ENVIRONMENT_META.iss_leo).toMatchObject({
+        label: 'ISS Low Earth Orbit',
+        shortLabel: 'ISS (LEO)',
+        gravityG: '0.00g',
+        commDelay: 'Real-time ONE-WAY',
+      });
+
+      expect(ENVIRONMENT_META.lunar_base).toMatchObject({
+        label: 'Artemis Lunar Base (1/6g)',
+        shortLabel: 'Lunar Base',
+        gravityG: '0.16g',
+        commDelay: '1.3s ONE-WAY',
+      });
+
+      expect(ENVIRONMENT_META['0g_transit']).toMatchObject({
+        label: '0g Deep-Space Transit',
+        shortLabel: '0g Transit',
+        gravityG: '0.00g',
+        commDelay: '14m 22s ONE-WAY',
+      });
+
+      expect(ENVIRONMENT_META.mars_base).toMatchObject({
+        label: 'Mars Surface Base (3/8g)',
+        shortLabel: 'Mars Base',
+        gravityG: '0.38g',
+        commDelay: '18m 10s ONE-WAY',
+      });
+    });
+
+    it('returns gravity- and location-adjusted metric thresholds', () => {
+      // ONSD cephalad fluid shift thresholds:
+      const onsd0g = getMetricThreshold('onsd', '0g_transit');
+      const onsdLunar = getMetricThreshold('onsd', 'lunar_base');
+      const onsdMars = getMetricThreshold('onsd', 'mars_base');
+
+      expect(onsd0g).toEqual({ nominalMin: 4.5, nominalMax: 5.5, yellowMin: 4.2, yellowMax: 5.9 });
+      expect(onsdLunar).toEqual({ nominalMin: 4.3, nominalMax: 5.3, yellowMin: 4.0, yellowMax: 5.7 });
+      expect(onsdMars).toEqual({ nominalMin: 4.1, nominalMax: 5.1, yellowMin: 3.8, yellowMax: 5.5 });
+
+      // ARED resistance load thresholds:
+      const ared0g = getMetricThreshold('ared_load', '0g_transit');
+      const aredLunar = getMetricThreshold('ared_load', 'lunar_base');
+      const aredMars = getMetricThreshold('ared_load', 'mars_base');
+
+      expect(ared0g).toEqual({ nominalMin: 18, nominalMax: 30, yellowMin: 12, yellowMax: 35 });
+      expect(aredLunar).toEqual({ nominalMin: 14, nominalMax: 26, yellowMin: 10, yellowMax: 30 });
+      expect(aredMars).toEqual({ nominalMin: 12, nominalMax: 24, yellowMin: 8, yellowMax: 28 });
+
+      // Radiation dose rate thresholds (mSv/d):
+      const radIss = getMetricThreshold('rad_dose', 'iss_leo');
+      const rad0g = getMetricThreshold('rad_dose', '0g_transit');
+      const radLunar = getMetricThreshold('rad_dose', 'lunar_base');
+      const radMars = getMetricThreshold('rad_dose', 'mars_base');
+
+      expect(radIss).toEqual({ nominalMin: 0.2, nominalMax: 0.6, yellowMin: 0.0, yellowMax: 1.2 });
+      expect(rad0g).toEqual({ nominalMin: 0.4, nominalMax: 1.2, yellowMin: 0.0, yellowMax: 2.5 });
+      expect(radLunar).toEqual({ nominalMin: 0.3, nominalMax: 0.9, yellowMin: 0.0, yellowMax: 2.0 });
+      expect(radMars).toEqual({ nominalMin: 0.3, nominalMax: 0.8, yellowMin: 0.0, yellowMax: 1.8 });
+    });
+
+    it('evaluates metric status dynamically based on the active gravity environment', () => {
+      // 5.3 mm ONSD is nominal in 0g_transit, but elevated (yellow) on Mars
+      expect(evaluateMetricStatus('onsd', 5.3, '0g_transit')).toBe('green');
+      expect(evaluateMetricStatus('onsd', 5.3, 'iss_leo')).toBe('green');
+      expect(evaluateMetricStatus('onsd', 5.3, 'lunar_base')).toBe('green');
+      expect(evaluateMetricStatus('onsd', 5.3, 'mars_base')).toBe('yellow');
+
+      // 15 kN·reps ARED load is yellow (under-exercised) in 0g transit, but green on Moon and Mars
+      expect(evaluateMetricStatus('ared_load', 15, '0g_transit')).toBe('yellow');
+      expect(evaluateMetricStatus('ared_load', 15, 'lunar_base')).toBe('green');
+      expect(evaluateMetricStatus('ared_load', 15, 'mars_base')).toBe('green');
+
+      // 0.8 mSv/d radiation is nominal in 0g deep space and lunar base, but elevated on ISS (due to geomagnetic expectation)
+      expect(evaluateMetricStatus('rad_dose', 0.8, '0g_transit')).toBe('green');
+      expect(evaluateMetricStatus('rad_dose', 0.8, 'iss_leo')).toBe('yellow');
+      expect(evaluateMetricStatus('rad_dose', 0.8, 'lunar_base')).toBe('green');
+      expect(evaluateMetricStatus('rad_dose', 1.0, 'mars_base')).toBe('yellow');
+    });
+
+    it('formats flight norm badges using the active location shortLabel', () => {
+      expect(formatFlightNormBadge('onsd', 'mm', 'iss_leo')).toBe('ISS (LEO) Norm: 4.5–5.5 mm');
+      expect(formatFlightNormBadge('onsd', 'mm', 'lunar_base')).toBe('Lunar Base Norm: 4.3–5.3 mm');
+      expect(formatFlightNormBadge('onsd', 'mm', '0g_transit')).toBe('0g Transit Norm: 4.5–5.5 mm');
+      expect(formatFlightNormBadge('onsd', 'mm', 'mars_base')).toBe('Mars Base Norm: 4.1–5.1 mm');
+    });
+
+    it('tailors offline flight surgeon guidance hazard context to the active environment', () => {
+      const g0g = getOfflineFlightSurgeonGuidance('nominal', 'neuro', '0g_transit');
+      expect(g0g.hazardContextSummary).toContain('14m 22s one-way Earth comm delay');
+
+      const gIss = getOfflineFlightSurgeonGuidance('nominal', 'neuro', 'iss_leo');
+      expect(gIss.hazardContextSummary).toContain('real-time comm link to Mission Control');
+
+      const gLunar = getOfflineFlightSurgeonGuidance('nominal', 'neuro', 'lunar_base');
+      expect(gLunar.hazardContextSummary).toContain('1.3s one-way Earth comm delay');
+
+      const gMars = getOfflineFlightSurgeonGuidance('nominal', 'neuro', 'mars_base');
+      expect(gMars.hazardContextSummary).toContain('18m 10s one-way Earth comm delay');
+    });
+
+    it('re-evaluates all zones and readiness score when environment switches', () => {
+      // In nominal scenario, check if readiness score is calculated deterministically across environments
+      const issScore = calculateCrewReadinessScore(TELEMETRY_SCENARIOS.nominal.zones, 'iss_leo');
+      const marsScore = calculateCrewReadinessScore(TELEMETRY_SCENARIOS.nominal.zones, 'mars_base');
+      const transitScore = calculateCrewReadinessScore(TELEMETRY_SCENARIOS.nominal.zones, '0g_transit');
+
+      expect(transitScore).toBe(98);
+      expect(issScore).toBeGreaterThanOrEqual(15);
+      expect(marsScore).toBeGreaterThanOrEqual(15);
     });
   });
 });
