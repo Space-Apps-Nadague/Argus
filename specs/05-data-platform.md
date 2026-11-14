@@ -17,7 +17,13 @@ ARGUS stores crew health data in a shared **PostgreSQL** database instead of eac
 | Local dev | `docker compose up -d postgres` (`pgvector/pgvector:0.8.0-pg17`) | each developer, with throwaway data |
 | Shared team | Azure Database for PostgreSQL Flexible Server, B1MS, PostgreSQL 17, free tier [SRC-061] | the whole team and the demo |
 
-- Connection is `DATABASE_URL` in `.env`, which is server-only. Never prefix it with `VITE_`. Azure requires `sslmode=require`.
+- **Connection, in this order** (`server/db/connectionString.ts`):
+  1. `DATABASE_URL` (local dev and teammates).
+  2. `AZURE_POSTGRESQL_CONNECTIONSTRING` as an app setting.
+  3. The same name as an App Service connection string, which Linux exposes as `CUSTOMCONNSTR_…` or `POSTGRESQLCONNSTR_…`.
+
+  Azure's `Server=…;Database=…;User Id=…;Password=…` format is converted to a TLS URL. Values are server-only: never prefix them with `VITE_`.
+- **Production (argus-space.health):** web app `argus-space` uses the private database `argus-space-server` (reachable only through the app's private network). With `ARGUS_BOOTSTRAP_ON_START=1` the app seeds an empty database on first start, then generates 30 days of simulated history and loads the NASA reference CSVs. Every `ARGUS_SIMULATE_TOPUP_MIN` minutes (default 15) it extends the simulated history to the present (`server/jobs/bootstrap.ts`).
 - Extensions: `citext` (case-insensitive usernames) and `pgcrypto` (`gen_random_uuid`). `vector` is enabled but unused until RAG is added [SRC-062].
 - Schema changes go **only** through Drizzle migrations (`server/db/migrations/`, `npm run db:migrate`). Nobody edits the Azure schema by hand.
 - Team access: one firewall rule per teammate IP, plus DB roles `argus_app` (the server) and `argus_analyst` (read-only, for notebooks). See `docs/DATABASE.md`.

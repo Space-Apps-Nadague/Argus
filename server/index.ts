@@ -4,6 +4,7 @@ import { createApp } from './app';
 import { getDbHandle } from './db/client';
 import { loadEnv } from './env';
 import { startAnalyticsTimer } from './jobs/analytics';
+import { bootstrapIfEmpty, startSimulatedTopUp } from './jobs/bootstrap';
 
 loadEnv();
 
@@ -13,10 +14,21 @@ const chain = resolveProviderChain(process.env).map(describeProvider);
 
 const dbHandle = getDbHandle();
 if (dbHandle) {
-  // Apply committed migrations on start so every teammate's schema matches (spec 05 §2).
-  await dbHandle.migrate();
-  startAnalyticsTimer(dbHandle.db);
-  console.log(`[ARGUS server] database: ${dbHandle.kind}`);
+  try {
+    // Apply committed migrations on start so every environment's schema matches (spec 05 §2).
+    await dbHandle.migrate();
+    startAnalyticsTimer(dbHandle.db);
+    console.log(`[ARGUS server] database: ${dbHandle.kind}`);
+    if (process.env.ARGUS_BOOTSTRAP_ON_START === '1') {
+      // Runs after the server is listening, so App Service's start-up probe is not blocked.
+      void bootstrapIfEmpty(dbHandle.db)
+        .then(() => startSimulatedTopUp(dbHandle.db))
+        .catch((err) => console.error('[ARGUS bootstrap] failed', err));
+    }
+  } catch (err) {
+    // Keep serving the HUD (offline mode in the browser) instead of crash-looping; API calls will report errors.
+    console.error('[ARGUS server] database unavailable at start-up:', (err as Error).message);
+  }
 } else {
   console.log('[ARGUS server] No DATABASE_URL — stateless mode (HUD runs the offline demo).');
 }

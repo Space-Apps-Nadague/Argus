@@ -10,16 +10,15 @@
  */
 
 import { and, eq, isNull } from 'drizzle-orm';
-import { type DeviceKind, SENSOR_KIT } from '../server/db/catalog';
-import { openDb, sql } from '../server/db/client';
+import { resolveDatabaseUrl } from '../server/db/connectionString';
+import type { DeviceKind } from '../server/db/catalog';
+import { openDb } from '../server/db/client';
 import { getProfile } from '../server/db/profiles';
 import { astronauts, devices, missions } from '../server/db/schema';
 import { loadEnv } from '../server/env';
 import { deviceToken } from '../server/ingest/deviceTokens';
-import { ingestReadings } from '../server/ingest/service';
+import { backfillSimulated } from '../server/ingest/backfill';
 import { simulate } from '../server/ingest/simulator';
-import { runAnalytics } from '../server/jobs/analytics';
-import { evaluateTriage, rollupDays } from '../server/jobs/rollup';
 import type { ScenarioId } from '../src/types/argus';
 
 loadEnv();
@@ -33,7 +32,7 @@ const crewFilter = process.argv.flatMap((a, i) => (a === '--crew' ? [process.arg
 const scenarioOverride = arg('scenario') as ScenarioId | undefined;
 const seed = Number(arg('seed') ?? 42);
 
-const url = process.env.DATABASE_URL;
+const url = resolveDatabaseUrl();
 if (!url) {
   console.error('DATABASE_URL is not set (see .env.example).');
   process.exit(1);
@@ -41,7 +40,6 @@ if (!url) {
 const h = openDb(url);
 const db = h.db;
 
-const DEVICE_SOURCE: Partial<Record<DeviceKind, string>> = Object.fromEntries(SENSOR_KIT.map((k) => [k.kind, k.sourceId]));
 
 async function crewList() {
   const rows = await db
@@ -60,57 +58,17 @@ async function deviceMap(astronautId: string): Promise<Map<DeviceKind, string>> 
   return new Map(rows.map((r) => [r.kind as DeviceKind, r.id]));
 }
 
-/** --reset: delete simulated observations and everything derived from them for the selected crew. */
-async function resetSimulated(ids: string[]) {
-  for (const id of ids) {
-    await db.execute(sql`delete from observations where astronaut_id = ${id} and origin = 'simulated'`);
-    for (const t of ['daily_metrics', 'baselines', 'anomalies', 'triage_events']) {
-      await db.execute(sql`delete from ${sql.identifier(t)} where astronaut_id = ${id}`);
-    }
-  }
-  console.log(`[simulate] reset simulated data for ${ids.length} astronaut(s)`);
-}
-
 async function backfill(days: number) {
-  const now = new Date();
-  if (has('reset')) await resetSimulated((await crewList()).map((c) => c.id));
-  for (const { id, missionStart } of await crewList()) {
-    const crew = await getProfile(db, id, null, { forceFull: true });
-    if (!crew) continue;
-    const templateStart = missionStart ?? new Date(now.getTime() - 29 * 86_400_000);
-    const from = new Date(Math.max(templateStart.getTime(), now.getTime() - days * 86_400_000));
-    const batch = simulate({
-      crew,
-      scenarioId: scenarioOverride ?? crew.defaultScenarioId,
-      from,
-      to: now,
-      templateStart,
-      seed,
-      secondaryEveryMin: has('full') ? 1 : 5,
-    });
-    const devs = await deviceMap(id);
-    let total = 0;
-    for (const [kind, readings] of batch) {
-      const r = await ingestReadings(db, {
-        astronautId: id,
-        deviceId: devs.get(kind) ?? null,
-        readings,
-        origin: 'simulated',
-        kind: 'simulator_backfill',
-        sourceId: DEVICE_SOURCE[kind] ?? null,
-        script: 'scripts/simulate-wearables.ts --backfill',
-        keepRaw: false, // bronze is skipped for bulk synthetic history; live batches keep raw
-        rollup: false,
-      });
-      total += r.inserted;
-    }
-    await rollupDays(db, id, from, now);
-    const triage = await evaluateTriage(db, id);
-    const analytics = await runAnalytics(db, id);
-    console.log(
-      `[simulate] ${crew.callsign.padEnd(10)} ${total.toLocaleString()} readings, ${triage} triage events, ${analytics.baselines} baselines, ${analytics.anomalies} anomalies`
-    );
-  }
+  await backfillSimulated(db, {
+    days,
+    seed,
+    crewIds: crewFilter,
+    scenarioOverride,
+    reset: has('reset'),
+    secondaryEveryMin: has('full') ? 1 : 5,
+    script: 'scripts/simulate-wearables.ts --backfill',
+    log: (m) => console.log(`[simulate] ${m}`),
+  });
 }
 
 async function live() {

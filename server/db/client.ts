@@ -19,6 +19,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import postgres from 'postgres';
+import { resolveDatabaseUrl } from './connectionString';
 import * as schema from './schema';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -63,7 +64,7 @@ let handle: DbHandle | null = null;
 /** The process-wide database, or null when DATABASE_URL is not set (stateless/offline mode). */
 export function getDb(): Db | null {
   if (handle) return handle.db;
-  const url = process.env.DATABASE_URL;
+  const url = resolveDatabaseUrl();
   if (!url) return null;
   handle = openDb(url);
   return handle.db;

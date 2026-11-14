@@ -1,9 +1,10 @@
 /** npm run db:migrate — applies committed SQL migrations to DATABASE_URL. */
 import { loadEnv } from '../env';
+import { resolveDatabaseUrl } from './connectionString';
 import { openDb } from './client';
 
 loadEnv();
-const url = process.env.DATABASE_URL;
+const url = resolveDatabaseUrl();
 if (!url) {
   console.error('DATABASE_URL is not set (see .env.example).');
   process.exit(1);

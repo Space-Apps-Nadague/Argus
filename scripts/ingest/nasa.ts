@@ -1,11 +1,12 @@
 /** npm run data:nasa — load NASA reference data into DATABASE_URL (specs/05-data-platform.md §7). */
 import { openDb } from '../../server/db/client';
+import { resolveDatabaseUrl } from '../../server/db/connectionString';
 import { loadEnv } from '../../server/env';
 import { loadOsdr } from './osdr';
 import { loadReferenceCsvs } from './reference';
 
 loadEnv();
-const url = process.env.DATABASE_URL;
+const url = resolveDatabaseUrl();
 if (!url) {
   console.error('DATABASE_URL is not set (see .env.example).');
   process.exit(1);
