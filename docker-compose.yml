@@ -27,6 +27,23 @@ services:
       - ollama-models:/root/.ollama
     restart: unless-stopped
 
+  whatsapp-bot:
+    profiles: ["whatsapp"]
+    build:
+      context: ./tools/whatsapp-bot
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - WHATSAPP_DB_PATH=/data/whatsapp.db
+    volumes:
+      - .:/workspace
+      - whatsapp-session:/data
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+
 volumes:
   ollama-models:
   argus-pg:
+  whatsapp-session:
