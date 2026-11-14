@@ -1086,6 +1086,8 @@ export function getOfflineFlightSurgeonGuidance(
       'At the Artemis Lunar Base (1/6g partial gravity, 1.3s one-way Earth comm delay), partial weight-bearing mitigates fluid shift while lunar regolith and surface radiation pose unique operational hazards.',
     'mars_base':
       'At Mars Surface Base (3/8g partial gravity, 18m 10s one-way Earth comm delay), substantial communications latency necessitates autonomous crew clinical protocols.',
+    'earth_1g':
+      'On Earth (1.00g terrestrial gravity, on-site real-time medical support), full hydrostatic pressure gradients and standard clinical baselines apply for pre-flight qualification and post-flight rehabilitation.',
   };
 
   // Specific crisis guidance overrides

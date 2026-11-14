@@ -9,6 +9,11 @@ import {
   getMetricThreshold,
 } from '../triageEngine';
 import {
+  LOCATION_ENVIRONMENT,
+  SPACE_LOCATIONS,
+  environmentForLocation,
+} from '../../data/spaceLocations';
+import {
   DEFAULT_CREW_ROSTER,
   getCrewAdjustedZones,
   getOfflineFlightSurgeonGuidance,
@@ -230,12 +235,13 @@ describe('ARGUS Deterministic Triage Engine (specs/01-data-schema.md)', () => {
   });
 
   describe('Issue #21: Multi-environment support & dynamic location/gravity presets (REQ-07)', () => {
-    it('defines all 4 canonical location presets in ENVIRONMENT_META and ENVIRONMENT_ORDER', () => {
+    it('defines all 5 canonical location presets in ENVIRONMENT_META and ENVIRONMENT_ORDER', () => {
       expect(ENVIRONMENT_ORDER).toEqual([
         'iss_leo',
         'lunar_base',
         '0g_transit',
         'mars_base',
+        'earth_1g',
       ]);
 
       expect(ENVIRONMENT_META.iss_leo).toMatchObject({
@@ -265,6 +271,13 @@ describe('ARGUS Deterministic Triage Engine (specs/01-data-schema.md)', () => {
         gravityG: '0.38g',
         commDelay: '18m 10s ONE-WAY',
       });
+
+      expect(ENVIRONMENT_META.earth_1g).toMatchObject({
+        label: 'Earth Surface (1.00g)',
+        shortLabel: 'Earth (1.00g)',
+        gravityG: '1.00g',
+        commDelay: 'On-Site',
+      });
     });
 
     it('returns gravity- and location-adjusted metric thresholds', () => {
@@ -272,49 +285,69 @@ describe('ARGUS Deterministic Triage Engine (specs/01-data-schema.md)', () => {
       const onsd0g = getMetricThreshold('onsd', '0g_transit');
       const onsdLunar = getMetricThreshold('onsd', 'lunar_base');
       const onsdMars = getMetricThreshold('onsd', 'mars_base');
+      const onsdEarth = getMetricThreshold('onsd', 'earth_1g');
 
       expect(onsd0g).toEqual({ nominalMin: 4.5, nominalMax: 5.5, yellowMin: 4.2, yellowMax: 5.9 });
       expect(onsdLunar).toEqual({ nominalMin: 4.3, nominalMax: 5.3, yellowMin: 4.0, yellowMax: 5.7 });
       expect(onsdMars).toEqual({ nominalMin: 4.1, nominalMax: 5.1, yellowMin: 3.8, yellowMax: 5.5 });
+      expect(onsdEarth).toEqual({ nominalMin: 4.0, nominalMax: 5.0, yellowMin: 3.8, yellowMax: 5.3 });
 
       // ARED resistance load thresholds:
       const ared0g = getMetricThreshold('ared_load', '0g_transit');
       const aredLunar = getMetricThreshold('ared_load', 'lunar_base');
       const aredMars = getMetricThreshold('ared_load', 'mars_base');
+      const aredEarth = getMetricThreshold('ared_load', 'earth_1g');
 
       expect(ared0g).toEqual({ nominalMin: 18, nominalMax: 30, yellowMin: 12, yellowMax: 35 });
       expect(aredLunar).toEqual({ nominalMin: 14, nominalMax: 26, yellowMin: 10, yellowMax: 30 });
       expect(aredMars).toEqual({ nominalMin: 12, nominalMax: 24, yellowMin: 8, yellowMax: 28 });
+      expect(aredEarth).toEqual({ nominalMin: 0, nominalMax: 16, yellowMin: 0, yellowMax: 24 });
 
       // Radiation dose rate thresholds (mSv/d):
       const radIss = getMetricThreshold('rad_dose', 'iss_leo');
       const rad0g = getMetricThreshold('rad_dose', '0g_transit');
       const radLunar = getMetricThreshold('rad_dose', 'lunar_base');
       const radMars = getMetricThreshold('rad_dose', 'mars_base');
+      const radEarth = getMetricThreshold('rad_dose', 'earth_1g');
 
       expect(radIss).toEqual({ nominalMin: 0.2, nominalMax: 0.6, yellowMin: 0.0, yellowMax: 1.2 });
       expect(rad0g).toEqual({ nominalMin: 0.4, nominalMax: 1.2, yellowMin: 0.0, yellowMax: 2.5 });
       expect(radLunar).toEqual({ nominalMin: 0.3, nominalMax: 0.9, yellowMin: 0.0, yellowMax: 2.0 });
       expect(radMars).toEqual({ nominalMin: 0.3, nominalMax: 0.8, yellowMin: 0.0, yellowMax: 1.8 });
+      expect(radEarth).toEqual({ nominalMin: 0.0, nominalMax: 0.05, yellowMin: 0.0, yellowMax: 0.1 });
+
+      // Cabin CO2 and BMD Delta on Earth:
+      const co2Earth = getMetricThreshold('cabin_co2', 'earth_1g');
+      expect(co2Earth).toEqual({ nominalMin: 0.0, nominalMax: 1.0, yellowMin: 0.0, yellowMax: 2.0 });
+
+      const bmdEarth = getMetricThreshold('bmd_delta', 'earth_1g');
+      expect(bmdEarth).toEqual({ nominalMin: -0.2, nominalMax: 0.2, yellowMin: -0.5, yellowMax: 0.5 });
     });
 
     it('evaluates metric status dynamically based on the active gravity environment', () => {
-      // 5.3 mm ONSD is nominal in 0g_transit, but elevated (yellow) on Mars
+      // 5.3 mm ONSD is nominal in 0g_transit, but elevated (yellow) on Mars and Earth
       expect(evaluateMetricStatus('onsd', 5.3, '0g_transit')).toBe('green');
       expect(evaluateMetricStatus('onsd', 5.3, 'iss_leo')).toBe('green');
       expect(evaluateMetricStatus('onsd', 5.3, 'lunar_base')).toBe('green');
       expect(evaluateMetricStatus('onsd', 5.3, 'mars_base')).toBe('yellow');
+      expect(evaluateMetricStatus('onsd', 5.3, 'earth_1g')).toBe('yellow');
 
-      // 15 kN·reps ARED load is yellow (under-exercised) in 0g transit, but green on Moon and Mars
+      // 15 kN·reps ARED load is yellow (under-exercised) in 0g transit, but green on Moon, Mars, and Earth
       expect(evaluateMetricStatus('ared_load', 15, '0g_transit')).toBe('yellow');
       expect(evaluateMetricStatus('ared_load', 15, 'lunar_base')).toBe('green');
       expect(evaluateMetricStatus('ared_load', 15, 'mars_base')).toBe('green');
+      expect(evaluateMetricStatus('ared_load', 15, 'earth_1g')).toBe('green');
 
-      // 0.8 mSv/d radiation is nominal in 0g deep space and lunar base, but elevated on ISS (due to geomagnetic expectation)
+      // 0.8 mSv/d radiation is nominal in 0g deep space and lunar base, but elevated on ISS and critical on Earth
       expect(evaluateMetricStatus('rad_dose', 0.8, '0g_transit')).toBe('green');
       expect(evaluateMetricStatus('rad_dose', 0.8, 'iss_leo')).toBe('yellow');
       expect(evaluateMetricStatus('rad_dose', 0.8, 'lunar_base')).toBe('green');
       expect(evaluateMetricStatus('rad_dose', 1.0, 'mars_base')).toBe('yellow');
+      expect(evaluateMetricStatus('rad_dose', 0.3, 'earth_1g')).toBe('red');
+
+      // 1.5 mmHg cabin CO2 is nominal in space ECLSS, but elevated on Earth
+      expect(evaluateMetricStatus('cabin_co2', 1.5, '0g_transit')).toBe('green');
+      expect(evaluateMetricStatus('cabin_co2', 1.5, 'earth_1g')).toBe('yellow');
     });
 
     it('formats flight norm badges using the active location shortLabel', () => {
@@ -322,6 +355,7 @@ describe('ARGUS Deterministic Triage Engine (specs/01-data-schema.md)', () => {
       expect(formatFlightNormBadge('onsd', 'mm', 'lunar_base')).toBe('Lunar Base Norm: 4.3–5.3 mm');
       expect(formatFlightNormBadge('onsd', 'mm', '0g_transit')).toBe('0g Transit Norm: 4.5–5.5 mm');
       expect(formatFlightNormBadge('onsd', 'mm', 'mars_base')).toBe('Mars Base Norm: 4.1–5.1 mm');
+      expect(formatFlightNormBadge('onsd', 'mm', 'earth_1g')).toBe('Earth (1.00g) Norm: 4–5 mm');
     });
 
     it('tailors offline flight surgeon guidance hazard context to the active environment', () => {
@@ -336,6 +370,10 @@ describe('ARGUS Deterministic Triage Engine (specs/01-data-schema.md)', () => {
 
       const gMars = getOfflineFlightSurgeonGuidance('nominal', 'neuro', 'mars_base');
       expect(gMars.hazardContextSummary).toContain('18m 10s one-way Earth comm delay');
+
+      const gEarth = getOfflineFlightSurgeonGuidance('nominal', 'neuro', 'earth_1g');
+      expect(gEarth.hazardContextSummary).toContain('1.00g terrestrial gravity');
+      expect(gEarth.hazardContextSummary).toContain('on-site real-time medical support');
     });
 
     it('re-evaluates all zones and readiness score when environment switches', () => {
@@ -343,10 +381,32 @@ describe('ARGUS Deterministic Triage Engine (specs/01-data-schema.md)', () => {
       const issScore = calculateCrewReadinessScore(TELEMETRY_SCENARIOS.nominal.zones, 'iss_leo');
       const marsScore = calculateCrewReadinessScore(TELEMETRY_SCENARIOS.nominal.zones, 'mars_base');
       const transitScore = calculateCrewReadinessScore(TELEMETRY_SCENARIOS.nominal.zones, '0g_transit');
+      const earthScore = calculateCrewReadinessScore(TELEMETRY_SCENARIOS.nominal.zones, 'earth_1g');
 
       expect(transitScore).toBe(98);
       expect(issScore).toBeGreaterThanOrEqual(15);
       expect(marsScore).toBeGreaterThanOrEqual(15);
+      expect(earthScore).toBeGreaterThanOrEqual(15);
+    });
+  });
+
+  describe('Issue #25: Earth (1.00g) pre/post-flight location & gravity preset', () => {
+    it('maps earth_pre and earth_post locations to earth_1g environment in LOCATION_ENVIRONMENT', () => {
+      expect(LOCATION_ENVIRONMENT.earth_pre).toBe('earth_1g');
+      expect(LOCATION_ENVIRONMENT.earth_post).toBe('earth_1g');
+      expect(environmentForLocation('earth_pre')).toBe('earth_1g');
+      expect(environmentForLocation('earth_post')).toBe('earth_1g');
+    });
+
+    it('configures 1.00g gravityLabel and shielded radiation on earth_pre and earth_post locations', () => {
+      expect(SPACE_LOCATIONS.earth_pre.gravityLabel).toBe('1.00g');
+      expect(SPACE_LOCATIONS.earth_post.gravityLabel).toBe('1.00g');
+      expect(SPACE_LOCATIONS.earth_pre.gravityG).toBe(1);
+      expect(SPACE_LOCATIONS.earth_post.gravityG).toBe(1);
+      expect(SPACE_LOCATIONS.earth_pre.radiation).toBe('shielded');
+      expect(SPACE_LOCATIONS.earth_post.radiation).toBe('shielded');
+      expect(SPACE_LOCATIONS.earth_pre.commDelaySec).toEqual([0, 0]);
+      expect(SPACE_LOCATIONS.earth_post.commDelaySec).toEqual([0, 0]);
     });
   });
 });
