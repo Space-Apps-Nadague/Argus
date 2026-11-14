@@ -3,7 +3,7 @@
  * Shared by `npm run simulate` (scripts/simulate-wearables.ts) and the hosted app's bootstrap/top-up.
  */
 
-import { and, eq, isNull, max } from 'drizzle-orm';
+import { and, eq, isNull, max, min } from 'drizzle-orm';
 import type { ScenarioId } from '../../src/types/argus';
 import { type DeviceKind, SENSOR_KIT } from '../db/catalog';
 import { sql, type Db } from '../db/client';
@@ -28,7 +28,10 @@ export interface BackfillOptions {
   reset?: boolean;
   /** Only fill the gap since each astronaut's latest simulated reading (no-op if none). */
   topUpOnly?: boolean;
-  /** Skip astronauts that already have simulated history (resumable first-start fill). */
+  /**
+   * Resumable first-start fill: skip astronauts whose simulated history is complete; an astronaut whose history
+   * starts later than expected (a fill interrupted by a restart) is cleared and filled again.
+   */
   onlyMissing?: boolean;
   script?: string;
   log?: (msg: string) => void;
@@ -77,12 +80,17 @@ export async function backfillSimulated(db: Db, opts: BackfillOptions = {}): Pro
       from = new Date(templateStart.getTime() - preflightDays * DAY_MS);
     }
     if (opts.onlyMissing) {
-      const has = await db
-        .select({ ts: observations.ts })
+      const [{ first }] = await db
+        .select({ first: min(observations.ts) })
         .from(observations)
-        .where(and(eq(observations.astronautId, id), eq(observations.origin, 'simulated')))
-        .limit(1);
-      if (has.length) continue;
+        .where(and(eq(observations.astronautId, id), eq(observations.origin, 'simulated')));
+      if (first) {
+        // A complete fill starts at `from` (heart rate is recorded every minute); allow one hour of slack.
+        const complete = new Date(first).getTime() <= from.getTime() + 3_600_000;
+        if (complete) continue;
+        log(`${profile.callsign}: incomplete history (starts ${new Date(first).toISOString().slice(0, 10)}), refilling`);
+        await resetSimulated(db, [id]);
+      }
     }
     if (opts.topUpOnly) {
       const [{ last }] = await db
