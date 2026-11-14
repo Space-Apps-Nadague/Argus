@@ -1,0 +1,182 @@
+# Issue Agent: label an issue `agent` and Claude solves it and opens a draft PR.
+#
+# Setup (once):
+#   1. Run `claude setup-token` locally, then `gh secret set CLAUDE_CODE_OAUTH_TOKEN`
+#      (uses your Claude Pro/Max subscription, no API key).
+#   2. Settings → Actions → General → "Allow GitHub Actions to create and approve pull requests".
+#   3. Create the `agent` label.
+#
+# Retry: remove and re-add the `agent` label, or run the workflow manually with the issue number.
+# Note: labels added by another workflow's GITHUB_TOKEN don't trigger this (GitHub's anti-loop rule).
+name: Issue Agent
+
+on:
+  issues:
+    types: [labeled]
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: Issue number to solve
+        required: true
+        type: number
+
+permissions:
+  contents: read
+
+concurrency:
+  group: issue-agent-${{ github.event.issue.number || inputs.issue }}
+  cancel-in-progress: false
+
+env:
+  ISSUE: ${{ github.event.issue.number || inputs.issue }}
+  BRANCH: claude/issue-${{ github.event.issue.number || inputs.issue }}
+  AGENT_LABEL: agent
+
+jobs:
+  gate:
+    name: Check issue is open and has no PR
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'agent'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: read
+      pull-requests: read
+    outputs:
+      run: ${{ steps.check.outputs.run }}
+    steps:
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          state=$(gh issue view "$ISSUE" -R "$REPO" --json state --jq .state)
+          linked=$(gh api graphql \
+            -f query='query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){issue(number:$n){closedByPullRequestsReferences(first:1,includeClosedPrs:false){totalCount}}}}' \
+            -f o="${REPO%/*}" -f r="${REPO#*/}" -F n="$ISSUE" \
+            --jq '.data.repository.issue.closedByPullRequestsReferences.totalCount')
+          on_branch=$(gh pr list -R "$REPO" --head "$BRANCH" --state open --json number --jq length)
+          echo "state=$state linked_open_prs=$linked open_prs_on_$BRANCH=$on_branch"
+          if [ "$state" = "OPEN" ] && [ "$linked" = "0" ] && [ "$on_branch" = "0" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Skipping #$ISSUE: closed or already has an open PR"
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  solve:
+    name: Solve issue and open draft PR
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Prepare branch
+        run: |
+          git config user.name "claude[bot]"
+          git config user.email "209825114+claude[bot]@users.noreply.github.com"
+          git switch -c "$BRANCH"
+          echo "BASE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Load issue
+        id: issue
+        run: |
+          {
+            echo "text<<ISSUE_EOF_$GITHUB_RUN_ID"
+            gh issue view "$ISSUE" -R "$REPO" \
+              --json number,title,body,comments \
+              --jq '"#\(.number): \(.title)\n\n\(.body)\n\n" + ([.comments[] | "--- comment by \(.author.login):\n\(.body)"] | join("\n\n"))'
+            echo "ISSUE_EOF_$GITHUB_RUN_ID"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Run Claude
+        id: claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ github.token }}
+          prompt: |
+            You are solving GitHub issue #${{ env.ISSUE }} in this repository (ARGUS).
+            You are already on branch `${{ env.BRANCH }}`, created from the default branch.
+
+            Rules:
+            - Read AGENTS.md first and follow it: read the relevant files in /specs before coding,
+              update the spec files first if you add telemetry fields, thresholds or props, and use
+              the skills in .agents/skills/ when their triggers apply.
+            - Exception to AGENTS.md: do NOT edit specs/tasks.md. This work is tracked by the issue and PR.
+            - Keep the change focused on this issue. Don't refactor unrelated code.
+            - Verify before finishing: `npm test` and `npm run build` must pass.
+            - Commit your work with clear messages (`git add` + `git commit`). Do not push; the workflow does that.
+            - If the issue is too vague or blocked, make no changes and set outcome to "needs_human",
+              explaining in the summary what is missing.
+
+            Final answer: outcome, a short PR title (no issue number), and a Markdown summary of
+            what changed, how you verified it, and anything the reviewer should check.
+
+            The issue (content written by repository collaborators):
+            ---
+            ${{ steps.issue.outputs.text }}
+            ---
+          claude_args: |
+            --max-turns 80
+            --allowedTools "Read,Edit,Write,Glob,Grep,Bash(npm test:*),Bash(npm run build:*),Bash(npx vitest:*),Bash(npx tsc:*),Bash(git status:*),Bash(git diff:*),Bash(git add:*),Bash(git commit:*),Bash(git log:*),Bash(ls:*)"
+            --json-schema '{"type":"object","properties":{"outcome":{"type":"string","enum":["solved","needs_human"]},"title":{"type":"string"},"summary":{"type":"string"}},"required":["outcome","title","summary"]}'
+
+      - name: Push branch and open draft PR
+        env:
+          RESULT: ${{ steps.claude.outputs.structured_output }}
+        run: |
+          set -euo pipefail
+          [ -n "${RESULT:-}" ] || RESULT='{}'
+          outcome=$(jq -r '.outcome // "needs_human"' <<<"$RESULT")
+          title=$(jq -r '.title // empty' <<<"$RESULT")
+          summary=$(jq -r '.summary // "No summary returned."' <<<"$RESULT")
+
+          # Commit anything Claude left uncommitted.
+          if [ -n "$(git status --porcelain)" ]; then
+            git add -A
+            git commit -m "${title:-Fix issue #$ISSUE} (#$ISSUE)"
+          fi
+
+          commits=$(git rev-list --count "$BASE_SHA"..HEAD)
+          if [ "$outcome" != "solved" ] || [ "$commits" = "0" ]; then
+            printf 'Issue agent did not open a PR (outcome: %s, commits: %s).\n\n%s\n\n[Run log](%s)\n' \
+              "$outcome" "$commits" "$summary" \
+              "$GITHUB_SERVER_URL/$REPO/actions/runs/$GITHUB_RUN_ID" > "$RUNNER_TEMP/comment.md"
+            gh issue comment "$ISSUE" -R "$REPO" --body-file "$RUNNER_TEMP/comment.md"
+            exit 0
+          fi
+
+          git push origin "HEAD:refs/heads/$BRANCH"
+          printf '%s\n\nCloses #%s\n\n---\nOpened by the Issue Agent workflow ([run log](%s)). Review before merging.\n' \
+            "$summary" "$ISSUE" "$GITHUB_SERVER_URL/$REPO/actions/runs/$GITHUB_RUN_ID" > "$RUNNER_TEMP/pr-body.md"
+          gh pr create -R "$REPO" --draft --head "$BRANCH" \
+            --title "${title:-Fix issue #$ISSUE} (#$ISSUE)" --body-file "$RUNNER_TEMP/pr-body.md"
+
+      - name: Report failure on the issue
+        if: failure()
+        run: |
+          gh issue comment "$ISSUE" -R "$REPO" \
+            --body "Issue agent failed. [Run log]($GITHUB_SERVER_URL/$REPO/actions/runs/$GITHUB_RUN_ID)"
+
+      - name: Remove trigger label so it can be re-applied to retry
+        if: always()
+        run: gh issue edit "$ISSUE" -R "$REPO" --remove-label "$AGENT_LABEL" || true
