@@ -139,13 +139,16 @@ Shared TypeScript lives in `shared/analytics/` and is used by both the server an
 Days are UTC calendar days, labelled as mission days (`MD-n`) from `missions.start_at`.
 
 ### 5.2 Baselines (`baselines`)
-Computed per astronaut × metric.
+Computed per astronaut × metric. As NASA does, in-flight values are compared with the same person **on Earth before launch**. Spaceflight Standard Measures collect pre-flight data [SRC-009], ARCHeR crews wore their actigraph months before flight [SRC-024], and Inspiration4 drew blood at L-92/L-44/L-3 [SRC-047].
 
 | Kind | Method |
 |---|---|
-| `preflight` | First 7 mission days, frozen once mission day 8 exists. Mean and SD, with SD floored at `METRIC_TYPICAL_SD`. This is the reference for drift. |
-| `rolling_14d` | The last 14 days of daily values: median, MAD, mean, SD, p05 and p95. This is the "your normal" band in the HUD. |
+| `preflight` | **Earth pre-flight**: daily values dated before `missions.start_at` (default 14 days, `--preflight-days`). Mean and SD, with SD floored at `METRIC_TYPICAL_SD`. This is the reference for drift. Without at least 2 Earth days (e.g. `cabin_co2`, `ared_load`, which only exist in the habitat), it falls back to `early_flight`. |
+| `early_flight` | Mission days 1–7: the adaptation reference. Radiation (`rad_dose`) drifts from this one, because its rise from Earth is environmental, not physiological (`DRIFT_FROM_EARLY_FLIGHT`). |
+| `rolling_14d` | The last 14 in-flight days: median, MAD, mean, SD, p05 and p95. This is the "your normal" band in the HUD. |
 | `hour_of_day` | `heart_rate` minute data over 14 days, grouped by UTC hour. This is the circadian reference, so the 03:00 heart rate is compared with that person's own 03:00. |
+
+The simulated Earth phase uses each crew member's recorded pre-flight values (`restingHrBaselineBpm`, `preFlightOnsdMm`), natural background radiation (≈ 3.1 mSv/yr [SRC-080]), weekly exams, no circadian shift, and no habitat CO₂ or flight exercise device. In the HUD these days appear at the start of each series as `L-n` (L-1 = the day before launch). The client drift maths uses the same rule, `baselinePoints()` in `shared/analytics`.
 
 ### 5.3 Anomaly detectors (`anomalies`)
 These are informational only: an anomaly never changes a triage status.

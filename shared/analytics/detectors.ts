@@ -10,6 +10,18 @@ export const ROBUST_Z_LIMIT = 3.5;
 /** Minutes an outlier must persist before it counts (suppresses wearable artifacts). */
 export const PERSISTENCE_MIN = 10;
 export const EWMA_ALPHA = 0.3;
+/**
+ * Exposure metrics whose change from Earth is environmental, not physiological (spec 05 §5.2):
+ * their personal baseline is early flight (mission days 1–7) instead of Earth pre-flight.
+ */
+export const DRIFT_FROM_EARLY_FLIGHT: readonly string[] = ['rad_dose'];
+
+/** Points that form a metric's personal baseline: Earth pre-flight days (missionDay ≤ 0) if present, else early flight. */
+export function baselinePoints<T extends { missionDay: number }>(metricId: string, sorted: T[], n = 7): T[] {
+  const earth = sorted.filter((p) => p.missionDay < 1);
+  if (earth.length >= 2 && !DRIFT_FROM_EARLY_FLIGHT.includes(metricId)) return earth;
+  return sorted.filter((p) => p.missionDay >= 1).slice(0, n);
+}
 /** CUSUM reference value k and decision interval h, in σ units (Source: SRC-064). */
 export const CUSUM_K = 0.5;
 export const CUSUM_H = 4;

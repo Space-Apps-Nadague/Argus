@@ -40,7 +40,7 @@ Columns:
 | SRC-021 | [Astroskin sensor sampling rates](https://support.hexoskin.com/en/astroskin/what-is-the-sampling-rate-for-the-astroskin-sensors) (Hexoskin) | web | open | `specs/05-data-platform.md` §4 (precedent: 1 Hz vitals on a wearable) |
 | SRC-022 | [Bio-Monitor validation, NTRS 20190000238](https://ntrs.nasa.gov/api/citations/20190000238/downloads/20190000238.pdf) | paper | open | `specs/05-data-platform.md` §4 |
 | SRC-023 | [Actigraphy in spaceflight, NTRS 20200001281](https://ntrs.nasa.gov/api/citations/20200001281/downloads/20200001281.pdf) (Actiwatch Spectrum) | paper | open | `specs/05-data-platform.md` §4 (wrist actigraphy → watch sleep/activity), `server/ingest/simulator.ts` (sleep blocks) |
-| SRC-024 | [Artemis II crew research (ARCHeR)](https://www.nasa.gov/humans-in-space/artemis-ii-crew-to-advance-human-spaceflight-research/) (NASA) | web | open | `specs/05-data-platform.md` §4 |
+| SRC-024 | [Artemis II crew research (ARCHeR)](https://www.nasa.gov/humans-in-space/artemis-ii-crew-to-advance-human-spaceflight-research/) (NASA) | web | open | `specs/05-data-platform.md` §4, §5.2 (crew wear the actigraph ~6 months before flight → Earth pre-flight baseline), `server/ingest/simulator.ts` |
 | SRC-025 | [ESA "Keeping the rhythm in space"](https://www.esa.int/Science_Exploration/Human_and_Robotic_Exploration/Research/Keeping_the_rhythm_in_space) (Circadian Rhythms, Double Sensor core temperature) | web | open | `server/ingest/simulator.ts` (~2 h circadian shift, body-temperature rise) |
 | SRC-026 | [ISS Crew Active Dosimeter](https://read.qxmd.com/read/37945094/the-importance-of-time-resolved-personal-dosimetry-in-space-the-iss-crew-active-dosimeter) (Gaza et al., 2023) | paper | open | `specs/05-data-platform.md` §4, `server/db/catalog.ts`, `server/ingest/simulator.ts` (dosimeter, the 2nd worn device) |
 | SRC-027 | [Inspiration4 wearables (Apple Watch)](https://pmc.ncbi.nlm.nih.gov/articles/PMC11357997) | paper | open | `specs/05-data-platform.md` §4, `server/db/catalog.ts` (smartwatch flown on Inspiration4) |
@@ -86,4 +86,10 @@ Columns:
 | SRC-077 | Challenge brief: camera images incl. blood sugar mg/dL as an input modality (`specs/03-requirements.md` §3.2) | web | open | `server/db/catalog.ts` (glucometer photo), `specs/05-data-platform.md` §4 |
 | SRC-078 | [SPACEDOS04 personal active dosimeter with wristwatch display](https://docs.dos.ust.cz/spacedos/SPACEDOS04) (in development) | web | open | `specs/05-data-platform.md` §4 (dosimeter could show on the wrist later) |
 | SRC-079 | [ESA: Active tracking of astronaut radiation exposures (EuCPAD / ESA Active Dosimeter)](https://www.esa.int/Enabling_Support/Space_Engineering_Technology/Active_tracking_of_astronaut_rad-exposures_targeted) | web | open | `specs/05-data-platform.md` §4 (real-time personal dosimetry) |
+
+## Earth pre-flight baseline
+
+| ID | Source | Type | Access | Used in |
+|---|---|---|---|---|
+| SRC-080 | [US NRC: Backgrounder on Biological Effects of Radiation](https://www.nrc.gov/reading-rm/doc-collections/fact-sheets/bio-effects-radiation) (natural background ≈ 3.1 mSv/yr in the US) | standard | open | `server/ingest/simulator.ts` (Earth pre-flight `rad_dose`), `specs/05-data-platform.md` §5.2 |
 

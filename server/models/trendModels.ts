@@ -6,7 +6,7 @@
 
 import type { BodyZoneId, GravityEnvironment, VitalSignReading } from '../../src/types/argus';
 import type { MetricTrend, TrendDirection, TrendLevel } from '../../src/types/aiApi';
-import { EWMA_ALPHA, linearRegression, mean, sampleSd } from '../../shared/analytics';
+import { baselinePoints, EWMA_ALPHA, linearRegression, mean, sampleSd } from '../../shared/analytics';
 import { evaluateMetricStatus, getMetricThreshold, isMetricId, METRIC_TYPICAL_SD } from '../../src/utils/triageEngine';
 
 export { linearRegression };
@@ -52,7 +52,7 @@ export function analyzeMetricTrend(
   const values = history.map((p) => p.value);
   const t = getMetricThreshold(reading.metricId, environment);
 
-  const baselinePts = values.slice(0, BASELINE_DAYS);
+  const baselinePts = baselinePoints(reading.metricId, history, BASELINE_DAYS).map((p) => p.value);
   const baselineMean = baselinePts.length ? mean(baselinePts) : reading.currentValue;
   const sdFloor = isMetricId(reading.metricId) ? METRIC_TYPICAL_SD[reading.metricId] : Math.max((t.nominalMax - t.nominalMin) / 8, 1e-6);
   const sd = Math.max(sampleSd(baselinePts), sdFloor);

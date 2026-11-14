@@ -1,12 +1,13 @@
 /**
  * ARGUS — Per-astronaut analytics job (specs/05-data-platform.md §5.2–§5.3)
- * Writes `baselines` (preflight, rolling_14d, hour_of_day) and `anomalies` (ewma, cusum, robust_z).
+ * Writes `baselines` (preflight = Earth before launch, early_flight, rolling_14d, hour_of_day) and `anomalies` (ewma, cusum, robust_z).
  * Informational only: never changes triage status (AGENTS.md §2.4).
  */
 
 import { and, asc, eq, gte, isNull } from 'drizzle-orm';
 import {
   cusum,
+  DRIFT_FROM_EARLY_FLIGHT,
   ewma,
   mergeRuns,
   PERSISTENCE_MIN,
@@ -18,11 +19,11 @@ import {
 } from '../../shared/analytics';
 import { isMetricId, METRIC_TYPICAL_SD } from '../../src/utils/triageEngine';
 import type { Db } from '../db/client';
-import { anomalies, astronauts, baselines, dailyMetrics, observations } from '../db/schema';
+import { anomalies, astronauts, baselines, dailyMetrics, missions, observations } from '../db/schema';
 
 export const ANALYTICS_VERSION = 'analytics-v1';
 const DAY_MS = 86_400_000;
-const PREFLIGHT_DAYS = 7;
+const EARLY_FLIGHT_DAYS = 7;
 const ROLLING_DAYS = 14;
 /** Minute streams that get an hour-of-day (circadian) baseline and robust-z detection. */
 export const CIRCADIAN_METRICS = ['heart_rate'];
@@ -43,27 +44,39 @@ export async function runAnalytics(db: Db, astronautId: string, now = new Date()
   const byMetric = new Map<string, Array<{ day: string; value: number }>>();
   for (const r of daily) byMetric.set(r.metricId, [...(byMetric.get(r.metricId) ?? []), { day: r.day, value: r.value }]);
 
+  // Mission start splits Earth pre-flight days from in-flight days (spec 05 §5.2).
+  const mission = (
+    await db
+      .select({ startAt: missions.startAt })
+      .from(astronauts)
+      .leftJoin(missions, eq(missions.id, astronauts.missionId))
+      .where(eq(astronauts.id, astronautId))
+      .limit(1)
+  )[0];
+  const launchDay = mission?.startAt ? mission.startAt.toISOString().slice(0, 10) : '0000-00-00';
+
   const baselineRows: BaselineRow[] = [];
   const anomalyRows: AnomalyRow[] = [];
   const common = { astronautId, pipelineVersion: ANALYTICS_VERSION, computedAt: now };
 
-  // ── Daily metrics: preflight + rolling baselines, EWMA and CUSUM drift ──
-  for (const [metricId, series] of byMetric) {
+  // ── Daily metrics: Earth pre-flight, early-flight and rolling baselines; EWMA and CUSUM drift ──
+  for (const [metricId, all] of byMetric) {
+    const earthDays = all.filter((p) => p.day < launchDay);
+    const series = all.filter((p) => p.day >= launchDay); // in flight
     if (series.length < 3) continue;
-    const pre = series.slice(0, PREFLIGHT_DAYS);
-    const preSummary = summarize(pre.map((p) => p.value));
     const sdFloor = isMetricId(metricId) ? METRIC_TYPICAL_SD[metricId] : 1e-6;
-    const preSd = Math.max(preSummary.sd, sdFloor);
-    baselineRows.push({
-      ...common,
-      metricId,
-      kind: 'preflight',
-      hour: -1,
-      ...preSummary,
-      sd: preSd,
-      windowStart: dayStart(pre[0].day),
-      windowEnd: dayEnd(pre[pre.length - 1].day),
-    });
+    const summaryRow = (kind: 'preflight' | 'early_flight', pts: Array<{ day: string; value: number }>) => {
+      const sum = summarize(pts.map((p) => p.value));
+      return { sum, row: { ...common, metricId, kind, hour: -1, ...sum, sd: Math.max(sum.sd, sdFloor), windowStart: dayStart(pts[0].day), windowEnd: dayEnd(pts[pts.length - 1].day) } as BaselineRow };
+    };
+    const early = summaryRow('early_flight', series.slice(0, EARLY_FLIGHT_DAYS));
+    baselineRows.push(early.row);
+    // Pre-flight = measured on Earth before launch (≥ 2 days). Without Earth data, fall back to early flight.
+    const pre = earthDays.length >= 2 ? summaryRow('preflight', earthDays) : { ...early, row: { ...early.row, kind: 'preflight' as const } };
+    baselineRows.push(pre.row);
+    const ref = DRIFT_FROM_EARLY_FLIGHT.includes(metricId) ? early : pre;
+    const preSummary = ref.sum;
+    const preSd = Math.max(ref.sum.sd, sdFloor);
 
     const rolling = series.slice(-ROLLING_DAYS);
     baselineRows.push({
@@ -90,7 +103,7 @@ export async function runAnalytics(db: Db, astronautId: string, now = new Date()
         detector: 'ewma',
         score: Math.round(peak * 100) / 100,
         severity,
-        detail: { baselineMean: preSummary.mean, baselineSd: preSd, direction: peak > 0 ? 'up' : 'down', days: run.end - run.start + 1 },
+        detail: { baselineMean: preSummary.mean, baselineSd: preSd, reference: ref.row.kind, direction: peak > 0 ? 'up' : 'down', days: run.end - run.start + 1 },
       });
     }
 
@@ -106,7 +119,7 @@ export async function runAnalytics(db: Db, astronautId: string, now = new Date()
         detector: 'cusum',
         score: Math.round(stat * 100) / 100,
         severity: stat > 8 ? 'drifting' : 'watch',
-        detail: { direction: dir > 0 ? 'up' : 'down', k: 0.5, h: 4, baselineMean: preSummary.mean, baselineSd: preSd },
+        detail: { direction: dir > 0 ? 'up' : 'down', k: 0.5, h: 4, reference: ref.row.kind, baselineMean: preSummary.mean, baselineSd: preSd },
       });
     }
   }

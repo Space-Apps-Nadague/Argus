@@ -40,7 +40,10 @@ export async function buildZonesFromDb(
       .limit(1)
   )[0];
   const missionStart = mission?.startAt ?? null;
-  const since = new Date(Date.now() - SERIES_DAYS * DAY_MS).toISOString().slice(0, 10);
+  // Flight days plus up to SERIES_DAYS of Earth pre-flight days (labelled L-n), so baselines on the client
+  // (first points of the series) are the Earth pre-flight values (spec 05 §5.2).
+  const sinceMs = Math.min(Date.now() - SERIES_DAYS * DAY_MS, (missionStart?.getTime() ?? Date.now()) - SERIES_DAYS * DAY_MS);
+  const since = new Date(sinceMs).toISOString().slice(0, 10);
   const rows = await db
     .select()
     .from(dailyMetrics)
@@ -51,9 +54,9 @@ export async function buildZonesFromDb(
   for (const r of rows) {
     const dayMs = Date.parse(`${r.day}T00:00:00Z`);
     const missionDay = missionStart ? Math.floor((dayMs - missionStart.getTime()) / DAY_MS) + 1 : 1;
-    if (missionDay < 1) continue;
     const list = byMetric.get(r.metricId) ?? [];
-    list.push({ missionDay, dateLabel: `MD-${missionDay}`, value: round(r.value, r.metricId), source: ORIGIN_TO_SOURCE[r.origin] });
+    const dateLabel = missionDay >= 1 ? `MD-${missionDay}` : `L-${1 - missionDay}`; // L-1 = the day before launch
+    list.push({ missionDay, dateLabel, value: round(r.value, r.metricId), source: ORIGIN_TO_SOURCE[r.origin] });
     byMetric.set(r.metricId, list);
   }
 
@@ -62,15 +65,16 @@ export async function buildZonesFromDb(
     zones[zone] = template[zone].map((reading) => {
       const history = byMetric.get(reading.metricId);
       if (!history?.length) return reading; // no data yet: keep the template series
-      const first = history.slice(0, 7);
-      const base = first.reduce((s, p) => s + p.value, 0) / first.length;
+      const earth = history.filter((p) => p.missionDay < 1);
+      const ref = earth.length >= 2 ? earth : history.filter((p) => p.missionDay >= 1).slice(0, 7);
+      const base = ref.reduce((s, p) => s + p.value, 0) / ref.length;
       const current = history[history.length - 1].value;
       const diff = round(current - base, reading.metricId);
       return {
         ...reading,
         history,
         currentValue: current,
-        deltaFromBaseline: `${diff >= 0 ? '+' : ''}${diff} ${reading.unit} vs first-week baseline`,
+        deltaFromBaseline: `${diff >= 0 ? '+' : ''}${diff} ${reading.unit} vs ${earth.length >= 2 ? 'Earth pre-flight' : 'first-week'} baseline`,
       };
     });
   }

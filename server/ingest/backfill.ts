@@ -19,6 +19,8 @@ const DEVICE_SOURCE: Partial<Record<DeviceKind, string>> = Object.fromEntries(SE
 
 export interface BackfillOptions {
   days?: number;
+  /** Days of Earth pre-flight data before mission start (default 14; 0 = none). */
+  preflightDays?: number;
   seed?: number;
   crewIds?: string[];
   scenarioOverride?: ScenarioId;
@@ -67,6 +69,11 @@ export async function backfillSimulated(db: Db, opts: BackfillOptions = {}): Pro
     if (!profile) continue;
     const templateStart = missionStart ?? new Date(now.getTime() - 29 * DAY_MS);
     let from = new Date(Math.max(templateStart.getTime(), now.getTime() - (opts.days ?? 30) * DAY_MS));
+    // Include the Earth pre-flight period when the window reaches back to launch (spec 05 §5.2).
+    const preflightDays = opts.preflightDays ?? 14;
+    if (preflightDays > 0 && from.getTime() <= templateStart.getTime()) {
+      from = new Date(templateStart.getTime() - preflightDays * DAY_MS);
+    }
     if (opts.topUpOnly) {
       const [{ last }] = await db
         .select({ last: max(observations.ts) })

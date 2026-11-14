@@ -5,7 +5,7 @@
  *   npm run simulate -- --live                        # every 60 s, POST the last minute(s) to the ingest API as each device
  *   npm run simulate -- --live --crew crew-lindqvist --scenario solar_storm   # push a crisis now
  *
- * Options: --reset (delete earlier simulated data first), --crew <id> (repeatable), --scenario <id>, --seed <n>, --full (1-min secondary streams),
+ * Options: --preflight-days <n> (Earth days before launch, default 14), --reset (delete earlier simulated data first), --crew <id> (repeatable), --scenario <id>, --seed <n>, --full (1-min secondary streams),
  *          --interval <s> (live), --api <url> (live, default http://127.0.0.1:8787)
  */
 
@@ -61,6 +61,7 @@ async function deviceMap(astronautId: string): Promise<Map<DeviceKind, string>> 
 async function backfill(days: number) {
   await backfillSimulated(db, {
     days,
+    preflightDays: arg('preflight-days') !== undefined ? Number(arg('preflight-days')) : undefined,
     seed,
     crewIds: crewFilter,
     scenarioOverride,

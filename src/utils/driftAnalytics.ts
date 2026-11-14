@@ -21,6 +21,7 @@ import {
 } from '../types/argus';
 import { METRIC_TYPICAL_SD, isMetricId } from './triageEngine';
 import { mean, sampleSd } from '../../shared/analytics/stats';
+import { baselinePoints } from '../../shared/analytics/detectors';
 
 export const BASELINE_DAYS = 7;
 export const EWMA_ALPHA = 0.3;
@@ -51,12 +52,12 @@ function sortedHistory(history: TelemetryHistoryPoint[]): TelemetryHistoryPoint[
   return [...history].sort((a, b) => a.missionDay - b.missionDay);
 }
 
-/** Baseline = mean of the first 7 mission days, SD floored by METRIC_TYPICAL_SD. */
+/** Baseline = Earth pre-flight days when present (else the first 7 mission days), SD floored by METRIC_TYPICAL_SD. */
 export function computeBaseline(
   metricId: string,
   history: TelemetryHistoryPoint[]
 ): PersonalBaseline | null {
-  const pts = sortedHistory(history).slice(0, BASELINE_DAYS).map((p) => p.value);
+  const pts = baselinePoints(metricId, sortedHistory(history), BASELINE_DAYS).map((p) => p.value);
   if (!pts.length) return null;
   return {
     mean: mean(pts),

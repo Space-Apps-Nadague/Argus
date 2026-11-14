@@ -88,7 +88,9 @@ export interface AnalyticsResponse {
     metricId: string;
     day: string;
     value: number;
-    preflight: { mean: number; sd: number; n: number } | null;
+    /** Measured on Earth before launch (falls back to early flight when no Earth data). */
+    preflight: { mean: number; sd: number; n: number; windowStart: string; windowEnd: string } | null;
+    earlyFlight: { mean: number; sd: number; n: number } | null;
     normal: { median: number; p05: number; p95: number; mean: number; n: number } | null;
     zVsPreflight: number | null;
   }>;
