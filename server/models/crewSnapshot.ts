@@ -14,6 +14,7 @@ import type { CrewContextRequest, MetricTrend } from '../../src/types/aiApi';
 import { BODY_ZONES, getCrewAdjustedZones, TELEMETRY_SCENARIOS } from '../../src/data/telemetryScenarios';
 import { formatCommDelay, SPACE_LOCATIONS } from '../../src/data/spaceLocations';
 import type { SpaceLocation } from '../../src/types/argus';
+import { applyCheckIns } from '../../src/utils/checkIns';
 import {
   calculateCrewReadinessScore,
   DEFAULT_ENVIRONMENT,
@@ -39,7 +40,8 @@ export interface CrewSnapshot {
 export function buildCrewSnapshot(req: CrewContextRequest): CrewSnapshot {
   const environment = req.environment ?? DEFAULT_ENVIRONMENT;
   const scenario = TELEMETRY_SCENARIOS[req.scenarioId];
-  const zones = getCrewAdjustedZones(req.scenarioId, req.crewMember);
+  const baseZones = getCrewAdjustedZones(req.scenarioId, req.crewMember);
+  const zones = req.telemetryCheckIns?.length ? applyCheckIns(baseZones, req.telemetryCheckIns) : baseZones;
   const trends = analyzeAllTrends(zones, environment);
   return {
     crewMember: req.crewMember,

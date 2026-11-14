@@ -14,6 +14,7 @@ import { getCrewAdjustedZones, TELEMETRY_SCENARIOS } from '../data/telemetryScen
 import { applyCheckIns } from '../utils/checkIns';
 import { evaluateAllZones } from '../utils/triageEngine';
 import { hasConfiguredAiKey } from '../services/flightSurgeonAi';
+import { ProviderBadge, useAiStatus } from './ai/shared';
 import { StatusIcon, STATUS_WORD } from './ui/StatusPill';
 
 const SCENARIO_ORDER: ScenarioId[] = ['nominal', 'sans_alert', 'high_co2', 'solar_storm'];
@@ -59,6 +60,7 @@ export const TopMissionBar: React.FC = () => {
   const { currentUser, isAdmin, seesAllCrew, canViewHealth, logout } = useAuth();
 
   const [showKeyInput, setShowKeyInput] = useState(false);
+  const { status: aiStatus, checked: aiChecked } = useAiStatus(runtimeApiKey);
   const hasKey = hasConfiguredAiKey(runtimeApiKey);
   const rStatus = readinessStatus(readinessScore);
   const streak = countermeasureStreakSols + (completedStepIds.length > 0 ? 1 : 0);
@@ -157,6 +159,10 @@ export const TopMissionBar: React.FC = () => {
             </select>
           </label>
 
+          <div className="hidden xl:inline-flex">
+            <ProviderBadge status={aiStatus} checked={aiChecked} />
+          </div>
+
           <div className="relative">
             <button
               type="button"
@@ -186,6 +192,9 @@ export const TopMissionBar: React.FC = () => {
                   </button>
                 </div>
                 <p className="mb-2 text-[11px] text-hud-muted">Optional. ARGUS works fully offline.</p>
+                <div className="mb-2">
+                  <ProviderBadge status={aiStatus} checked={aiChecked} />
+                </div>
                 <input
                   type="password"
                   value={runtimeApiKey}

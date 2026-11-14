@@ -44,7 +44,7 @@ Env vars are **server-only** (never `VITE_`). See `.env.example`.
 - Vision requests use `<PROVIDER>_VISION_MODEL` (OpenRouter defaults to `openrouter/free`, Gemini to its chat model); providers without a vision model are skipped.
 
 ## 4. Endpoints
-Every request may include `locationId` (`SpaceLocationId`, spec 01 §8); the server adds the mission location (gravity, comm delay) to prompts.
+Every request may include `locationId` (`SpaceLocationId`, spec 01 §8) and `telemetryCheckIns` (`CheckInEntry[]`, spec 01 §6); the server adds the mission location (gravity, comm delay) to prompts and runs `applyCheckIns` before triage, readiness, and trend models.
 
 All JSON endpoints return `AiEnvelope<T> = { result: T, meta: { source, provider?, model?, latencyMs? } }` (types in `src/types/aiApi.ts`).
 
