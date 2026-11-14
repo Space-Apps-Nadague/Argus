@@ -13,9 +13,9 @@
  *   dynamically colored by deterministic `TriageStatus` (`#22c55e`, `#eab308`, `#ef4444`).
  */
 
-import React, { Component, useEffect, useMemo, useRef, useState } from 'react';
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { Html, OrbitControls } from '@react-three/drei';
+import React, { Component, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Canvas, useThree } from '@react-three/fiber';
+import { AdaptiveDpr, AdaptiveEvents, Bvh, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import {
   Activity,
@@ -48,26 +48,11 @@ import {
   STATUS_COLORS,
   STATUS_LABELS,
 } from '../utils/triageEngine';
-import {
-  createAirwayGeometries,
-  createAppendicularSkeletonGeometries,
-  createBrainHemisphereGeometry,
-  createCerebellumGeometry,
-  createHeartGeometry,
-  createLiverGeometry,
-  createLungGeometry,
-  createLymphaticConduitGeometries,
-  createNeuroVascularGeometries,
-  createPelvicGirdleGeometries,
-  createSculptedArmGeometry,
-  createSculptedHeadAndNeckGeometry,
-  createSculptedLegGeometry,
-  createSculptedTorsoGeometry,
-  createSpleenGeometry,
-  createThoracicRibGeometries,
-  createThymusGeometry,
-  createVascularTreeGeometries,
-} from '../utils/anatomicalGeometry';
+import { OrganTwinModel } from '../features/organs/OrganTwinModel';
+import { OrganPanel } from '../features/organs/OrganPanel';
+import { ORGAN_BY_ID, organStates, PEEL_LEVELS, type OrganId, type PeelLevel } from '../features/organs/organs';
+import { buildPerson } from '../features/thousandEyes/adapter';
+import type { Status } from '../features/thousandEyes/types';
 
 type CameraPresetId = 'full_body' | 'cranial_sans' | 'thorax_core';
 
@@ -92,12 +77,7 @@ const CAMERA_PRESETS: Record<
   },
 };
 
-const LAYER_OPTIONS: { id: AnatomicalLayer; label: string; shortLabel: string }[] = [
-  { id: 'all', label: 'All Composite Layers', shortLabel: 'All Layers' },
-  { id: 'dermal', label: 'Sculpted Dermal & Muscular Surface', shortLabel: 'Dermal / Muscle' },
-  { id: 'skeletal', label: 'Skeletal & Musculoskeletal System', shortLabel: 'Skeletal' },
-  { id: 'organs', label: 'Internal Organs & Vascular Network', shortLabel: 'Organs / Vascular' },
-];
+const STATUS_TO_TRIAGE: Record<Status, TriageStatus> = { 0: 'green', 1: 'yellow', 2: 'red' };
 
 const ZONE_ICONS: Record<BodyZoneId, React.ReactNode> = {
   neuro: <Brain className="w-3.5 h-3.5" />,
@@ -161,700 +141,6 @@ const CameraPresetController: React.FC<CameraControllerProps> = ({
   return null;
 };
 
-interface HolographicHumanProps {
-  sex: BiologicalSex;
-  selectedZone: BodyZoneId;
-  hoveredZone: BodyZoneId | null;
-  onSelectZone: (zone: BodyZoneId) => void;
-  onHoverZone: (zone: BodyZoneId | null) => void;
-  zoneStatuses: Record<BodyZoneId, TriageStatus>;
-  anatomicalLayer: AnatomicalLayer;
-  showScannerBeam: boolean;
-}
-
-const HolographicHumanModel: React.FC<HolographicHumanProps> = ({
-  sex,
-  selectedZone,
-  hoveredZone,
-  onSelectZone,
-  onHoverZone,
-  zoneStatuses,
-  anatomicalLayer,
-  showScannerBeam,
-}) => {
-  const isFemale = sex === 'female';
-  const pulseGroupRef = useRef<THREE.Group>(null);
-  const haloRef = useRef<THREE.Group>(null);
-  const heartRef = useRef<THREE.Group>(null);
-  const lungsRef = useRef<THREE.Group>(null);
-  const scanRingRef = useRef<THREE.Group>(null);
-
-  // Memoize sculpted 3D anatomical geometries per biological sex
-  const anatomies = useMemo(() => {
-    const headAndNeck = createSculptedHeadAndNeckGeometry(sex);
-    const torso = createSculptedTorsoGeometry(sex);
-    const leftArm = createSculptedArmGeometry(sex, -1);
-    const rightArm = createSculptedArmGeometry(sex, 1);
-    const leftLeg = createSculptedLegGeometry(sex, -1);
-    const rightLeg = createSculptedLegGeometry(sex, 1);
-    const ribs = createThoracicRibGeometries(sex);
-    const pelvis = createPelvicGirdleGeometries(sex);
-    const limbBones = createAppendicularSkeletonGeometries(sex);
-    const vascularTree = createVascularTreeGeometries(sex);
-    const neuroVascular = createNeuroVascularGeometries();
-    const lymphaticConduits = createLymphaticConduitGeometries(sex);
-    const leftBrainHemisphere = createBrainHemisphereGeometry(1);
-    const rightBrainHemisphere = createBrainHemisphereGeometry(-1);
-    const cerebellum = createCerebellumGeometry();
-    const heart = createHeartGeometry();
-    const rightLung = createLungGeometry(-1, sex);
-    const leftLung = createLungGeometry(1, sex);
-    const airways = createAirwayGeometries();
-    const liver = createLiverGeometry(sex);
-    const spleen = createSpleenGeometry();
-    const thymus = createThymusGeometry();
-
-    return {
-      headAndNeck,
-      torso,
-      leftArm,
-      rightArm,
-      leftLeg,
-      rightLeg,
-      ribs,
-      pelvis,
-      limbBones,
-      vascularTree,
-      neuroVascular,
-      lymphaticConduits,
-      leftBrainHemisphere,
-      rightBrainHemisphere,
-      cerebellum,
-      heart,
-      rightLung,
-      leftLung,
-      airways,
-      liver,
-      spleen,
-      thymus,
-    };
-  }, [sex]);
-
-  useFrame(({ clock }) => {
-    const t = clock.getElapsedTime();
-    if (haloRef.current) {
-      haloRef.current.rotation.z = t * 0.55;
-      haloRef.current.rotation.x = Math.sin(t * 0.65) * 0.22;
-    }
-    if (pulseGroupRef.current) {
-      // Subtle respiration vertical micro-motion
-      pulseGroupRef.current.position.y = -0.02 + Math.sin(t * 1.8) * 0.015;
-    }
-    if (heartRef.current) {
-      // Realistic double-beat systolic/diastolic cardiac contraction
-      const beatPhase = (t * 1.15) % 1;
-      const d1 = (beatPhase - 0.15) / 0.06;
-      const d2 = (beatPhase - 0.32) / 0.08;
-      const systole =
-        Math.exp(-(d1 * d1)) * 0.11 + Math.exp(-(d2 * d2)) * 0.06;
-      const s = 1 + systole;
-      heartRef.current.scale.set(s, s, s);
-    }
-    if (lungsRef.current) {
-      // Gentle respiratory lung expansion
-      const breath = 1 + Math.sin(t * 1.8) * 0.035;
-      lungsRef.current.scale.set(breath, 1 + Math.sin(t * 1.8) * 0.02, breath);
-    }
-    if (scanRingRef.current && showScannerBeam) {
-      // Smooth vertical biometric scanner sweep from feet (-1.92) to crown (+1.92)
-      scanRingRef.current.position.y = Math.sin(t * 0.85) * 1.88;
-    }
-  });
-
-  const showDermal = anatomicalLayer === 'all' || anatomicalLayer === 'dermal';
-  const showSkeletal =
-    anatomicalLayer === 'all' || anatomicalLayer === 'skeletal';
-  const showOrgans = anatomicalLayer === 'all' || anatomicalLayer === 'organs';
-
-  const getZoneMaterialProps = (
-    zone: BodyZoneId,
-    baseOpacity: number = 0.82
-  ) => {
-    const status = zoneStatuses[zone];
-    const color = STATUS_COLORS[status];
-    const isSelected = selectedZone === zone;
-    const isHovered = hoveredZone === zone;
-    const emissiveIntensity =
-      status === 'red'
-        ? 1.1
-        : isSelected
-        ? 0.85
-        : isHovered
-        ? 0.72
-        : 0.38;
-
-    return {
-      color,
-      emissive: color,
-      emissiveIntensity,
-      transparent: true,
-      opacity:
-        isSelected || isHovered ? Math.min(1, baseOpacity + 0.18) : baseOpacity,
-      roughness: 0.25,
-      metalness: 0.25,
-    };
-  };
-
-  // Material helper for the outer sculpted dermal/muscular envelope so it looks like a
-  // high-resolution medical hologram with specular anatomical shading (never a flat wireframe stickman)
-  const getSculptedSkinMaterialProps = (zone: BodyZoneId, isCoreTorso: boolean = false) => {
-    const status = zoneStatuses[zone];
-    const isAlert = status !== 'green';
-    const isSelected = selectedZone === zone;
-    const isHovered = hoveredZone === zone;
-    const isDermalIsolated = anatomicalLayer === 'dermal';
-
-    const baseColor = isAlert
-      ? STATUS_COLORS[status]
-      : isSelected || isHovered
-      ? '#38bdf8'
-      : isFemale
-      ? '#22d3ee'
-      : '#38bdf8';
-
-    const emissiveColor = isAlert
-      ? STATUS_COLORS[status]
-      : '#0284c7';
-
-    const opacity = isDermalIsolated
-      ? isCoreTorso
-        ? 0.88
-        : 0.86
-      : isAlert
-      ? 0.52
-      : isSelected || isHovered
-      ? 0.5
-      : 0.42;
-
-    return {
-      color: baseColor,
-      emissive: emissiveColor,
-      emissiveIntensity: isAlert ? 0.5 : isSelected || isHovered ? 0.38 : 0.22,
-      transparent: true,
-      opacity,
-      roughness: 0.22,
-      metalness: 0.18,
-      clearcoat: 0.9,
-      clearcoatRoughness: 0.18,
-      depthWrite: isDermalIsolated,
-      side: THREE.DoubleSide,
-    };
-  };
-
-  const bindZoneEvents = (zone: BodyZoneId) => ({
-    onClick: (e: { stopPropagation: () => void }) => {
-      e.stopPropagation();
-      onSelectZone(zone);
-    },
-    onPointerOver: (e: { stopPropagation: () => void }) => {
-      e.stopPropagation();
-      onHoverZone(zone);
-      document.body.style.cursor = 'pointer';
-    },
-    onPointerOut: (e: { stopPropagation: () => void }) => {
-      e.stopPropagation();
-      onHoverZone(null);
-      document.body.style.cursor = 'auto';
-    },
-  });
-
-  // 18-segment curved vertebral column (cervical, thoracic, lumbar, sacral)
-  const spineVertebrae = useMemo(() => {
-    const items: Array<{ y: number; z: number; rx: number }> = [];
-    for (let i = 0; i < 18; i++) {
-      const t = i / 17; // 0 = C2 (y=1.36) down to 1 = Sacrum (y=-0.12)
-      const y = 1.36 - t * 1.48;
-      // Anatomical S-curve in Z
-      const z =
-        -0.065 +
-        Math.sin(t * Math.PI * 2.1) * 0.018 -
-        (t > 0.82 ? (t - 0.82) * 0.12 : 0);
-      const rx = 0.026 + t * 0.018;
-      items.push({ y, z, rx });
-    }
-    return items;
-  }, []);
-
-  const activeTooltipZone = hoveredZone || selectedZone;
-  const tooltipAnchor: Record<BodyZoneId, [number, number, number]> = {
-    neuro: [0.36, 1.72, 0.15],
-    behavioral: [-0.46, 1.88, 0.1],
-    cardio: [0.38, 0.82, 0.22],
-    immune: [-0.44, 0.52, 0.2],
-    musculo: [0.38, -0.62, 0.2],
-  };
-
-  return (
-    <group ref={pulseGroupRef} position={[0, -0.02, 0]}>
-      {/* ============================================================
-          HOLOGRAPHIC MEDICAL BAY PEDESTAL & SCANNER STAGE
-         ============================================================ */}
-      <group position={[0, -1.98, 0]}>
-        {/* Outer Calibration Ring */}
-        <mesh rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[0.82, 0.96, 64]} />
-          <meshBasicMaterial
-            color="#22d3ee"
-            transparent
-            opacity={0.38}
-            side={THREE.DoubleSide}
-          />
-        </mesh>
-        {/* Inner Segmented Ring */}
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.005, 0]}>
-          <ringGeometry args={[0.52, 0.56, 48]} />
-          <meshBasicMaterial
-            color="#38bdf8"
-            transparent
-            opacity={0.45}
-            side={THREE.DoubleSide}
-          />
-        </mesh>
-        {/* Glowing Platform Disc */}
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]}>
-          <circleGeometry args={[0.8, 64]} />
-          <meshBasicMaterial
-            color="#083344"
-            transparent
-            opacity={0.36}
-            side={THREE.DoubleSide}
-          />
-        </mesh>
-      </group>
-
-      {/* Active Biometric Horizontal Laser Scanner Ring */}
-      {showScannerBeam && (
-        <group ref={scanRingRef} position={[0, 0, 0]}>
-          <mesh rotation={[Math.PI / 2, 0, 0]}>
-            <ringGeometry args={[0.58, 0.62, 64]} />
-            <meshBasicMaterial
-              color="#22d3ee"
-              transparent
-              opacity={0.55}
-              side={THREE.DoubleSide}
-            />
-          </mesh>
-          <mesh rotation={[Math.PI / 2, 0, 0]}>
-            <circleGeometry args={[0.58, 48]} />
-            <meshBasicMaterial
-              color="#22d3ee"
-              transparent
-              opacity={0.07}
-              side={THREE.DoubleSide}
-            />
-          </mesh>
-        </group>
-      )}
-
-      {/* ============================================================
-          LAYER 1: SCULPTED MALE / FEMALE ANATOMICAL BODY ENVELOPE
-         ============================================================ */}
-      {showDermal && (
-        <group>
-          {/* 1A. Sculpted Cranium, Face (Brow, Orbit Sockets, Nose, Jaw/Chin) & Neck */}
-          <mesh
-            geometry={anatomies.headAndNeck}
-            {...bindZoneEvents('neuro')}
-          >
-            <meshPhysicalMaterial {...getSculptedSkinMaterialProps('neuro')} />
-          </mesh>
-          {/* Subtle holographic contour lattice over head/neck */}
-          <mesh geometry={anatomies.headAndNeck}>
-            <meshBasicMaterial
-              color="#38bdf8"
-              wireframe
-              transparent
-              opacity={0.045}
-              depthWrite={false}
-            />
-          </mesh>
-
-          {/* 1B. Sculpted Torso, Chest (Female Mammary Contours vs Male Pectoralis/Abs), Waist, Pelvis & Glutes */}
-          <mesh
-            geometry={anatomies.torso}
-            {...bindZoneEvents('immune')}
-          >
-            <meshPhysicalMaterial
-              {...getSculptedSkinMaterialProps('immune', true)}
-            />
-          </mesh>
-          {/* Subtle holographic contour lattice over torso */}
-          <mesh geometry={anatomies.torso}>
-            <meshBasicMaterial
-              color={
-                zoneStatuses.immune !== 'green'
-                  ? STATUS_COLORS[zoneStatuses.immune]
-                  : '#22d3ee'
-              }
-              wireframe
-              transparent
-              opacity={0.055}
-              depthWrite={false}
-            />
-          </mesh>
-
-          {/* 1C. Sculpted Left & Right Upper Limbs (Deltoid, Biceps/Triceps, Forearm, Wrist & Hand) */}
-          <mesh
-            geometry={anatomies.leftArm}
-            {...bindZoneEvents('immune')}
-          >
-            <meshPhysicalMaterial {...getSculptedSkinMaterialProps('immune')} />
-          </mesh>
-          <mesh
-            geometry={anatomies.rightArm}
-            {...bindZoneEvents('immune')}
-          >
-            <meshPhysicalMaterial {...getSculptedSkinMaterialProps('immune')} />
-          </mesh>
-
-          {/* 1D. Sculpted Left & Right Lower Limbs (Hip/Thigh, Q-Angle, Quadriceps, Patella, Calf, Ankle & Foot) */}
-          <mesh
-            geometry={anatomies.leftLeg}
-            {...bindZoneEvents('musculo')}
-          >
-            <meshPhysicalMaterial {...getSculptedSkinMaterialProps('musculo')} />
-          </mesh>
-          <mesh
-            geometry={anatomies.rightLeg}
-            {...bindZoneEvents('musculo')}
-          >
-            <meshPhysicalMaterial {...getSculptedSkinMaterialProps('musculo')} />
-          </mesh>
-          <mesh geometry={anatomies.leftLeg}>
-            <meshBasicMaterial
-              color="#38bdf8"
-              wireframe
-              transparent
-              opacity={0.04}
-              depthWrite={false}
-            />
-          </mesh>
-          <mesh geometry={anatomies.rightLeg}>
-            <meshBasicMaterial
-              color="#38bdf8"
-              wireframe
-              transparent
-              opacity={0.04}
-              depthWrite={false}
-            />
-          </mesh>
-        </group>
-      )}
-
-      {/* ============================================================
-          ZONE 5: BEHAVIORAL / CIRCADIAN NEURAL HALO RINGS
-         ============================================================ */}
-      <group
-        ref={haloRef}
-        position={[0, 1.72, 0]}
-        {...bindZoneEvents('behavioral')}
-      >
-        <mesh rotation={[Math.PI / 2.3, 0, 0]}>
-          <torusGeometry args={[0.36, 0.014, 16, 64]} />
-          <meshStandardMaterial {...getZoneMaterialProps('behavioral', 0.92)} />
-        </mesh>
-        <mesh rotation={[-Math.PI / 3.1, 0.42, 0]}>
-          <torusGeometry args={[0.42, 0.01, 16, 64]} />
-          <meshStandardMaterial {...getZoneMaterialProps('behavioral', 0.68)} />
-        </mesh>
-      </group>
-
-      {/* ============================================================
-          ZONE 1: NEURO-OCULAR (GYRI BRAIN HEMISPHERES, CEREBELLUM, EYES & OPTIC NERVES)
-         ============================================================ */}
-      {showOrgans && (
-        <group {...bindZoneEvents('neuro')}>
-          {/* Left & Right Gyri-Sculpted Cerebral Hemispheres */}
-          <mesh
-            position={[-0.022, 1.745, -0.01]}
-            geometry={anatomies.rightBrainHemisphere}
-          >
-            <meshStandardMaterial {...getZoneMaterialProps('neuro', 0.9)} />
-          </mesh>
-          <mesh
-            position={[0.022, 1.745, -0.01]}
-            geometry={anatomies.leftBrainHemisphere}
-          >
-            <meshStandardMaterial {...getZoneMaterialProps('neuro', 0.9)} />
-          </mesh>
-
-          {/* Cerebellum & Brainstem */}
-          <mesh
-            position={[0, 1.615, -0.095]}
-            geometry={anatomies.cerebellum}
-          >
-            <meshStandardMaterial {...getZoneMaterialProps('neuro', 0.85)} />
-          </mesh>
-          <mesh position={[0, 1.48, -0.04]} rotation={[0.12, 0, 0]}>
-            <cylinderGeometry args={[0.026, 0.018, 0.22, 14]} />
-            <meshStandardMaterial {...getZoneMaterialProps('neuro', 0.85)} />
-          </mesh>
-
-          {/* Bilateral Ocular Globes (Eyes) + Cornea/Iris Rings in Facial Eye Sockets */}
-          {([-1, 1] as const).map((side) => (
-            <group key={side} position={[side * 0.068, 1.64, 0.145]}>
-              <mesh>
-                <sphereGeometry args={[0.032, 20, 20]} />
-                <meshStandardMaterial {...getZoneMaterialProps('neuro', 0.98)} />
-              </mesh>
-              {/* Luminous Cornea / Iris Ring */}
-              <mesh position={[0, 0, 0.028]}>
-                <ringGeometry args={[0.008, 0.018, 20]} />
-                <meshBasicMaterial
-                  color="#e0f2fe"
-                  side={THREE.DoubleSide}
-                />
-              </mesh>
-              {/* Optic Nerve Sheath (ONSD — Primary SANS Target) */}
-              <mesh
-                position={[-side * 0.018, 0, -0.055]}
-                rotation={[Math.PI / 2, 0, side * 0.26]}
-              >
-                <cylinderGeometry args={[0.014, 0.018, 0.11, 14]} />
-                <meshStandardMaterial {...getZoneMaterialProps('neuro', 0.96)} />
-              </mesh>
-            </group>
-          ))}
-
-          {/* Carotid / Jugular Neuro-Vascular Tracts */}
-          {anatomies.neuroVascular.map((geo, idx) => (
-            <mesh key={idx} geometry={geo}>
-              <meshStandardMaterial {...getZoneMaterialProps('neuro', 0.82)} />
-            </mesh>
-          ))}
-        </group>
-      )}
-
-      {/* ============================================================
-          ZONE 2: CARDIOVASCULAR & PULMONARY (BEATING HEART, LUNGS, BRONCHI, VASCULAR TREE)
-         ============================================================ */}
-      {showOrgans && (
-        <group {...bindZoneEvents('cardio')}>
-          {/* Beating 4-Chambered Heart (Myocardium) angled anatomically toward left thorax */}
-          <group
-            ref={heartRef}
-            position={[0.04, 0.75, 0.06]}
-            rotation={[0.12, -0.15, -0.22]}
-          >
-            <mesh geometry={anatomies.heart}>
-              <meshStandardMaterial {...getZoneMaterialProps('cardio', 0.96)} />
-            </mesh>
-          </group>
-
-          {/* Trachea & Bifurcating Primary Bronchi */}
-          {anatomies.airways.map((geo, idx) => (
-            <mesh key={`airway-${idx}`} geometry={geo}>
-              <meshStandardMaterial {...getZoneMaterialProps('cardio', 0.78)} />
-            </mesh>
-          ))}
-
-          {/* Breathing Left (2-Lobe + Cardiac Notch) & Right (3-Lobe) Sculpted Lungs */}
-          <group ref={lungsRef}>
-            {/* Right Lung (anatomical right = viewer left, x < 0) */}
-            <mesh
-              position={[isFemale ? -0.115 : -0.145, 0.8, 0.008]}
-              geometry={anatomies.rightLung}
-            >
-              <meshStandardMaterial {...getZoneMaterialProps('cardio', 0.54)} />
-            </mesh>
-
-            {/* Left Lung (anatomical left = viewer right, x > 0, with cardiac notch) */}
-            <mesh
-              position={[isFemale ? 0.12 : 0.15, 0.8, 0.008]}
-              geometry={anatomies.leftLung}
-            >
-              <meshStandardMaterial {...getZoneMaterialProps('cardio', 0.54)} />
-            </mesh>
-          </group>
-
-          {/* 3D Arterial / Venous Vascular Tree (Aortic Arch, Descending Aorta, Iliac/Femoral & Subclavian Vessels) */}
-          {anatomies.vascularTree.map((geo, idx) => (
-            <mesh key={idx} geometry={geo}>
-              <meshStandardMaterial {...getZoneMaterialProps('cardio', 0.88)} />
-            </mesh>
-          ))}
-        </group>
-      )}
-
-      {/* ============================================================
-          ZONE 4: IMMUNE, RADIATION & LYMPHATIC NETWORK (THYMUS, SPLEEN, LIVER, NODES & CONDUITS)
-         ============================================================ */}
-      {showOrgans && (
-        <group {...bindZoneEvents('immune')}>
-          {/* Mediastinal Thymus Gland (Bilobed) */}
-          <mesh position={[0, 1.02, 0.082]} geometry={anatomies.thymus}>
-            <meshStandardMaterial {...getZoneMaterialProps('immune', 0.94)} />
-          </mesh>
-
-          {/* Spleen (Left Upper Quadrant, crescent-shaped) */}
-          <mesh
-            position={[isFemale ? 0.175 : 0.21, 0.46, 0.005]}
-            rotation={[0.08, -0.2, -0.32]}
-            geometry={anatomies.spleen}
-          >
-            <meshStandardMaterial {...getZoneMaterialProps('immune', 0.92)} />
-          </mesh>
-
-          {/* Visceral Hepatic / Liver Contour (Right Upper Quadrant, asymmetric wedge) */}
-          <mesh
-            position={[isFemale ? -0.055 : -0.065, 0.49, 0.035]}
-            rotation={[0.05, 0, 0.1]}
-            geometry={anatomies.liver}
-          >
-            <meshStandardMaterial {...getZoneMaterialProps('immune', 0.46)} />
-          </mesh>
-
-          {/* Interconnected Lymphatic Conduits */}
-          {anatomies.lymphaticConduits.map((geo, idx) => (
-            <mesh key={idx} geometry={geo}>
-              <meshStandardMaterial {...getZoneMaterialProps('immune', 0.85)} />
-            </mesh>
-          ))}
-
-          {/* Cervical, Axillary, Cisterna Chyli & Inguinal Lymph Nodes */}
-          {[
-            [-0.06, 1.32, 0.04],
-            [0.06, 1.32, 0.04],
-            [isFemale ? -0.27 : -0.34, 0.92, 0.04],
-            [isFemale ? 0.27 : 0.34, 0.92, 0.04],
-            [0.0, 0.32, 0.05],
-            [isFemale ? -0.16 : -0.14, -0.15, 0.08],
-            [isFemale ? 0.16 : 0.14, -0.15, 0.08],
-          ].map((pos, idx) => (
-            <mesh key={idx} position={pos as [number, number, number]}>
-              <sphereGeometry args={[0.032, 14, 14]} />
-              <meshStandardMaterial {...getZoneMaterialProps('immune', 0.95)} />
-            </mesh>
-          ))}
-        </group>
-      )}
-
-      {/* ============================================================
-          ZONE 3: SEX-DIMORPHIC SKELETAL & MUSCULOSKELETAL SYSTEM
-         ============================================================ */}
-      {showSkeletal && (
-        <group {...bindZoneEvents('musculo')}>
-          {/* 18-Segment Curved Vertebral Column + Spinous Processes */}
-          {spineVertebrae.map((v, idx) => (
-            <mesh key={idx} position={[0, v.y, v.z]}>
-              <cylinderGeometry args={[v.rx, v.rx * 1.04, 0.062, 16]} />
-              <meshStandardMaterial {...getZoneMaterialProps('musculo', 0.92)} />
-            </mesh>
-          ))}
-
-          {/* Anterior Sternum (Manubrium, Body & Xiphoid Process) */}
-          <mesh
-            position={[0, 0.84, isFemale ? 0.145 : 0.182]}
-            rotation={[0.12, 0, 0]}
-            scale={[1, 1, 0.35]}
-          >
-            <capsuleGeometry args={[0.032, 0.34, 8, 16]} />
-            <meshStandardMaterial {...getZoneMaterialProps('musculo', 0.9)} />
-          </mesh>
-
-          {/* 10 Pairs of 3D Curved Thoracic Ribs */}
-          {anatomies.ribs.map((ribGeo, idx) => (
-            <mesh key={idx} geometry={ribGeo}>
-              <meshStandardMaterial {...getZoneMaterialProps('musculo', 0.76)} />
-            </mesh>
-          ))}
-
-          {/* Sex-Differentiated Pelvic Girdle (Iliac Wings, Acetabulum, Pubic Symphysis & Ischial Rings) */}
-          {anatomies.pelvis.map((pelvisGeo, idx) => (
-            <mesh key={idx} geometry={pelvisGeo}>
-              <meshStandardMaterial {...getZoneMaterialProps('musculo', 0.9)} />
-            </mesh>
-          ))}
-
-          {/* Appendicular Skeleton (Clavicles, Humeri, Radius/Ulna, Femoral Necks, Femurs, Tibia/Fibula) */}
-          {anatomies.limbBones.map((boneGeo, idx) => (
-            <mesh key={idx} geometry={boneGeo}>
-              <meshStandardMaterial {...getZoneMaterialProps('musculo', 0.92)} />
-            </mesh>
-          ))}
-
-          {/* Shoulder Humeral Heads, Elbow Condyles, Femoral Heads & Patella Knee Caps */}
-          {([-1, 1] as const).map((side) => {
-            const shX = side * (isFemale ? 0.355 : 0.45);
-            const elbX = side * (isFemale ? 0.465 : 0.575);
-            const acetX = side * (isFemale ? 0.185 : 0.155);
-            const kneeX = side * (isFemale ? 0.152 : 0.17);
-            return (
-              <group key={side}>
-                {/* Humeral Head */}
-                <mesh position={[shX, 1.04, -0.01]}>
-                  <sphereGeometry args={[isFemale ? 0.034 : 0.042, 16, 16]} />
-                  <meshStandardMaterial
-                    {...getZoneMaterialProps('musculo', 0.92)}
-                  />
-                </mesh>
-                {/* Elbow Joint */}
-                <mesh position={[elbX, 0.48, -0.032]}>
-                  <sphereGeometry args={[isFemale ? 0.028 : 0.034, 14, 14]} />
-                  <meshStandardMaterial
-                    {...getZoneMaterialProps('musculo', 0.9)}
-                  />
-                </mesh>
-                {/* Femoral Head in Acetabulum */}
-                <mesh position={[acetX, -0.16, 0.02]}>
-                  <sphereGeometry args={[0.038, 16, 16]} />
-                  <meshStandardMaterial
-                    {...getZoneMaterialProps('musculo', 0.96)}
-                  />
-                </mesh>
-                {/* Patella / Knee Joint */}
-                <mesh position={[kneeX, -1.0, 0.022]}>
-                  <sphereGeometry args={[isFemale ? 0.036 : 0.042, 16, 16]} />
-                  <meshStandardMaterial
-                    {...getZoneMaterialProps('musculo', 0.94)}
-                  />
-                </mesh>
-              </group>
-            );
-          })}
-        </group>
-      )}
-
-      {/* ============================================================
-          FLOATING 3D SPATIAL HUD CALLOUT FOR HOVERED / SELECTED ZONE
-         ============================================================ */}
-      <Html
-        position={tooltipAnchor[activeTooltipZone]}
-        center
-        distanceFactor={5.5}
-        zIndexRange={[10, 0]}
-      >
-        <div className="pointer-events-none select-none px-2.5 py-1 rounded-md bg-slate-950/90 border border-cyan-400/60 shadow-[0_0_18px_rgba(34,211,238,0.3)] whitespace-nowrap flex items-center gap-2">
-          <span
-            className="w-2 h-2 rounded-full animate-pulse"
-            style={{
-              backgroundColor: STATUS_COLORS[zoneStatuses[activeTooltipZone]],
-            }}
-          />
-          <span className="font-mono text-[11px] font-bold text-slate-100">
-            {BODY_ZONES[activeTooltipZone].shortLabel}
-          </span>
-          <span
-            className="font-mono text-[10px] font-semibold uppercase"
-            style={{ color: STATUS_COLORS[zoneStatuses[activeTooltipZone]] }}
-          >
-            {STATUS_LABELS[zoneStatuses[activeTooltipZone]]}
-          </span>
-        </div>
-      </Html>
-    </group>
-  );
-};
 
 export const BioTwinMap: React.FC = () => {
   const {
@@ -868,11 +154,67 @@ export const BioTwinMap: React.FC = () => {
     currentZoneReadings,
     environment,
     readinessScore,
-    anatomicalLayer,
-    setAnatomicalLayer,
+    zones,
+    spaceLocationId,
+    spaceLocation,
   } = useMission();
 
-  const [hoveredZone, setHoveredZone] = useState<BodyZoneId | null>(null);
+  const [hoveredOrgan, setHoveredOrgan] = useState<OrganId | null>(null);
+  const [selectedOrgan, setSelectedOrgan] = useState<OrganId | null>(null);
+  const [peel, setPeel] = useState<PeelLevel>('body');
+  // Moving the pointer across the gaps between bones fires pointerout/pointerover many times a
+  // second. Updating state on each one re-rendered the whole model and toggled auto-rotate (lag +
+  // flicker). Keep the hover for a short grace period and skip no-op updates.
+  const hoverClearTimer = useRef<number | null>(null);
+  const handleHoverOrgan = useCallback((organ: OrganId | null) => {
+    if (hoverClearTimer.current !== null) {
+      window.clearTimeout(hoverClearTimer.current);
+      hoverClearTimer.current = null;
+    }
+    if (organ) {
+      document.body.style.cursor = 'pointer';
+      setHoveredOrgan((prev) => (prev === organ ? prev : organ));
+      return;
+    }
+    hoverClearTimer.current = window.setTimeout(() => {
+      hoverClearTimer.current = null;
+      document.body.style.cursor = 'auto';
+      setHoveredOrgan(null);
+    }, 150);
+  }, []);
+  useEffect(
+    () => () => {
+      if (hoverClearTimer.current !== null) window.clearTimeout(hoverClearTimer.current);
+      document.body.style.cursor = 'auto';
+    },
+    []
+  );
+  // Organ status = worst of its Thousand Eyes indicators vs. the personal baseline.
+  const organNow = useMemo(() => Date.now(), [zones, spaceLocationId]);
+  const organs = useMemo(() => {
+    const person = buildPerson({
+      locationId: spaceLocationId,
+      metrics: ZONE_ORDER.flatMap((z) => zones[z]),
+      now: organNow,
+    });
+    return organStates(person, organNow);
+  }, [zones, spaceLocationId, organNow]);
+  const organStatus = useMemo(
+    () => Object.fromEntries(Object.entries(organs).map(([id, o]) => [id, o.status])) as Record<OrganId, Status | undefined>,
+    [organs]
+  );
+  const handleSelectOrgan = useCallback(
+    (organ: OrganId) => {
+      setSelectedOrgan(organ);
+      setSelectedZone(ORGAN_BY_ID[organ].zone);
+    },
+    [setSelectedZone]
+  );
+  const changePeel = (level: PeelLevel) => {
+    setPeel(level);
+    setSelectedOrgan((cur) => (cur && ORGAN_BY_ID[cur].levels.includes(level) ? cur : null));
+  };
+
   const [autoRotate, setAutoRotate] = useState<boolean>(
     () => !(typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)
   );
@@ -892,9 +234,11 @@ export const BioTwinMap: React.FC = () => {
     }
   };
 
-  const activeZoneId = hoveredZone || selectedZone;
+  const focusOrgan = hoveredOrgan ?? selectedOrgan;
+  const activeZoneId = focusOrgan ? ORGAN_BY_ID[focusOrgan].zone : selectedZone;
   const activeZoneMeta = BODY_ZONES[activeZoneId];
-  const activeZoneStatus = zoneStatuses[activeZoneId];
+  const focusStatus = focusOrgan ? organStatus[focusOrgan] : undefined;
+  const activeZoneStatus = focusStatus != null ? STATUS_TO_TRIAGE[focusStatus] : zoneStatuses[activeZoneId];
 
   const fallback2DBioMap = (
     <div className="flex flex-col items-center justify-center h-full p-4 text-center">
@@ -992,24 +336,22 @@ export const BioTwinMap: React.FC = () => {
           SECONDARY BAR: ANATOMICAL LAYER SWITCHER + CAMERA FOCUS PRESETS
          ============================================================ */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-hud-line/70 px-4 py-2 min-w-0">
-        {/* Layer Switcher */}
-        <div className="flex flex-wrap items-center gap-1 min-w-0" role="group" aria-label="Anatomy layer">
+        {/* Peel: each step removes the outer layer so deeper organs are easy to reach */}
+        <div className="flex flex-wrap items-center gap-1 min-w-0" role="group" aria-label="Peel layers">
           <Layers className="mr-1 h-4 w-4 text-hud-muted shrink-0" aria-hidden="true" />
-          {LAYER_OPTIONS.map((layer) => {
-            const active = anatomicalLayer === layer.id;
-            return (
-              <button
-                key={layer.id}
-                type="button"
-                onClick={() => setAnatomicalLayer(layer.id)}
-                title={layer.label}
-                aria-pressed={active}
-                className="hud-seg"
-              >
-                {layer.shortLabel}
-              </button>
-            );
-          })}
+          {PEEL_LEVELS.map((level, i) => (
+            <button
+              key={level.id}
+              type="button"
+              onClick={() => changePeel(level.id)}
+              title={level.hint}
+              aria-pressed={peel === level.id}
+              className="hud-seg"
+            >
+              <span className="mr-1 font-mono text-[10px] text-hud-muted">{i + 1}</span>
+              {level.label}
+            </button>
+          ))}
         </div>
 
         {/* Camera Focus Presets */}
@@ -1040,7 +382,7 @@ export const BioTwinMap: React.FC = () => {
         onMouseEnter={() => setIsInteracting(true)}
         onMouseLeave={() => {
           setIsInteracting(false);
-          setHoveredZone(null);
+          setHoveredOrgan(null);
         }}
       >
         {/* Spacecraft HUD Corner Reticles */}
@@ -1052,8 +394,15 @@ export const BioTwinMap: React.FC = () => {
         <WebGLErrorBoundary fallback={fallback2DBioMap}>
           <Canvas
             camera={{ position: [0, 0.05, 4.35], fov: 42 }}
-            gl={{ antialias: true, alpha: true }}
+            gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
+            // Cap the pixel ratio: on 2x/3x screens the transparent, double-sided body was being
+            // shaded at up to 9x the pixels. Drop further while the user drags (AdaptiveDpr).
+            dpr={[1, 1.5]}
+            performance={{ min: 0.6 }}
+            onPointerMissed={() => setSelectedOrgan(null)}
           >
+            <AdaptiveDpr />
+            <AdaptiveEvents />
             <ambientLight intensity={0.7} />
             <hemisphereLight
               color="#e0f2fe"
@@ -1079,21 +428,25 @@ export const BioTwinMap: React.FC = () => {
               controlsRef={controlsRef}
             />
 
-            <HolographicHumanModel
+            {/* BVH: fast pointer raycasting against the high-poly sculpted meshes. */}
+            <Bvh firstHitOnly>
+            <OrganTwinModel
               sex={activeSex}
-              selectedZone={selectedZone}
-              hoveredZone={hoveredZone}
-              onSelectZone={setSelectedZone}
-              onHoverZone={setHoveredZone}
-              zoneStatuses={zoneStatuses}
-              anatomicalLayer={anatomicalLayer}
+              peel={peel}
+              organStatus={organStatus}
+              selectedOrgan={selectedOrgan}
+              hoveredOrgan={hoveredOrgan}
+              onSelectOrgan={handleSelectOrgan}
+              onHoverOrgan={handleHoverOrgan}
               showScannerBeam={showScannerBeam}
             />
+            </Bvh>
 
             <OrbitControls
               ref={controlsRef}
-              autoRotate={autoRotate && !isInteracting && !hoveredZone}
+              autoRotate={autoRotate && !isInteracting && !hoveredOrgan && !selectedOrgan}
               autoRotateSpeed={1.25}
+              regress
               enablePan={false}
               minDistance={1.5}
               maxDistance={6.2}
@@ -1103,11 +456,19 @@ export const BioTwinMap: React.FC = () => {
           </Canvas>
         </WebGLErrorBoundary>
 
+        {selectedOrgan && (
+          <OrganPanel
+            state={organs[selectedOrgan]}
+            locationLabel={spaceLocation.label}
+            onClose={() => setSelectedOrgan(null)}
+          />
+        )}
+
         {/* Bottom overlay: hovered/selected zone */}
         <div className="pointer-events-none absolute inset-x-4 bottom-3 flex items-center justify-between gap-2 rounded-xl border border-hud-line bg-hud-bg/85 px-3.5 py-2 backdrop-blur-md">
           <span className="flex items-center gap-2 text-sm font-medium text-hud-text">
             <Activity className="h-4 w-4 text-hud-accent" aria-hidden="true" />
-            {activeZoneMeta.name}
+            {focusOrgan ? ORGAN_BY_ID[focusOrgan].label : activeZoneMeta.name}
           </span>
           <StatusPill status={activeZoneStatus} />
         </div>
