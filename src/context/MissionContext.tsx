@@ -21,6 +21,7 @@ import {
   FlightSurgeonGuidance,
   GravityEnvironment,
   HudTabId,
+  MetricId,
   MetricLink,
   ScenarioId,
   TriageStatus,
@@ -476,6 +477,7 @@ interface MissionContextValue extends MissionState {
   clearVisualExam: () => void;
   queueEarthPacket: (crewNotes?: string) => EarthTelemetryPacket;
   setRuntimeApiKey: (key: string) => void;
+  logVitalReading: (zoneId: BodyZoneId, metricKey: string, value: number) => Promise<void>;
 }
 
 const MissionContext = createContext<MissionContextValue | undefined>(undefined);
@@ -646,6 +648,50 @@ export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({
       });
     },
     [activeCrewMember.id]
+  );
+
+  const logVitalReading = useCallback(
+    async (zoneId: BodyZoneId, metricKey: string, value: number) => {
+      const now = new Date();
+      const targetDay = latestDay || 30;
+      const entry: CheckInEntry = {
+        id: `vital-${now.getTime().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+        crewId: activeCrewMember.id,
+        missionDay: targetDay,
+        timestampIso: now.toISOString(),
+        values: {
+          [metricKey as MetricId]: value,
+        },
+        note: `Interactive vital reading: ${metricKey} = ${value}`,
+      };
+      dispatch({ type: 'ADD_CHECK_IN', payload: entry });
+      dispatch({ type: 'SET_SELECTED_ZONE', payload: zoneId });
+      dispatch({ type: 'SET_SELECTED_METRIC', payload: metricKey });
+
+      dispatch({ type: 'SET_SYNTHESIZING_AI', payload: true });
+      try {
+        const updated = await synthesizeFlightSurgeonGuidance({
+          scenarioId: state.scenarioId,
+          zoneId,
+          environment: state.environment,
+          crewMember: activeCrewMember,
+          runtimeApiKey: state.runtimeApiKey,
+          forceLiveAi: true,
+        });
+        dispatch({ type: 'SET_GUIDANCE', payload: updated });
+      } catch (err) {
+        console.warn('[ARGUS AI] Guidance synthesis failed after vital log:', err);
+      } finally {
+        dispatch({ type: 'SET_SYNTHESIZING_AI', payload: false });
+      }
+    },
+    [
+      activeCrewMember,
+      latestDay,
+      state.scenarioId,
+      state.environment,
+      state.runtimeApiKey,
+    ]
   );
 
   const requestLiveAiGuidance = useCallback(async () => {
@@ -827,6 +873,7 @@ export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({
       clearVisualExam,
       queueEarthPacket,
       setRuntimeApiKey,
+      logVitalReading,
     }),
     [
       state,
@@ -840,6 +887,7 @@ export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({
       setActiveTab,
       addCheckIn,
       deleteCheckIn,
+      logVitalReading,
       zoneStatuses,
       currentZoneReadings,
       readinessScore,
