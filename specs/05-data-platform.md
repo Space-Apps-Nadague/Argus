@@ -63,7 +63,7 @@ Deleting an astronaut sets `archived_at` (a soft delete), which hides them and k
 | Gold | `baselines` (`astronaut_id`, `metric_id`, `kind` (`preflight` \| `rolling_14d` \| `hour_of_day`), `hour` nullable, `n`, `mean`, `sd`, `median`, `mad`, `p05`, `p95`, `window_start`, `window_end`, `pipeline_version`, `computed_at`) | §5.2 |
 | Gold | `anomalies` (`id`, `astronaut_id`, `metric_id`, `ts_start`, `ts_end`, `detector` (`robust_z` \| `ewma` \| `cusum`), `score`, `severity` (`watch` \| `drifting`), `detail` jsonb, `pipeline_version`, `computed_at`) | Informational only. Never changes triage. |
 | Gold | `triage_events` (`id`, `astronaut_id`, `ts`, `zone`, `status`, `previous_status`, `metrics` jsonb, `engine_version`) | Written when a zone's deterministic status changes. |
-| Reference | `ref_thresholds`, `ref_radiation_dose_rates`, `ref_osdr_studies` | Curated NASA reference data (§7). Every row has `source_id` and `ingest_run_id`. |
+| Reference | `ref_thresholds`, `ref_radiation_dose_rates`, `ref_osdr_studies`, `ref_osdr_lab_values` | Curated NASA reference data (§7). Every row has `source_id` and `ingest_run_id`. `ref_osdr_lab_values` is long-format (study, pseudonymous subject, timepoint, analyte, value, unit, reference range). |
 
 ### 3.5 AI chat link
 Stores what was said to the AI, which astronaut it was about, and the data the AI saw. That is all: no RAG, embeddings or chat analytics yet.
@@ -176,11 +176,14 @@ Medallion applies here too:
 2. Curated small tables live in `data/reference/*.csv`, committed, every row carrying `source_id`.
 3. Pipelines load them into the `ref_*` tables.
 
+Loaders that write to the database are TypeScript (`scripts/ingest/`, `npm run data:nasa`) so they work against every engine, PGlite included. Analysis is Python (`analysis/`).
+
 | Dataset | Access | Pipeline | Table |
 |---|---|---|---|
-| NASA OSDR API, Inspiration4 studies OSD-569…575 [SRC-046, SRC-047] | open, no key | `analysis/pipelines/ingest_osdr.py` | `ref_osdr_studies` |
-| Mission dose rates from MSL RAD papers and DOSIS ISS [SRC-042..045] | open | `analysis/pipelines/load_reference.py` | `ref_radiation_dose_rates` |
-| NASA-STD-3001 limits and OCHMO radiation limits [SRC-007, SRC-008] | open | `analysis/pipelines/load_reference.py` | `ref_thresholds` |
+| NASA OSDR API, Inspiration4 studies OSD-569…575 [SRC-046, SRC-047] | open, no key | `scripts/ingest/osdr.ts` | `ref_osdr_studies` |
+| Inspiration4 Complete Blood Count, 4 crew × 7 timepoints (OSD-569, `LSDS-7_Complete_Blood_Count_CBC_TRANSFORMED.csv`) [SRC-047] | open | `scripts/ingest/osdr.ts` | `ref_osdr_lab_values` |
+| Mission dose rates from MSL RAD papers and DOSIS ISS [SRC-042..045] | open | `scripts/ingest/reference.ts` | `ref_radiation_dose_rates` |
+| NASA-STD-3001 limits and OCHMO radiation limits [SRC-007, SRC-008] | open | `scripts/ingest/reference.ts` | `ref_thresholds` |
 | LSDA / LSAH / CIPHER per-astronaut data [SRC-005, SRC-006] | request-only or restricted | — | Not ingested; this is why §4 is simulated |
 
 ### Best-practice rules

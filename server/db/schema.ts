@@ -392,6 +392,28 @@ export const refOsdrStudies = pgTable('ref_osdr_studies', {
   ingestRunId: uuid('ingest_run_id').references(() => ingestRuns.id),
 });
 
+/** Long-format clinical lab values from open NASA datasets (e.g. Inspiration4 CBC, OSD-569). */
+export const refOsdrLabValues = pgTable(
+  'ref_osdr_lab_values',
+  {
+    studyId: text('study_id').notNull(), // OSD-xxx
+    subject: text('subject').notNull(), // pseudonymous crew code, e.g. C001
+    timepoint: text('timepoint').notNull(), // L-92 … R+194 (L = before launch, R = after return)
+    daysFromLaunch: integer('days_from_launch').notNull(),
+    phase: text('phase').notNull(), // preflight | postflight
+    analyte: text('analyte').notNull(),
+    value: doublePrecision('value').notNull(),
+    unit: text('unit').notNull(),
+    refMin: doublePrecision('ref_min'),
+    refMax: doublePrecision('ref_max'),
+    sourceId: text('source_id')
+      .notNull()
+      .references(() => dataSources.id),
+    ingestRunId: uuid('ingest_run_id').references(() => ingestRuns.id),
+  },
+  (t) => [primaryKey({ columns: [t.studyId, t.subject, t.timepoint, t.analyte] })]
+);
+
 // ── 3.5 AI chat link ────────────────────────────────────────────────────────
 export const conversations = pgTable(
   'conversations',

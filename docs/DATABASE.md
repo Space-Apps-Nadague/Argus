@@ -45,7 +45,16 @@ Never change the Azure schema by hand. Migrations are the only path.
 | `npm run db:studio` | Drizzle Studio (browse tables) for a `postgres://` URL |
 | `rm -rf .data/argus` | Reset the embedded local DB |
 
-## Provisioning Azure (one person, once)
+## The team server
+- **Server:** `argus-pg-a405de.postgres.database.azure.com`
+- **Resource group:** `argus-rg`
+- **Region:** Israel Central
+- **Spec:** PostgreSQL 17, B1ms
+- **Budget guard:** spend is capped below the free-trial credit. A budget alert plus an automation stops the server if the cap is reached.
+
+Do not create more servers. The free allowance covers one B1ms.
+
+## Provisioning Azure (only if the server ever has to be recreated)
 Prerequisites: the Azure CLI (`az`) and a signed-in session from `az login`.
 ```bash
 scripts/azure/provision.sh        # AZ_LOCATION=..., AZ_BUDGET_EMAIL=... optional

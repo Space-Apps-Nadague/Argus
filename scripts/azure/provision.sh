@@ -10,8 +10,8 @@
 set -euo pipefail
 
 RG="${AZ_RG:-argus-rg}"
-LOCATION="${AZ_LOCATION:-westeurope}"
-SERVER="${AZ_PG_SERVER:-argus-pg-$(az account show --query id -o tsv | cut -c1-6)}"
+LOCATION="${AZ_LOCATION:-israelcentral}"  # westeurope/eastus are restricted for free subscriptions
+SERVER="${AZ_PG_SERVER:-argus-pg-a405de}"  # reuse the team server; never create a second one
 ADMIN_USER="${AZ_PG_ADMIN:-argusadmin}"
 DB="argus"
 OUT="azure.env.local"
@@ -26,8 +26,14 @@ echo "› Resource group $RG in $LOCATION, server $SERVER"
 az group create -n "$RG" -l "$LOCATION" -o none
 
 if az postgres flexible-server show -g "$RG" -n "$SERVER" -o none 2>/dev/null; then
-  echo "› Server already exists; skipping create (admin password unchanged)."
-  ADMIN_PW=""
+  if [ -f "$OUT" ]; then
+    echo "› Server already exists and $OUT is present; keeping the admin password."
+    ADMIN_PW=""
+  else
+    echo "› Server already exists but $OUT is missing; resetting the admin password."
+    ADMIN_PW="$(rnd)"
+    az postgres flexible-server update -g "$RG" -n "$SERVER" --admin-password "$ADMIN_PW" -o none
+  fi
 else
   ADMIN_PW="$(rnd)"
   echo "› Creating Flexible Server (Burstable B1ms, PG 17, 32 GB). This takes ~5–10 minutes…"
@@ -45,7 +51,7 @@ echo "› Creating database $DB"
 az postgres flexible-server db create -g "$RG" -s "$SERVER" -d "$DB" -o none 2>/dev/null || true
 
 echo "› Firewall rule for this machine ($MY_IP)"
-az postgres flexible-server firewall-rule create -g "$RG" -n "$SERVER" -r "setup-$(whoami)" \
+az postgres flexible-server firewall-rule create -g "$RG" -s "$SERVER" -n "setup-$(whoami)" \
   --start-ip-address "$MY_IP" --end-ip-address "$MY_IP" -o none
 
 HOST="$SERVER.postgres.database.azure.com"

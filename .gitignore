@@ -19,3 +19,4 @@ data/raw/
 analysis/.venv/
 .ipynb_checkpoints/
 __pycache__/
+data/exports/
