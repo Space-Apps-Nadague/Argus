@@ -23,7 +23,9 @@ import {
   HudTabId,
   MetricId,
   MetricLink,
+  ReadinessMilestone,
   ScenarioId,
+  ScheduledRoutineStatus,
   TriageStatus,
   VitalSignReading,
   VisualExamAnalysis,
@@ -47,6 +49,11 @@ import {
   latestMissionDay,
 } from '../utils/checkIns';
 import { findMetricLinks } from '../utils/driftAnalytics';
+import {
+  createQuickRoutineCheckIn,
+  evaluateReadinessMilestones,
+  getScheduledRoutineStatus,
+} from '../utils/routineMilestones';
 import {
   analyzeVisualSelfExam,
   synthesizeFlightSurgeonGuidance,
@@ -487,6 +494,9 @@ interface MissionContextValue extends MissionState {
   setActiveTab: (tab: HudTabId) => void;
   addCheckIn: (entry: CheckInEntry) => void;
   deleteCheckIn: (entryId: string) => void;
+  routineStatus: ScheduledRoutineStatus;
+  milestones: ReadinessMilestone[];
+  completeScheduledRoutine: () => void;
   zoneStatuses: Record<BodyZoneId, TriageStatus>;
   currentZoneReadings: VitalSignReading[];
   readinessScore: number;
@@ -612,6 +622,43 @@ export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({
       ),
     [adjustedZones, state.environment, state.completedStepIds.length]
   );
+
+  const routineStatus = useMemo(
+    () =>
+      getScheduledRoutineStatus({
+        activeCheckIns,
+        latestDay,
+        countermeasureStreakSols: activeCrewMember.countermeasureStreakSols,
+      }),
+    [activeCheckIns, latestDay, activeCrewMember.countermeasureStreakSols]
+  );
+
+  const milestones = useMemo(
+    () =>
+      evaluateReadinessMilestones({
+        activeCheckIns,
+        streakDays: routineStatus.streakDays,
+        readinessScore,
+        completedStepCount: state.completedStepIds.length,
+        crewMember: activeCrewMember,
+      }),
+    [
+      activeCheckIns,
+      routineStatus.streakDays,
+      readinessScore,
+      state.completedStepIds.length,
+      activeCrewMember,
+    ]
+  );
+
+  const completeScheduledRoutine = useCallback(() => {
+    const entry = createQuickRoutineCheckIn({
+      crewId: activeCrewMember.id,
+      missionDay: latestDay || 30,
+      crewProfile: activeCrewMember,
+    });
+    dispatch({ type: 'ADD_CHECK_IN', payload: entry });
+  }, [activeCrewMember, latestDay]);
 
   const selectCrewMember = useCallback((crewId: string) => {
     dispatch({ type: 'SELECT_CREW_MEMBER', payload: crewId });
@@ -895,6 +942,9 @@ export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({
       checkInStreakDays,
       latestDay,
       metricLinks,
+      routineStatus,
+      milestones,
+      completeScheduledRoutine,
       setActiveTab,
       addCheckIn,
       deleteCheckIn,
@@ -930,6 +980,9 @@ export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({
       checkInStreakDays,
       latestDay,
       metricLinks,
+      routineStatus,
+      milestones,
+      completeScheduledRoutine,
       setActiveTab,
       addCheckIn,
       deleteCheckIn,

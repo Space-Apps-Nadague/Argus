@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { Activity, Flame, Globe, KeyRound, Orbit, Radio, UserPlus, X } from 'lucide-react';
+import { Activity, Award, Flame, Globe, KeyRound, Orbit, Radio, UserPlus, X } from 'lucide-react';
 import { useMission } from '../context/MissionContext';
 import { GravityEnvironment, ScenarioId, TriageStatus } from '../types/argus';
 import { getCrewAdjustedZones, TELEMETRY_SCENARIOS } from '../data/telemetryScenarios';
@@ -45,13 +45,18 @@ export const TopMissionBar: React.FC = () => {
     runtimeApiKey,
     setRuntimeApiKey,
     checkIns,
+    milestones,
   } = useMission();
 
   const [showKeyInput, setShowKeyInput] = useState(false);
+  const [showMilestonesPopover, setShowMilestonesPopover] = useState(false);
   const envMeta = ENVIRONMENT_META[environment];
   const hasKey = hasConfiguredAiKey(runtimeApiKey);
   const rStatus = readinessStatus(readinessScore);
   const streak = countermeasureStreakSols + (completedStepIds.length > 0 ? 1 : 0);
+  const unlockedMilestones = milestones?.filter((m) => m.unlocked) ?? [];
+  const unlockedCount = unlockedMilestones.length;
+  const totalMilestones = milestones?.length ?? 6;
 
   return (
     <header className="relative z-30 border-b border-hud-line bg-hud-bg/90 backdrop-blur-md">
@@ -111,6 +116,94 @@ export const TopMissionBar: React.FC = () => {
               <Flame className="h-3.5 w-3.5" aria-hidden="true" />
               {streak}d
             </span>
+          </div>
+
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowMilestonesPopover((p) => !p)}
+              aria-expanded={showMilestonesPopover}
+              aria-label={`Readiness milestones: ${unlockedCount} of ${totalMilestones} unlocked`}
+              title="Readiness milestone badges"
+              className="hud-focus flex items-center gap-1.5 rounded-lg border border-hud-line bg-hud-panel/80 px-2.5 py-1.5 text-xs text-amber-300 transition-colors hover:border-amber-400/50"
+            >
+              <Award className="h-4 w-4 text-amber-400" aria-hidden="true" />
+              <span className="font-mono font-semibold">{unlockedCount}/{totalMilestones}</span>
+              <span className="hidden sm:inline text-hud-muted text-[11px]">Badges</span>
+            </button>
+            {showMilestonesPopover && (
+              <div
+                role="dialog"
+                aria-label="Readiness milestone badges"
+                className="absolute right-0 z-50 mt-2 w-80 rounded-xl border border-hud-line bg-hud-panel p-3 shadow-2xl"
+              >
+                <div className="mb-2 flex items-center justify-between border-b border-hud-line pb-2">
+                  <div className="flex items-center gap-1.5">
+                    <Award className="h-4 w-4 text-amber-400" aria-hidden="true" />
+                    <span className="font-display text-xs font-semibold text-hud-text">
+                      Readiness Milestones
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowMilestonesPopover(false)}
+                    aria-label="Close milestones popover"
+                    className="hud-focus rounded p-0.5 text-hud-muted hover:text-hud-text"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                <p className="mb-2.5 text-[11px] text-hud-muted">
+                  {unlockedCount} of {totalMilestones} badges earned for routine logging and resilience.
+                </p>
+                <div className="space-y-2 max-h-72 overflow-y-auto no-scrollbar pr-0.5">
+                  {(milestones ?? []).map((m) => {
+                    const pct = Math.min(100, Math.round((m.progress.current / m.progress.target) * 100));
+                    return (
+                      <div
+                        key={m.id}
+                        className={`rounded-lg border p-2 text-xs transition-colors ${
+                          m.unlocked
+                            ? 'border-amber-400/40 bg-amber-400/10'
+                            : 'border-hud-line/70 bg-hud-bg/40 opacity-75'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-semibold text-hud-text flex items-center gap-1.5">
+                            <span className={m.unlocked ? 'text-amber-400' : 'text-slate-500'}>
+                              {m.unlocked ? '✓' : '○'}
+                            </span>
+                            {m.title}
+                          </span>
+                          <span
+                            className={`rounded px-1.5 py-0.2 font-mono text-[9px] font-bold uppercase ${
+                              m.unlocked
+                                ? 'bg-amber-400/20 text-amber-300 border border-amber-400/40'
+                                : 'bg-slate-800 text-slate-400'
+                            }`}
+                          >
+                            {m.unlocked ? 'Unlocked' : 'In Progress'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-hud-muted mb-1.5">{m.description}</p>
+                        <div className="flex items-center justify-between font-mono text-[10px] text-hud-muted mb-0.5">
+                          <span>Progress</span>
+                          <span>
+                            {m.progress.current} / {m.progress.target} {m.progress.unit}
+                          </span>
+                        </div>
+                        <div className="h-1 w-full overflow-hidden rounded-full bg-slate-800">
+                          <div
+                            className={`h-full rounded-full ${m.unlocked ? 'bg-amber-400' : 'bg-hud-accent/60'}`}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           <label className="flex items-center gap-2 rounded-lg border border-hud-line bg-hud-panel/80 px-2.5 py-1.5">

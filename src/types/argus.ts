@@ -231,3 +231,30 @@ export interface CheckInEntry {
   values: Partial<Record<MetricId, number>>;
   note?: string;
 }
+
+/** Scheduled Mission Routine & Gamification Milestones (specs/01-data-schema.md §8) */
+export type MilestoneCategory = 'streak' | 'readiness' | 'routine';
+
+export interface ReadinessMilestone {
+  id: string;
+  title: string;
+  description: string;
+  category: MilestoneCategory;
+  icon: 'flame' | 'shield' | 'award' | 'zap' | 'check' | 'heart';
+  unlocked: boolean;
+  unlockedAtLabel?: string;
+  progress: {
+    current: number;
+    target: number;
+    unit: string;
+  };
+}
+
+export interface ScheduledRoutineStatus {
+  isDue: boolean;
+  currentDay: number;
+  lastLoggedDay: number | null;
+  coreMetricsDue: MetricId[];
+  streakDays: number;
+}
+

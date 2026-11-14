@@ -21,9 +21,13 @@
   - Dynamic **Surface/Orbital Gravity** badge (`0.00g`, `0.16g`, `0.38g`).
   - **Location / Habitat Selector** dropdown (`iss_leo`, `lunar_base`, `0g_transit`, `mars_base` presets) dynamically updating comm delay, gravity thresholds, Earth packet metadata, and autonomous urgency.
   - **Crew Readiness Score** `0–100%` with status color + daily countermeasure streak.
+  - **Milestone Badges Trigger**: Interactive badge chip (`🏆 <n> Badges`) with popover/modal to inspect unlocked readiness milestones and streak progress (`REQ-09`).
   - **Simulate Medical Event** dropdown (`nominal`, `sans_alert`, `high_co2`, `solar_storm`).
   - Optional Clinical AI key button (icon only + tooltip).
   - **Crew Roster Strip:** selectable pills (callsign, name, live readiness dot) + `+ Add crew` (opens `CrewManagerModal.tsx` in create mode).
+- **Scheduled Mission Routine Banner (`ScheduledRoutineBanner.tsx`):**
+  - Prominently positioned above tab content to prompt astronauts for pending daily measurements (`REQ-08`).
+  - Displays sol indicator (`MD-<n>`), check-in status, quick-log action (1-click completion of nominal routine), link to full check-in tab, and expandable readiness milestone progress shelf (`REQ-09`).
 - **Tab Bar (`TabBar.tsx`):** `role="tablist"`. Each tab is a `role="tab"` button with icon + short label + optional badge (e.g. red count on Bio-Twin when any zone is red; check-in due dot when today is not logged). Left/Right/Home/End keys move focus and selection. The active tab persists in `localStorage` (`argus_active_tab_v1`). Type: `HudTabId = 'biotwin' | 'trends' | 'checkin' | 'surgeon' | 'crew'`.
 
 ## 2. Tabs

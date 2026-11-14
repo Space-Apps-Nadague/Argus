@@ -13,6 +13,7 @@ import { MissionProvider, useMission } from './context/MissionContext';
 import { HudTabId } from './types/argus';
 import { TopMissionBar } from './components/TopMissionBar';
 import { TabBar, HUD_TAB_DEFS, panelId, tabId } from './components/TabBar';
+import { ScheduledRoutineBanner } from './components/ScheduledRoutineBanner';
 import { BioTwinTab } from './components/BioTwinTab';
 import { TrendsTab } from './components/TrendsTab';
 import { CheckInTab } from './components/CheckInTab';
@@ -52,6 +53,7 @@ export const App: React.FC = () => (
       <TabBar />
       <CrewManagerModal />
       <main className="mx-auto w-full max-w-[1800px] p-3 md:p-4">
+        <ScheduledRoutineBanner />
         <ActivePanel />
       </main>
     </div>
