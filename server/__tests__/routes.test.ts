@@ -49,6 +49,20 @@ describe('AI routes (offline)', () => {
     expect(body.result).toMatchObject({ zoneId: 'neuro', triageStatus: 'red' });
   });
 
+  it('POST /api/ai/guidance incorporates crewSymptoms in offline fallback', async () => {
+    const res = await post('/api/ai/guidance', {
+      scenarioId: 'nominal',
+      zoneId: 'cardio',
+      crewMember,
+      crewSymptoms: 'Throbbing headache behind eyes, blurred near vision, optic disc swelling',
+    });
+    const body = (await res.json()) as GuidanceResponse;
+    expect(body.meta.source).toBe('offline_verified_cache');
+    expect(body.result.headline).toContain('Neuro-Ocular & SANS Assessment');
+    expect(body.result.zoneId).toBe('neuro');
+    expect(body.result.guidedSteps.length).toBeGreaterThan(0);
+  });
+
   it('POST /api/ai/vision returns the reference sample finding', async () => {
     const res = await post('/api/ai/vision', { sampleId: 'sans_ultrasound' });
     const body = await res.json();

@@ -37,7 +37,10 @@ export const CrewContextSchema = z.object({
   environment: EnvironmentSchema.optional(),
 });
 
-export const GuidanceRequestSchema = CrewContextSchema.extend({ zoneId: ZoneIdSchema });
+export const GuidanceRequestSchema = CrewContextSchema.extend({
+  zoneId: ZoneIdSchema,
+  crewSymptoms: text(2000).optional(),
+});
 
 export const VisionRequestSchema = z
   .object({

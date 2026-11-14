@@ -18,6 +18,7 @@ import {
   VisualExamSample,
 } from '../types/argus';
 import { evaluateZoneStatus } from '../utils/triageEngine';
+import { matchOfflineSymptomGuidance } from '../utils/symptomFallback';
 
 export const DEFAULT_CREW_ROSTER: CrewMemberProfile[] = [
   {
@@ -1058,8 +1059,20 @@ export function getOfflineFlightSurgeonGuidance(
   scenarioId: ScenarioId,
   zoneId: BodyZoneId,
   environment: GravityEnvironment = '0g_transit',
-  crewMember?: CrewMemberProfile
+  crewMember?: CrewMemberProfile,
+  crewSymptoms?: string
 ): FlightSurgeonGuidance {
+  if (crewSymptoms && crewSymptoms.trim().length > 0) {
+    const matched = matchOfflineSymptomGuidance({
+      symptoms: crewSymptoms,
+      scenarioId,
+      fallbackZoneId: zoneId,
+      environment,
+      crewMember,
+    });
+    if (matched) return matched;
+  }
+
   const adjustedZones = getCrewAdjustedZones(scenarioId, crewMember);
   const zoneReadings = adjustedZones[zoneId];
   const triageStatus: TriageStatus = evaluateZoneStatus(zoneReadings, environment);

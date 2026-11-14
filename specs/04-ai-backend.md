@@ -48,7 +48,7 @@ All JSON endpoints return `AiEnvelope<T> = { result: T, meta: { source, provider
 | Method & path | Request | Result | Deterministic part | LLM part |
 |---|---|---|---|---|
 | `GET /api/health[?probe=1]` | — | `AiProviderStatus` | chain resolution | — |
-| `POST /api/ai/guidance` | `GuidanceRequest` | `FlightSurgeonGuidance` | zone triage status | headline, explanation, guided steps |
+| `POST /api/ai/guidance` | `GuidanceRequest` (`zoneId`, optional `crewSymptoms`) | `FlightSurgeonGuidance` | zone triage status, deterministic offline symptom fallback | headline, explanation, guided steps |
 | `POST /api/ai/vision` | `VisionRequest` | `VisualExamAnalysis` | status for reference samples | summary, guidance, action (status only for custom uploads) |
 | `POST /api/ai/diagnostics` | `CrewContextRequest` | `DiagnosticsReport` | zone statuses, readiness, trends, rule candidates, urgency floor | ranked hypotheses + rationale, summary |
 | `POST /api/ai/recommendations` | `CrewContextRequest` | `CountermeasurePlan` | library baseline per flagged metric | personalization, ordering |

@@ -31,7 +31,13 @@ guidanceRoutes.post('/guidance', async (c) => {
   const req = body.data;
 
   const snapshot = buildCrewSnapshot(req);
-  const offline = getOfflineFlightSurgeonGuidance(req.scenarioId, req.zoneId, snapshot.environment, req.crewMember);
+  const offline = getOfflineFlightSurgeonGuidance(
+    req.scenarioId,
+    req.zoneId,
+    snapshot.environment,
+    req.crewMember,
+    req.crewSymptoms
+  );
   const deterministicStatus = snapshot.zoneStatuses[req.zoneId];
   const zone = BODY_ZONES[req.zoneId];
   const env = ENVIRONMENT_META[snapshot.environment];
@@ -45,6 +51,10 @@ guidanceRoutes.post('/guidance', async (c) => {
     })
     .join('\n');
 
+  const symptomContext = req.crewSymptoms?.trim()
+    ? `\nCrew Reported Symptoms / Clinical Question: "${req.crewSymptoms.trim()}"\nAddress these reported symptoms directly within NASA HRP clinical countermeasure protocols.\n`
+    : '';
+
   const result = await completeJson(
     GuidanceLlmSchema,
     [
@@ -56,7 +66,7 @@ Environment: ${env.label} (${env.gravityG}), comm delay ${env.commDelay}.
 Scenario: ${snapshot.scenarioLabel}
 Selected zone: ${zone.name} (${zone.anatomicalSubtitle}) — HRP focus: ${zone.nasaHazardFocus}
 Deterministic zone status: ${deterministicStatus.toUpperCase()}
-
+${symptomContext}
 Zone telemetry:
 ${metrics}
 

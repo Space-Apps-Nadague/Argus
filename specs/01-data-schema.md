@@ -202,6 +202,19 @@ export interface FlightSurgeonGuidance {
   source: 'live_ai' | 'offline_verified_cache';
 }
 
+### Crew Symptom & Clinical Q&A Input (`crewSymptoms`)
+During spaceflight communication blackouts (e.g. 14–22 min Mars/Deep-Space one-way transit), astronauts can submit free-text clinical symptoms and questions directly to the Autonomous Flight Surgeon:
+- **Parameter:** `crewSymptoms?: string` passed into `synthesizeFlightSurgeonGuidance` and `GuidanceRequest`.
+- **Deterministic Offline Keyword Fallback (`src/utils/symptomFallback.ts`):** When operating offline or without an active AI key, incoming symptom text is evaluated deterministically against clinical spaceflight keyword dictionaries:
+  1. *Neuro-Ocular / SANS*: keywords (`headache`, `vision`, `blur`, `optic`, `eye`, `sans`, `papilledema`, `scotoma`) → triggers SANS protocol, cranial pressure relief steps, and fundoscopy/ultrasound instructions.
+  2. *Hypercapnia / Cabin CO₂*: keywords (`co2`, `carbon dioxide`, `hypercapnia`, `scrubber`, `stuffy`, `air hunger`) → triggers CDRA/LiOH scrubber exchange, portable O₂ breathing, and metabolic exertion limits.
+  3. *Cardiovascular & Autonomic*: keywords (`palpitation`, `heart`, `chest`, `tachycardia`, `arrhythmia`, `pulse`, `dyspnea`, `orthostatic`) → triggers ECG verification, hydration bolus, and aerobic interval protocols.
+  4. *Musculoskeletal & Spine*: keywords (`back`, `spine`, `vertebra`, `bone`, `muscle`, `lumbar`, `elongation`, `stiff`) → triggers ARED axial loading and spinal alignment countermeasures.
+  5. *Immune, Dermal & Radiation*: keywords (`rash`, `itch`, `skin`, `erythema`, `radiation`, `storm`, `spe`, `dosimeter`, `lymphocyte`) → triggers water-wall shelter verification, antioxidant packs, and dermal photography.
+  6. *Behavioral & Circadian*: keywords (`sleep`, `insomnia`, `fatigue`, `exhausted`, `fog`, `lapse`, `anxiety`, `circadian`) → triggers 480nm depleted lighting and psychomotor vigilance testing (PVT).
+  7. *Acute Red Flags*: keywords (`crushing chest pain`, `loss of vision`, `cannot breathe`, `unconscious`, `severe hemorrhage`) → deterministically escalates status to `'red'` and `earthConsultUrgency` to `'immediate_emergency_packet'`.
+- **Live AI Enhancement:** When a supported AI provider is available, `crewSymptoms` is grounded into the LLM prompt while preserving deterministic triage boundaries.
+
 export interface VisualExamSample {
   id: 'nominal_retina' | 'sans_ultrasound' | 'cabin_rash';
   title: string;
