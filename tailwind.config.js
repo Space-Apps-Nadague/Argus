@@ -13,6 +13,10 @@ export default {
         mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'monospace'],
         display: ['Orbitron', 'Inter', 'system-ui', 'sans-serif'],
       },
+      gridTemplateColumns: {
+        // Container-driven form rows: as many ≥11rem columns as fit (specs/02 §4 Responsive)
+        fields: 'repeat(auto-fit, minmax(11rem, 1fr))',
+      },
       colors: {
         hud: {
           bg: '#020617',      // slate-950 canvas

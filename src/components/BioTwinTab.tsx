@@ -32,11 +32,11 @@ export const BioTwinTab: React.FC = () => {
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-      <div className="lg:col-span-2 flex flex-col">
+      <div className="flex min-w-0 flex-col lg:col-span-2">
         <BioTwinMap />
       </div>
 
-      <div className="flex flex-col gap-4">
+      <div className="flex min-w-0 flex-col gap-4">
         <Card
           title={
             <span className="flex items-center gap-2">

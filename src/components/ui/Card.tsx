@@ -28,14 +28,14 @@ export const Card: React.FC<CardProps> = ({
 }) => (
   <Tag className={`hud-card ${className}`} aria-label={ariaLabel}>
     {(title || actions) && (
-      <header className="flex items-center justify-between gap-2 px-4 pt-3.5 pb-2">
+      <header className="flex flex-wrap items-center justify-between gap-2 px-4 pt-3.5 pb-2">
         {title && (
-          <h2 className="flex items-center gap-2 font-display text-[13px] font-semibold tracking-wide text-hud-text">
+          <h2 className="flex min-w-0 items-center gap-2 font-display text-[13px] font-semibold tracking-wide text-hud-text">
             {icon && <span className="text-hud-accent" aria-hidden="true">{icon}</span>}
             {title}
           </h2>
         )}
-        {actions && <div className="flex items-center gap-1.5">{actions}</div>}
+        {actions && <div className="ml-auto flex flex-wrap items-center gap-1.5">{actions}</div>}
       </header>
     )}
     <div className={bodyClassName}>{children}</div>

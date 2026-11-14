@@ -254,7 +254,7 @@ export const TopMissionBar: React.FC = () => {
               <KeyRound className="h-4 w-4" aria-hidden="true" />
             </button>
             {showKeyInput && (
-              <div className="absolute right-0 z-50 mt-2 w-72 rounded-xl border border-hud-line bg-hud-panel p-3 shadow-2xl">
+              <div className="absolute right-0 z-50 mt-2 w-72 max-w-[calc(100vw-1.5rem)] rounded-xl border border-hud-line bg-hud-panel p-3 shadow-2xl">
                 <div className="mb-1.5 flex items-center justify-between">
                   <span className="text-xs font-semibold text-hud-text">Clinical AI key</span>
                   <button

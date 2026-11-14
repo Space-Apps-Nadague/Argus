@@ -339,7 +339,7 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
           bodyClassName="p-4 space-y-3"
         >
           <form onSubmit={handleLogSubmit} className="space-y-3" noValidate>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 items-start">
+            <div className="grid grid-cols-fields items-start gap-3">
               {/* Zone selector */}
               <div>
                 <label htmlFor={`${formId}-zone`} className="block text-xs font-medium text-hud-muted mb-1">
@@ -396,7 +396,7 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
                   </label>
                   {previewStatus && (
                     <span
-                      className="inline-flex items-center gap-1 text-[11px] font-mono px-1.5 py-0.2 rounded"
+                      className="inline-flex items-center gap-1 text-[11px] font-mono px-1.5 py-0.5 rounded"
                       style={{
                         color: STATUS_COLORS[previewStatus],
                         backgroundColor: `${STATUS_COLORS[previewStatus]}15`,
@@ -437,66 +437,67 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
                 )}
               </div>
 
-              {/* Action & quick presets */}
-              <div className="flex flex-col gap-1.5 pt-0.5">
-                <span className="block text-xs font-medium text-hud-muted mb-0.5">Quick Presets</span>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => applyPreset('nominal')}
-                    className="hud-focus rounded border border-status-green/40 bg-status-green/10 px-2 py-1 text-[10px] font-mono text-status-green hover:bg-status-green/20"
-                    title={`Fill Nominal: ${logThreshold.nominalMin}–${logThreshold.nominalMax}`}
-                  >
-                    Nominal
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => applyPreset('yellow')}
-                    className="hud-focus rounded border border-status-yellow/40 bg-status-yellow/10 px-2 py-1 text-[10px] font-mono text-status-yellow hover:bg-status-yellow/20"
-                    title={`Fill Caution: ${logThreshold.yellowMax}`}
-                  >
-                    Caution
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => applyPreset('red')}
-                    className="hud-focus rounded border border-status-red/40 bg-status-red/10 px-2 py-1 text-[10px] font-mono text-status-red hover:bg-status-red/20"
-                    title="Fill Alert (Red threshold exceeded)"
-                  >
-                    Alert
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={validation.ok !== true || isSubmitting}
-                    className="hud-focus ml-auto flex items-center gap-1.5 rounded-lg border border-hud-accent/60 bg-hud-accent px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-cyan-300 disabled:opacity-40 disabled:pointer-events-none transition-colors"
-                  >
-                    {isSubmitting || isSynthesizingAi ? (
-                      <Sparkles className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                    )}
-                    <span>Record Reading</span>
-                  </button>
-                </div>
-                <span className="text-[10px] font-mono text-hud-muted">
-                  Allowed {logInputRange.min}–{logInputRange.max} {logMetricUnit} · {formatFlightNormBadge(logMetricId, logMetricUnit, environment)}
-                </span>
+            </div>
+
+            {/* Action footer: presets · allowed range · submit (wraps by card width) */}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-hud-line pt-3">
+              <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Quick presets">
+                <span className="text-xs font-medium text-hud-muted">Quick Presets</span>
+                <button
+                  type="button"
+                  onClick={() => applyPreset('nominal')}
+                  className="hud-focus rounded border border-status-green/40 bg-status-green/10 px-2 py-1 text-[10px] font-mono text-status-green hover:bg-status-green/20"
+                  title={`Fill Nominal: ${logThreshold.nominalMin}–${logThreshold.nominalMax}`}
+                >
+                  Nominal
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyPreset('yellow')}
+                  className="hud-focus rounded border border-status-yellow/40 bg-status-yellow/10 px-2 py-1 text-[10px] font-mono text-status-yellow hover:bg-status-yellow/20"
+                  title={`Fill Caution: ${logThreshold.yellowMax}`}
+                >
+                  Caution
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyPreset('red')}
+                  className="hud-focus rounded border border-status-red/40 bg-status-red/10 px-2 py-1 text-[10px] font-mono text-status-red hover:bg-status-red/20"
+                  title="Fill Alert (Red threshold exceeded)"
+                >
+                  Alert
+                </button>
               </div>
+              <span className="min-w-0 text-[10px] font-mono text-hud-muted">
+                Allowed {logInputRange.min}–{logInputRange.max} {logMetricUnit} · {formatFlightNormBadge(logMetricId, logMetricUnit, environment)}
+              </span>
+              <button
+                type="submit"
+                disabled={validation.ok !== true || isSubmitting}
+                className="hud-focus flex w-full items-center justify-center gap-1.5 rounded-lg border border-hud-accent/60 bg-hud-accent px-3 py-1.5 text-xs font-semibold text-slate-950 transition-colors hover:bg-cyan-300 disabled:pointer-events-none disabled:opacity-40 sm:ml-auto sm:w-auto"
+              >
+                {isSubmitting || isSynthesizingAi ? (
+                  <Sparkles className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                ) : (
+                  <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+                )}
+                <span>Record Reading</span>
+              </button>
             </div>
 
             {logStatusMessage && (
               <div
                 role="status"
-                className="flex items-center justify-between rounded-lg border border-hud-accent/40 bg-hud-accent/10 px-3 py-2 text-xs text-hud-text"
+                className="flex items-start justify-between gap-2 rounded-lg border border-hud-accent/40 bg-hud-accent/10 px-3 py-2 text-xs text-hud-text"
               >
-                <div className="flex items-center gap-2">
+                <div className="flex min-w-0 items-start gap-2">
                   <CheckCircle2 className="h-4 w-4 text-hud-accent shrink-0" />
                   <span>{logStatusMessage}</span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setLogStatusMessage(null)}
-                  className="text-hud-muted hover:text-hud-text text-xs ml-2"
+                  className="hud-focus shrink-0 rounded text-xs text-hud-muted hover:text-hud-text"
                 >
                   Dismiss
                 </button>

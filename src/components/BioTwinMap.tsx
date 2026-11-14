@@ -1013,7 +1013,7 @@ export const BioTwinMap: React.FC = () => {
         </div>
 
         {/* Camera Focus Presets */}
-        <div className="flex items-center gap-1" role="group" aria-label="Camera focus">
+        <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Camera focus">
           <Crosshair className="mr-1 h-4 w-4 text-hud-muted" aria-hidden="true" />
           {(Object.keys(CAMERA_PRESETS) as CameraPresetId[]).map((presetKey) => {
             const active = cameraPreset === presetKey;
@@ -1036,7 +1036,7 @@ export const BioTwinMap: React.FC = () => {
           CENTRAL EXPANSIVE 3D HOLOGRAPHIC VIEWPORT (STAR OF THE DASHBOARD)
          ============================================================ */}
       <div
-        className="relative flex-1 min-h-[500px] lg:min-h-[560px] w-full bg-[radial-gradient(ellipse_at_center,_rgba(8,51,68,0.42)_0%,_rgba(2,6,23,0.96)_72%)]"
+        className="relative flex-1 min-h-[420px] sm:min-h-[500px] lg:min-h-[560px] w-full bg-[radial-gradient(ellipse_at_center,_rgba(8,51,68,0.42)_0%,_rgba(2,6,23,0.96)_72%)]"
         onMouseEnter={() => setIsInteracting(true)}
         onMouseLeave={() => {
           setIsInteracting(false);

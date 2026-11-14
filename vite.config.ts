@@ -7,7 +7,9 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
-    host: true,
+    // Bind IPv4 explicitly: with `true` Vite listens on IPv6 only and WSL2
+    // doesn't forward Windows' 127.0.0.1 to it (VS Code browser / Windows Chrome).
+    host: '0.0.0.0',
     proxy: {
       // ARGUS AI backend (server/, specs/04-ai-backend.md)
       '/api': {

@@ -71,7 +71,7 @@ export const CheckInTab: React.FC = () => {
 
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-      <form onSubmit={submit} className="xl:col-span-2 space-y-4" noValidate aria-labelledby="checkin-title">
+      <form onSubmit={submit} className="min-w-0 space-y-4 xl:col-span-2" noValidate aria-labelledby="checkin-title">
         {/* Header */}
         <div className="hud-card flex flex-wrap items-center justify-between gap-3 px-4 py-3">
           <h2 id="checkin-title" className="flex items-center gap-2 font-display text-[13px] font-semibold tracking-wide text-hud-text">
@@ -217,7 +217,7 @@ export const CheckInTab: React.FC = () => {
       </form>
 
       {/* History */}
-      <Card title="Recent" bodyClassName="px-4 pb-4">
+      <Card title="Recent" className="min-w-0" bodyClassName="px-4 pb-4">
         {recent.length ? (
           <ul className="space-y-2">
             {recent.map((e) => (
