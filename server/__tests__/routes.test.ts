@@ -3,6 +3,8 @@
  * offline result (no network calls are made).
  */
 
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 import type {
   AiProviderStatus,
@@ -179,5 +181,19 @@ describe('AI routes (offline)', () => {
     const res = await app.request('/api/does-not-exist');
     expect(res.status).toBe(404);
     expect(await res.json()).toEqual({ error: 'Not found' });
+  });
+
+  it('serves favicon.svg and favicon.ico from dist when built (Azure App Service static)', async () => {
+    expect(existsSync(resolve(process.cwd(), 'public', 'favicon.svg'))).toBe(true);
+    expect(existsSync(resolve(process.cwd(), 'public', 'favicon.ico'))).toBe(true);
+    if (!existsSync(resolve(process.cwd(), 'dist', 'index.html'))) return;
+
+    const svgRes = await app.request('/favicon.svg');
+    expect(svgRes.status).toBe(200);
+    expect(svgRes.headers.get('content-type')).toMatch(/image\/svg\+xml/);
+
+    const icoRes = await app.request('/favicon.ico');
+    expect(icoRes.status).toBe(200);
+    expect(icoRes.headers.get('content-type')).toMatch(/image\/(x-icon|vnd\.microsoft\.icon)/);
   });
 });
