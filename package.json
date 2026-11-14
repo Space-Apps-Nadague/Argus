@@ -6,19 +6,28 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:server": "tsx watch server/index.ts",
+    "dev:all": "concurrently -k -n web,api -c cyan,magenta \"npm:dev\" \"npm:dev:server\"",
+    "dev:local": "cross-env AI_PROVIDERS=local concurrently -k -n web,api -c cyan,magenta \"npm:dev\" \"npm:dev:server\"",
+    "start:server": "tsx server/index.ts",
+    "ai:local": "tsx scripts/check-local-ai.ts",
     "build": "tsc -b && vite build",
+    "typecheck:server": "tsc -p server/tsconfig.json",
     "preview": "vite preview",
     "test": "vitest run"
   },
   "dependencies": {
-    "@google/genai": "^2.29.1",
+    "@hono/node-server": "^2.1.8",
     "@react-three/drei": "^9.121.4",
     "@react-three/fiber": "^8.17.10",
+    "hono": "^4.13.18",
     "lucide-react": "^0.468.0",
+    "openai": "^7.57.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "recharts": "^2.15.0",
-    "three": "^0.170.0"
+    "three": "^0.170.0",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
@@ -27,8 +36,11 @@
     "@types/three": "^0.170.0",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
+    "concurrently": "^10.0.7",
+    "cross-env": "^10.1.0",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
+    "tsx": "^4.23.15",
     "typescript": "^5.7.2",
     "vite": "^6.0.5",
     "vitest": "^2.1.8"

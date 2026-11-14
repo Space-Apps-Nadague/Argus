@@ -1,4 +1,6 @@
 /** @type {import('tailwindcss').Config} */
+// Design tokens: specs/02-ui-dashboard.md §4 + AGENTS.md §3 visual language.
+// Add new colors/fonts here (design-system skill), never as raw hex in components.
 export default {
   content: [
     "./index.html",
@@ -9,8 +11,23 @@ export default {
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
         mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+        display: ['Orbitron', 'Inter', 'system-ui', 'sans-serif'],
       },
       colors: {
+        hud: {
+          bg: '#020617',      // slate-950 canvas
+          panel: '#0f172a',   // slate-900 surfaces
+          line: '#1e293b',    // slate-800 borders
+          text: '#f1f5f9',    // slate-100
+          muted: '#94a3b8',   // slate-400 (≥ 4.5:1 on panel)
+          accent: '#22d3ee',  // cyan-400 primary
+          drift: '#a78bfa',   // violet-400: personal-baseline drift & links only
+        },
+        status: {
+          green: '#22c55e',
+          yellow: '#eab308',
+          red: '#ef4444',
+        },
         argus: {
           green: '#22c55e',
           yellow: '#eab308',
