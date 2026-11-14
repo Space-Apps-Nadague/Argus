@@ -122,12 +122,12 @@ export const WELLBEING_STORAGE_KEY = 'argus_wellbeing_v1';
  * (specs/05-data-platform.md §3.4); offline demo: this browser.
  */
 export function useWellbeingHistory(crewId: string): [WellbeingCheckIn[], (entry: WellbeingCheckIn) => Promise<WellbeingCheckIn[]>] {
-  const { serverBacked } = useMission();
+  const { serverBacked, canReadActiveCrew } = useMission();
   const [local, setLocal] = usePerCrewList<WellbeingCheckIn>(WELLBEING_STORAGE_KEY, crewId, 60);
   const [remote, setRemote] = useState<WellbeingCheckIn[]>([]);
 
   useEffect(() => {
-    if (!serverBacked) return;
+    if (!serverBacked || !canReadActiveCrew) return;
     let alive = true;
     setRemote([]);
     wellbeingApi
@@ -137,7 +137,7 @@ export function useWellbeingHistory(crewId: string): [WellbeingCheckIn[], (entry
     return () => {
       alive = false;
     };
-  }, [serverBacked, crewId]);
+  }, [serverBacked, canReadActiveCrew, crewId]);
 
   const add = useCallback(
     async (entry: WellbeingCheckIn) => {

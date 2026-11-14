@@ -568,6 +568,8 @@ interface MissionContextValue extends MissionState {
   createCrewMember: (newMember: Omit<CrewMemberProfile, 'id' | 'isCustom'>) => void;
   /** True when roster, data and chat come from the ARGUS database (specs/05-data-platform.md). */
   serverBacked: boolean;
+  /** True when the signed-in user is allowed to fetch health/chat/wellbeing data for `activeCrewMember`. */
+  canReadActiveCrew: boolean;
   updateCrewMemberSex: (crewId: string, sex: BiologicalSex) => void;
   deleteCrewMember: (crewId: string) => void;
   setCrewModalOpen: (open: boolean) => void;
@@ -596,6 +598,8 @@ interface MissionProviderProps {
   children: React.ReactNode;
   /** Crew users are locked to their own crew member (specs/02-ui-dashboard.md §6). */
   lockedCrewId?: string;
+  /** False for plain server admins who manage accounts/roster without health access (specs/05-data-platform.md §6). */
+  canViewHealth?: boolean;
   /** Called after a crew member is deleted (e.g. to remove linked accounts). */
   onCrewDeleted?: (crewId: string) => void;
   /** Load and save the roster (and later data) through the ARGUS server instead of localStorage. */
@@ -605,6 +609,7 @@ interface MissionProviderProps {
 export const MissionProvider: React.FC<MissionProviderProps> = ({
   children,
   lockedCrewId,
+  canViewHealth = true,
   onCrewDeleted,
   serverBacked = false,
 }) => {
@@ -722,12 +727,12 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
     []
   );
   useEffect(() => {
-    if (!serverBacked || !readableCrewIds) return;
+    if (!serverBacked || !canViewHealth || !readableCrewIds) return;
     const ids = readableCrewIds.split(',');
     void refreshServerZones(ids);
     const timer = setInterval(() => void refreshServerZones(ids), 60_000);
     return () => clearInterval(timer);
-  }, [serverBacked, readableCrewIds, refreshServerZones]);
+  }, [serverBacked, canViewHealth, readableCrewIds, refreshServerZones]);
 
   const zonesForCrew = useCallback(
     (member: CrewMemberProfile, scenario: ScenarioId = member.defaultScenarioId) => {
@@ -1182,6 +1187,9 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
     }
   }, [currentZoneReadings, state.selectedMetricId]);
 
+  const canReadActiveCrew =
+    !serverBacked || (canViewHealth && (!lockedCrewId || activeCrewMember.id === lockedCrewId));
+
   const value = useMemo<MissionContextValue>(
     () => ({
       ...state,
@@ -1198,6 +1206,7 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
       setActiveTab,
       isCrewLocked: Boolean(lockedCrewId),
       serverBacked,
+      canReadActiveCrew,
       zonesSource,
       zonesForCrew,
       spaceLocationId,
@@ -1246,6 +1255,7 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
       setActiveTab,
       lockedCrewId,
       serverBacked,
+      canReadActiveCrew,
       zonesSource,
       zonesForCrew,
       spaceLocationId,
