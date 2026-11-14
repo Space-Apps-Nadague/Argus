@@ -101,6 +101,13 @@ function readRepoFileExcerpt(relPath, maxChars = 6000) {
   return `${content.slice(0, maxChars)}\n... [truncated ${content.length - maxChars} chars]`;
 }
 
+function inferKanbanColumn(priorityOrTitle) {
+  const text = String(priorityOrTitle || '').toUpperCase();
+  if (text.includes('P0')) return 'urgent';
+  if (text.includes('P2')) return 'backlog';
+  return 'todo';
+}
+
 function formatIssueMarkdown(item) {
   const critiqueBullets = (item.pmCritique || [])
     .slice(0, 2)
@@ -157,6 +164,14 @@ async function generateAuditPlan(apiKey, prompt) {
           properties: {
             slug: { type: 'string' },
             priority: { type: 'string', enum: ['P0', 'P1', 'P2'] },
+            assigneeType: {
+              type: 'string',
+              enum: ['human-review', 'agent-task'],
+            },
+            kanbanColumn: {
+              type: 'string',
+              enum: ['backlog', 'todo', 'urgent'],
+            },
             title: { type: 'string' },
             reqRefs: { type: 'string' },
             whyItMatters: { type: 'string' },
@@ -168,17 +183,19 @@ async function generateAuditPlan(apiKey, prompt) {
               type: 'array',
               items: { type: 'string' },
             },
-            miroSummary: { type: 'string' },
+            projectSummary: { type: 'string' },
           },
           required: [
             'slug',
             'priority',
+            'assigneeType',
+            'kanbanColumn',
             'title',
             'reqRefs',
             'whyItMatters',
             'pmCritique',
             'tasks',
-            'miroSummary',
+            'projectSummary',
           ],
         },
       },
@@ -275,11 +292,13 @@ async function main() {
         (t) => t.issueNumber === issue.number
       );
       if (!alreadyInProject) {
+        const targetStatus = inferKanbanColumn(issue.title);
         if (dryRun) {
           projectBackfilled.push({
             dryRun: true,
             issueNumber: issue.number,
             title: issue.title,
+            status: targetStatus,
           });
         } else {
           const syncedItem = runJsonScript(PROJECT_SCRIPT, [
@@ -287,7 +306,7 @@ async function main() {
             '--issue-number',
             String(issue.number),
             '--status',
-            'todo',
+            targetStatus,
           ]);
           projectBackfilled.push(syncedItem);
         }
@@ -335,7 +354,10 @@ ${codebaseSnapshot}
 
 Instructions:
 1. Check every currently OPEN GitHub issue above. ONLY include an issue in "issuesToClose" if you can verify in the Codebase Snapshot that its requested feature/tasks are now genuinely implemented in src/. Do NOT close an issue if it is still unimplemented.
-2. Propose at most ${maxNewLimit} high-impact new issues in "issuesToCreate" for gaps in REQ-01 through REQ-10 that are NOT already covered by an existing open issue. If existing open issues already cover the top priorities, return an empty array [] for "issuesToCreate".`;
+2. Propose at most ${maxNewLimit} high-impact new issues in "issuesToCreate" for gaps in REQ-01 through REQ-10 that are NOT already covered by an existing open issue. If existing open issues already cover the top priorities, return an empty array [] for "issuesToCreate".
+3. For each new issue:
+   - Set "assigneeType" to "human-review" if it requires a human product/UX/clinical/credential decision or manual review, or "agent-task" if it is a concrete coding/spec/UI task ready for an AI coding agent to implement.
+   - Set "kanbanColumn" based on urgency: "urgent" for P0 (critical hackathon/demo impact), "todo" for P1 (regular urgency), or "backlog" for P2 (not urgent / polish).`;
 
   const { model, plan } = await generateAuditPlan(geminiApiKey, prompt);
 
@@ -415,11 +437,15 @@ Instructions:
       .replace(/^\[P[012]\]\s*/i, '')
       .trim();
     const fullTitle = `[PM Agent] [${item.priority}] ${cleanActionTitle}`;
+    const issueLabel = item.assigneeType === 'human-review' ? 'human-review' : 'agent-task';
+    const kanbanStatus = item.kanbanColumn || inferKanbanColumn(item.priority);
 
     if (dryRun) {
       createdResults.push({
         dryRun: true,
         title: fullTitle,
+        labels: [issueLabel],
+        kanbanStatus,
         issueFilePath,
         bodyMarkdown,
       });
@@ -430,6 +456,8 @@ Instructions:
       'create',
       '--title',
       fullTitle,
+      '--labels',
+      issueLabel,
       '--body',
       `@${issueFilePath}`,
     ]);
@@ -442,7 +470,7 @@ Instructions:
           '--issue-number',
           String(createRes.number),
           '--status',
-          'todo',
+          kanbanStatus,
         ]);
         createRes.projectItem = projectItem;
       } catch (err) {

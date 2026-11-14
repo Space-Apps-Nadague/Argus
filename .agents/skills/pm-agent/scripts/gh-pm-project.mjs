@@ -16,7 +16,7 @@
  *
  * Usage:
  *   node .agents/skills/pm-agent/scripts/gh-pm-project.mjs list [--project <number>] [--owner <login>]
- *   node .agents/skills/pm-agent/scripts/gh-pm-project.mjs sync-issue --issue-number <n> --status "todo|in_progress|done" [--project <number>] [--owner <login>]
+ *   node .agents/skills/pm-agent/scripts/gh-pm-project.mjs sync-issue --issue-number <n> --status "backlog|todo|urgent|in_progress|done" [--project <number>] [--owner <login>]
  */
 
 import { execSync } from 'node:child_process';
@@ -281,12 +281,28 @@ function resolveStatusOption(project, desiredStatus) {
     .replace(/[_-]+/g, ' ')
     .trim();
 
-  const option =
-    statusField.options.find((o) => o.name.toLowerCase() === normalized) ||
-    statusField.options.find((o) => o.name.toLowerCase().includes(normalized)) ||
-    null;
+  const aliases = {
+    backlog: ['backlog', 'not urgent', 'later'],
+    todo: ['todo', 'to do', 'regular', 'ready'],
+    urgent: ['urgent', 'p0', 'high', 'critical'],
+    'in progress': ['in progress', 'doing', 'active'],
+    done: ['done', 'completed', 'closed'],
+  };
+  const candidates = aliases[normalized] || [normalized];
 
-  return { fieldId: statusField.id, option };
+  let option = null;
+  for (const candidate of candidates) {
+    option =
+      statusField.options.find((o) => o.name.toLowerCase() === candidate) ||
+      statusField.options.find((o) => o.name.toLowerCase().includes(candidate));
+    if (option) break;
+  }
+
+  return {
+    fieldId: statusField.id,
+    option,
+    availableOptions: statusField.options.map((o) => o.name),
+  };
 }
 
 async function main() {
@@ -394,7 +410,7 @@ async function main() {
       );
     }
 
-    const { fieldId, option } = resolveStatusOption(project, desiredStatus);
+    const { fieldId, option, availableOptions } = resolveStatusOption(project, desiredStatus);
     let updatedStatus = null;
 
     if (fieldId && option) {
@@ -427,7 +443,9 @@ async function main() {
           projectUrl: project.url,
           issueNumber,
           itemId,
-          status: updatedStatus || 'Unchanged (no matching Status option)',
+          status:
+            updatedStatus ||
+            `Unchanged (no Status option matching "${desiredStatus}"; available: ${(availableOptions || []).join(', ')})`,
         },
         null,
         2
