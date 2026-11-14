@@ -28,6 +28,8 @@ export interface BackfillOptions {
   reset?: boolean;
   /** Only fill the gap since each astronaut's latest simulated reading (no-op if none). */
   topUpOnly?: boolean;
+  /** Skip astronauts that already have simulated history (resumable first-start fill). */
+  onlyMissing?: boolean;
   script?: string;
   log?: (msg: string) => void;
 }
@@ -73,6 +75,14 @@ export async function backfillSimulated(db: Db, opts: BackfillOptions = {}): Pro
     const preflightDays = opts.preflightDays ?? 14;
     if (preflightDays > 0 && from.getTime() <= templateStart.getTime()) {
       from = new Date(templateStart.getTime() - preflightDays * DAY_MS);
+    }
+    if (opts.onlyMissing) {
+      const has = await db
+        .select({ ts: observations.ts })
+        .from(observations)
+        .where(and(eq(observations.astronautId, id), eq(observations.origin, 'simulated')))
+        .limit(1);
+      if (has.length) continue;
     }
     if (opts.topUpOnly) {
       const [{ last }] = await db

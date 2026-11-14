@@ -8,8 +8,12 @@ import { bootstrapIfEmpty, startSimulatedTopUp } from './jobs/bootstrap';
 
 loadEnv();
 
-const port = Number(process.env.PORT || process.env.ARGUS_SERVER_PORT) || 8787;
-const hostname = process.env.ARGUS_SERVER_HOST ?? (process.env.PORT ? '0.0.0.0' : '127.0.0.1');
+// Hosts (Azure App Service) pass PORT and need 0.0.0.0. Local `npm run dev…` always uses ARGUS_SERVER_PORT/8787,
+// the target of the Vite proxy, even if a launcher exports PORT for the web server.
+const isDevScript = process.env.npm_lifecycle_event?.startsWith('dev') ?? false;
+const hostPort = isDevScript ? undefined : process.env.PORT;
+const port = Number(process.env.ARGUS_SERVER_PORT || hostPort) || 8787;
+const hostname = process.env.ARGUS_SERVER_HOST ?? (hostPort ? '0.0.0.0' : '127.0.0.1');
 const chain = resolveProviderChain(process.env).map(describeProvider);
 
 const dbHandle = getDbHandle();
