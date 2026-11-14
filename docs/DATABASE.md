@@ -23,6 +23,25 @@ npm run dev:all                   # HUD + API
 - `db:seed` is idempotent, so running it again is safe.
 - Demo logins (`valkyrie`, `apex`, `pulse`, `solaris`, `surgeon`) are created only when `ARGUS_DEMO_PASSWORD` is set.
 
+## Sharing access with teammates
+Each teammate gets **their own login**, so access can be revoked per person and the audit trail shows who connected. The person with `az` access and the admin file (`~/.config/argus/pg-admin.env`) runs:
+
+```bash
+scripts/azure/add-teammate.sh dana 203.0.113.7              # app login (runs the app and migrations)
+scripts/azure/add-teammate.sh dana 203.0.113.7 --readonly   # notebooks only
+scripts/azure/remove-teammate.sh dana                       # revoke login + firewall rule
+```
+
+1. **The teammate sends their public IP**, from https://api.ipify.org.
+2. **The script does three things:**
+   - creates `dev_<name>` (acts as `argus_app`) or `ro_<name>` (acts as `argus_analyst`, read-only) with a random password;
+   - opens the firewall for that IP;
+   - writes `teammate.<name>.env.local`, which git ignores.
+3. **Send that file privately**, for example as a one-time password-manager share such as Bitwarden Send, or in a direct message that disappears. Never put it in git, an issue, a PR or a group channel.
+4. **The teammate pastes its line into their own `.env`**, then runs `npm run db:migrate && npm run dev:all`.
+
+If a teammate's IP changes (new Wi-Fi network, phone hotspot), run `add-teammate.sh` again with the new IP. It keeps the login and issues a new password.
+
 ## Getting through the Azure firewall
 Azure only accepts connections from listed IPs.
 1. Find your public IP at https://api.ipify.org.
