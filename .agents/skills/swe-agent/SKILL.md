@@ -28,12 +28,10 @@ node .agents/skills/swe-agent/scripts/gh-swe-pr.mjs list-tasks
 node .agents/skills/swe-agent/scripts/gh-swe-pr.mjs view-task <issue_number>
 ```
 
-### Step 2: Claim Issue on Kanban & Prepare Isolated Worktree
-1. Move the GitHub Projects v2 Kanban card to `In Progress` immediately so the PM Agent (`run-pm-audit.mjs`) preserves its `In Progress` state:
+### Step 2: Claim Issue (Assign & Sync Kanban) & Prepare Isolated Worktree
+1. Assign the issue and move its GitHub Projects v2 Kanban card to `In Progress` (when `PM_PROJECT_NUMBER` and a `project`-scoped `GH_PROJECT_TOKEN` are configured in `.env`):
    ```bash
-   node .agents/skills/pm-agent/scripts/gh-pm-project.mjs sync-issue \
-     --issue-number <issue_number> \
-     --status "in progress"
+   node .agents/skills/swe-agent/scripts/gh-swe-pr.mjs claim-issue <issue_number>
    ```
 2. Create an isolated worktree branched off `origin/main` with `node_modules` symlinked:
    ```bash

@@ -10,6 +10,7 @@
  * Usage:
  *   node .agents/skills/swe-agent/scripts/gh-swe-pr.mjs list-tasks [--issue <number>]
  *   node .agents/skills/swe-agent/scripts/gh-swe-pr.mjs view-task <issue_number>
+ *   node .agents/skills/swe-agent/scripts/gh-swe-pr.mjs claim-issue <issue_number> [--assignee <login>]
  *   node .agents/skills/swe-agent/scripts/gh-swe-pr.mjs prepare-worktree --issue <n> [--slug <slug>]
  *   node .agents/skills/swe-agent/scripts/gh-swe-pr.mjs cleanup-worktree --issue <n>
  *   node .agents/skills/swe-agent/scripts/gh-swe-pr.mjs list-prs [--state open|closed|all]
@@ -83,21 +84,19 @@ export function getGitHubTokens() {
   if (process.env.GH_PROJECT_TOKEN) tokens.push(process.env.GH_PROJECT_TOKEN.trim());
   if (process.env.GH_TOKEN) tokens.push(process.env.GH_TOKEN.trim());
 
-  if (tokens.length === 0) {
-    try {
-      const output = execSync('git credential fill', {
-        input: 'protocol=https\nhost=github.com\n\n',
-        encoding: 'utf8',
-        env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
-        stdio: ['pipe', 'pipe', 'ignore'],
-      });
-      const passwordMatch = output.match(/^password=(.+)$/m);
-      if (passwordMatch && passwordMatch[1]) {
-        tokens.push(passwordMatch[1].trim());
-      }
-    } catch {
-      // Ignore
+  try {
+    const output = execSync('git credential fill', {
+      input: 'protocol=https\nhost=github.com\n\n',
+      encoding: 'utf8',
+      env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+      stdio: ['pipe', 'pipe', 'ignore'],
+    });
+    const passwordMatch = output.match(/^password=(.+)$/m);
+    if (passwordMatch && passwordMatch[1]) {
+      tokens.push(passwordMatch[1].trim());
     }
+  } catch {
+    // Ignore
   }
 
   const unique = Array.from(new Set(tokens.filter(Boolean)));
@@ -532,6 +531,70 @@ async function main() {
             body: c.body,
           })),
           linkedPr: prDetails,
+        },
+        null,
+        2
+      )
+    );
+    return;
+  }
+
+  if (command === 'claim-issue') {
+    const number = Number(args._[1] || args.issue);
+    if (!number) {
+      throw new Error('Usage: gh-swe-pr.mjs claim-issue <issue_number> [--assignee <login>]');
+    }
+
+    let assignee = args.assignee ? String(args.assignee).trim() : '';
+    if (!assignee) {
+      try {
+        const me = await githubRequestWithFallback('GET', '/user', tokens);
+        assignee = me?.login || '';
+      } catch {
+        // Fallback if token is an Actions installation token
+      }
+    }
+
+    let assignedResult = null;
+    if (assignee) {
+      assignedResult = await githubRequestWithFallback(
+        'POST',
+        `/repos/${repo}/issues/${number}/assignees`,
+        tokens,
+        { assignees: [assignee] }
+      );
+    }
+
+    let projectSync = { synced: false, reason: 'PM_PROJECT_NUMBER not set in .env or environment' };
+    const projectNumber = process.env.PM_PROJECT_NUMBER || process.env.GITHUB_PROJECT_NUMBER;
+    if (projectNumber) {
+      const projectScript = path.resolve(
+        REPO_ROOT,
+        '.agents/skills/pm-agent/scripts/gh-pm-project.mjs'
+      );
+      try {
+        const out = execFileSync(
+          process.execPath,
+          [projectScript, 'sync-issue', '--issue-number', String(number), '--status', 'in progress'],
+          { cwd: REPO_ROOT, encoding: 'utf8', env: process.env, stdio: ['ignore', 'pipe', 'pipe'] }
+        );
+        projectSync = JSON.parse(out);
+      } catch (err) {
+        projectSync = {
+          synced: false,
+          reason: err.stderr ? String(err.stderr).trim() : err.message || String(err),
+        };
+      }
+    }
+
+    console.log(
+      JSON.stringify(
+        {
+          ok: true,
+          issueNumber: number,
+          assignee: assignee || null,
+          assignees: (assignedResult?.assignees || []).map((a) => a.login),
+          projectSync,
         },
         null,
         2
