@@ -26,18 +26,18 @@ func newGeminiClient() *geminiClient {
 	}
 	transport := &http.Transport{
 		DialContext: (&net.Dialer{
-			Timeout:   5 * time.Second,
-			KeepAlive: 30 * time.Second,
+			Timeout: 5 * time.Second,
 		}).DialContext,
 		TLSHandshakeTimeout:   5 * time.Second,
-		ResponseHeaderTimeout: 15 * time.Second,
+		ResponseHeaderTimeout: 25 * time.Second,
+		DisableKeepAlives:     true,
 		ForceAttemptHTTP2:     false,
 	}
 	return &geminiClient{
 		apiKey: strings.TrimSpace(os.Getenv("GEMINI_API_KEY")),
 		model:  model,
 		httpClient: &http.Client{
-			Timeout:   20 * time.Second,
+			Timeout:   30 * time.Second,
 			Transport: transport,
 		},
 	}
@@ -48,8 +48,17 @@ func (g *geminiClient) configured() bool {
 }
 
 type geminiRequest struct {
-	SystemInstruction *geminiContent  `json:"systemInstruction,omitempty"`
-	Contents          []geminiContent `json:"contents"`
+	SystemInstruction *geminiContent    `json:"systemInstruction,omitempty"`
+	Contents          []geminiContent   `json:"contents"`
+	GenerationConfig  *geminiGenConfig  `json:"generationConfig,omitempty"`
+}
+
+type geminiGenConfig struct {
+	ThinkingConfig *geminiThinkingConfig `json:"thinkingConfig,omitempty"`
+}
+
+type geminiThinkingConfig struct {
+	ThinkingBudget int `json:"thinkingBudget"`
 }
 
 type geminiContent struct {
@@ -82,6 +91,9 @@ func (g *geminiClient) ask(ctx context.Context, systemPrompt, userPrompt string)
 				Role:  "user",
 				Parts: []geminiPart{{Text: userPrompt}},
 			},
+		},
+		GenerationConfig: &geminiGenConfig{
+			ThinkingConfig: &geminiThinkingConfig{ThinkingBudget: 0},
 		},
 	}
 	if strings.TrimSpace(systemPrompt) != "" {

@@ -15,7 +15,11 @@ import (
 
 const maxWhatsAppReplyLen = 3500
 
-var issueNumRe = regexp.MustCompile(`#?(\d+)`)
+var (
+	issueNumRe  = regexp.MustCompile(`#?(\d+)`)
+	sweIntentRe = regexp.MustCompile(`(?i)\bswe\b`)
+	pmIntentRe  = regexp.MustCompile(`(?i)\b(pm|product\s+manager)\b`)
+)
 
 type agentRouter struct {
 	repoRoot string
@@ -38,7 +42,7 @@ func (a *agentRouter) handle(ctx context.Context, senderName, prompt string, gro
 	lower := strings.ToLower(trimmed)
 
 	switch {
-	case lower == "issues" || lower == "list issues" || lower == "list-issues":
+	case lower == "issues" || lower == "list issues" || lower == "list-issues" || lower == "open issues" || lower == "show issues":
 		return a.listIssues(ctx)
 	case lower == "tasks" || lower == "list tasks" || lower == "list-tasks":
 		return a.listSWETasks(ctx)
@@ -48,6 +52,10 @@ func (a *agentRouter) handle(ctx context.Context, senderName, prompt string, gro
 	case lower == "swe" || strings.HasPrefix(lower, "swe "):
 		arg := strings.TrimSpace(trimmed[3:])
 		return a.runSWESubagent(ctx, senderName, arg)
+	case sweIntentRe.MatchString(trimmed):
+		return a.runSWESubagent(ctx, senderName, trimmed)
+	case pmIntentRe.MatchString(trimmed):
+		return a.runPMSubagent(ctx, senderName, trimmed)
 	default:
 		return a.answerQuestion(ctx, senderName, trimmed, groupHistory)
 	}
