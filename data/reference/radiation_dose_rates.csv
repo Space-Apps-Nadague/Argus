@@ -1,0 +1,6 @@
+id,environment,dose_rate_msv_per_day,quantity,instrument,period_label,source_id,source_locator
+msl_cruise_dose_eq,mars_transit,1.84,dose equivalent (mSv/day),MSL RAD inside Curiosity cruise stage,Dec 2011 - Jul 2012 cruise,SRC-044,"Zeitlin et al. 2013, abstract (1.84 ± 0.33 mSv/day)"
+msl_cruise_absorbed,mars_transit,0.481,absorbed dose (mGy/day),MSL RAD inside Curiosity cruise stage,Dec 2011 - Jul 2012 cruise,SRC-044,"Zeitlin et al. 2013, abstract (481 ± 80 µGy/day)"
+msl_surface_dose_eq,mars_surface,0.64,dose equivalent (mSv/day),MSL RAD on Gale crater surface,first 300 sols,SRC-045,"Hassler et al. 2014, abstract (0.64 ± 0.12 mSv/day)"
+msl_surface_absorbed,mars_surface,0.21,absorbed dose (mGy/day),MSL RAD on Gale crater surface,first 300 sols,SRC-045,"Hassler et al. 2014, abstract (0.21 ± 0.04 mGy/day)"
+iss_columbus_peak_absorbed,leo,0.286,absorbed dose (mGy/day),DOSIS 3D active detectors in ISS Columbus,2012-2015 peak value,SRC-042,"Berger et al. 2017 (SWSC), peak ≈286 µGy/day"

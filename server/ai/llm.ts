@@ -8,6 +8,7 @@ import OpenAI, { APIError } from 'openai';
 import type { ZodType } from 'zod';
 import type { AiFeature, AiProviderId } from '../../src/types/aiApi';
 import { extractJson } from './json';
+import { currentPrivacy } from './privacy';
 import { type ProviderConfig, resolveProviderChain } from './providers';
 
 export type ChatMessage = OpenAI.Chat.Completions.ChatCompletionMessageParam;
@@ -47,6 +48,7 @@ function clientFor(cfg: ProviderConfig): OpenAI {
 }
 
 export function providerChainFor(options: LlmOptions): Array<{ cfg: ProviderConfig; model: string }> {
+  if (currentPrivacy().offlineOnly) return []; // astronaut withdrew AI consent (spec 05 §6)
   const chain = resolveProviderChain(options.env ?? process.env, {
     feature: options.feature,
     keyOverride: options.keyOverride,

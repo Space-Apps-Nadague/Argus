@@ -10,6 +10,7 @@ import React, {
   useEffect,
   useMemo,
   useReducer,
+  useState,
 } from 'react';
 import {
   AnatomicalLayer,
@@ -21,6 +22,8 @@ import {
   FlightSurgeonGuidance,
   GravityEnvironment,
   HudTabId,
+  SpaceLocation,
+  SpaceLocationId,
   MetricId,
   MetricLink,
   ReadinessMilestone,
@@ -48,7 +51,9 @@ import {
   checkInStreak,
   latestMissionDay,
 } from '../utils/checkIns';
+import { crewApi, dataApi } from '../services/dataApi';
 import { findMetricLinks } from '../utils/driftAnalytics';
+import { DEFAULT_SPACE_LOCATION, environmentForLocation, isSpaceLocationId, SPACE_LOCATIONS } from '../data/spaceLocations';
 import {
   createQuickRoutineCheckIn,
   evaluateReadinessMilestones,
@@ -98,7 +103,24 @@ export function resolveLiveGuidance(
   };
 }
 const TAB_STORAGE_KEY = 'argus_active_tab_v1';
-const HUD_TABS: HudTabId[] = ['biotwin', 'trends', 'checkin', 'surgeon', 'crew'];
+const HUD_TABS: HudTabId[] = ['biotwin', 'trends', 'forecast', 'eyes', 'ai', 'emergency', 'crew', 'users'];
+const LOCATIONS_STORAGE_KEY = 'argus_locations_v1';
+
+function loadInitialLocations(): Record<string, SpaceLocationId> {
+  try {
+    const raw = localStorage.getItem(LOCATIONS_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return Object.fromEntries(
+        Object.entries(parsed).filter(([, v]) => isSpaceLocationId(v))
+      ) as Record<string, SpaceLocationId>;
+    }
+  } catch {
+    // Ignore storage errors in restricted environments
+  }
+  return {};
+}
+
 const ENV_STORAGE_KEY = 'argus_mission_environment_v1';
 const VALID_ENVIRONMENTS: GravityEnvironment[] = [
   'iss_leo',
@@ -191,6 +213,7 @@ interface MissionState {
 
 type MissionAction =
   | { type: 'SELECT_CREW_MEMBER'; payload: string }
+  | { type: 'SET_ROSTER'; payload: { roster: CrewMemberProfile[]; selectId?: string } }
   | { type: 'ADD_CREW_MEMBER'; payload: CrewMemberProfile }
   | { type: 'UPDATE_CREW_SEX'; payload: { crewId: string; sex: BiologicalSex } }
   | { type: 'DELETE_CREW_MEMBER'; payload: string }
@@ -261,6 +284,13 @@ function missionReducer(
     roster.find((c) => c.id === id) || roster[0];
 
   switch (action.type) {
+    case 'SET_ROSTER': {
+      if (action.payload.roster.length === 0) return state;
+      const withRoster = { ...state, crewRoster: action.payload.roster };
+      const keep = action.payload.selectId ?? state.activeCrewId;
+      const target = action.payload.roster.some((c) => c.id === keep) ? keep : action.payload.roster[0].id;
+      return missionReducer(withRoster, { type: 'SELECT_CREW_MEMBER', payload: target });
+    }
     case 'SELECT_CREW_MEMBER': {
       const targetCrew = getActiveCrew(state.crewRoster, action.payload);
       const nextScenario = targetCrew.defaultScenarioId;
@@ -501,13 +531,22 @@ function missionReducer(
 
 interface MissionContextValue extends MissionState {
   activeCrewMember: CrewMemberProfile;
-  /** Crew-adjusted zones with check-ins overlaid (single source for all tabs). */
+  /** Crew-adjusted zones with check-ins overlaid (single source for all tabs). From the database in server mode. */
   zones: Record<BodyZoneId, VitalSignReading[]>;
+  /** Where `zones` came from: the ARGUS database, or the synthetic demo series. */
+  zonesSource: 'database' | 'demo';
+  /** Zones for any crew member; null in server mode when this user may not see that astronaut's data. */
+  zonesForCrew: (member: CrewMemberProfile, scenario?: ScenarioId) => Record<BodyZoneId, VitalSignReading[]> | null;
   activeCheckIns: CheckInEntry[];
   checkInStreakDays: number;
   latestDay: number;
   metricLinks: MetricLink[];
   setActiveTab: (tab: HudTabId) => void;
+  /** True when a crew user is signed in: the active crew member can't be changed. */
+  isCrewLocked: boolean;
+  spaceLocationId: SpaceLocationId;
+  spaceLocation: SpaceLocation;
+  setSpaceLocation: (id: SpaceLocationId) => void;
   addCheckIn: (entry: CheckInEntry) => void;
   deleteCheckIn: (entryId: string) => void;
   routineStatus: ScheduledRoutineStatus;
@@ -517,9 +556,9 @@ interface MissionContextValue extends MissionState {
   currentZoneReadings: VitalSignReading[];
   readinessScore: number;
   selectCrewMember: (crewId: string) => void;
-  createCrewMember: (
-    newMember: Omit<CrewMemberProfile, 'id' | 'isCustom'>
-  ) => CrewMemberProfile;
+  createCrewMember: (newMember: Omit<CrewMemberProfile, 'id' | 'isCustom'>) => void;
+  /** True when roster, data and chat come from the ARGUS database (specs/05-data-platform.md). */
+  serverBacked: boolean;
   updateCrewMemberSex: (crewId: string, sex: BiologicalSex) => void;
   deleteCrewMember: (crewId: string) => void;
   setCrewModalOpen: (open: boolean) => void;
@@ -543,18 +582,60 @@ interface MissionContextValue extends MissionState {
 
 const MissionContext = createContext<MissionContextValue | undefined>(undefined);
 
-export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({
+interface MissionProviderProps {
+  children: React.ReactNode;
+  /** Crew users are locked to their own crew member (specs/02-ui-dashboard.md §6). */
+  lockedCrewId?: string;
+  /** Called after a crew member is deleted (e.g. to remove linked accounts). */
+  onCrewDeleted?: (crewId: string) => void;
+  /** Load and save the roster (and later data) through the ARGUS server instead of localStorage. */
+  serverBacked?: boolean;
+}
+
+export const MissionProvider: React.FC<MissionProviderProps> = ({
   children,
+  lockedCrewId,
+  onCrewDeleted,
+  serverBacked = false,
 }) => {
-  const [state, dispatch] = useReducer(missionReducer, initialState);
+  const [state, dispatch] = useReducer(missionReducer, initialState, (s) =>
+    lockedCrewId && lockedCrewId !== s.activeCrewId && s.crewRoster.some((c) => c.id === lockedCrewId)
+      ? missionReducer(s, { type: 'SELECT_CREW_MEMBER', payload: lockedCrewId })
+      : s
+  );
+  const [locations, setLocations] = useState<Record<string, SpaceLocationId>>(loadInitialLocations);
 
   useEffect(() => {
+    try {
+      localStorage.setItem(LOCATIONS_STORAGE_KEY, JSON.stringify(locations));
+    } catch {
+      // Ignore storage errors
+    }
+  }, [locations]);
+
+  useEffect(() => {
+    if (serverBacked) return; // the database is the system of record
     try {
       localStorage.setItem(CREW_STORAGE_KEY, JSON.stringify(state.crewRoster));
     } catch {
       // Ignore storage errors
     }
-  }, [state.crewRoster]);
+  }, [state.crewRoster, serverBacked]);
+
+  // Server mode: the roster comes from the database (pseudonymized per role, spec 05 §6).
+  useEffect(() => {
+    if (!serverBacked) return;
+    let cancelled = false;
+    crewApi
+      .list()
+      .then(({ crew }) => {
+        if (!cancelled) dispatch({ type: 'SET_ROSTER', payload: { roster: crew, selectId: lockedCrewId } });
+      })
+      .catch((err) => console.warn('[ARGUS] could not load crew roster', err));
+    return () => {
+      cancelled = true;
+    };
+  }, [serverBacked, lockedCrewId]);
 
   useEffect(() => {
     try {
@@ -587,18 +668,75 @@ export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({
     [state.crewRoster, state.activeCrewId]
   );
 
+  const spaceLocationId: SpaceLocationId = locations[activeCrewMember.id] ?? DEFAULT_SPACE_LOCATION;
+  const spaceLocation = SPACE_LOCATIONS[spaceLocationId];
+
+  // The location selector drives the threshold set (iss_leo / lunar_base / 0g_transit / mars_base).
+  useEffect(() => {
+    const env = environmentForLocation(spaceLocationId);
+    if (env !== state.environment) dispatch({ type: 'SET_ENVIRONMENT', payload: env });
+  }, [spaceLocationId, state.environment]);
+
+  const setSpaceLocation = useCallback(
+    (id: SpaceLocationId) => setLocations((prev) => ({ ...prev, [activeCrewMember.id]: id })),
+    [activeCrewMember.id]
+  );
+
   const activeCheckIns = useMemo(
     () => state.checkIns[activeCrewMember.id] || [],
     [state.checkIns, activeCrewMember.id]
   );
 
+  // Server mode: zones per astronaut come from `daily_metrics` (spec 05 §8), refreshed every minute.
+  const [serverZones, setServerZones] = useState<Record<string, Record<BodyZoneId, VitalSignReading[]>>>({});
+  const readableCrewIds = useMemo(
+    () => (lockedCrewId ? [lockedCrewId] : state.crewRoster.map((c) => c.id)).join(','),
+    [lockedCrewId, state.crewRoster]
+  );
+  const refreshServerZones = useCallback(
+    async (ids: string[]) => {
+      const results = await Promise.all(
+        ids.map((id) =>
+          dataApi
+            .zones(id)
+            .then((r) => (r.hasData ? ([id, r.zones] as const) : null))
+            .catch(() => null)
+        )
+      );
+      setServerZones((prev) => {
+        const next = { ...prev };
+        for (const r of results) if (r) next[r[0]] = r[1];
+        return next;
+      });
+    },
+    []
+  );
+  useEffect(() => {
+    if (!serverBacked || !readableCrewIds) return;
+    const ids = readableCrewIds.split(',');
+    void refreshServerZones(ids);
+    const timer = setInterval(() => void refreshServerZones(ids), 60_000);
+    return () => clearInterval(timer);
+  }, [serverBacked, readableCrewIds, refreshServerZones]);
+
+  const zonesForCrew = useCallback(
+    (member: CrewMemberProfile, scenario: ScenarioId = member.defaultScenarioId) => {
+      if (serverBacked) return serverZones[member.id] ?? null;
+      return applyCheckIns(getCrewAdjustedZones(scenario, member), state.checkIns[member.id] || []);
+    },
+    [serverBacked, serverZones, state.checkIns]
+  );
+
+  const activeServerZones = serverBacked ? serverZones[activeCrewMember.id] : undefined;
+  const zonesSource: 'database' | 'demo' = activeServerZones ? 'database' : 'demo';
   const adjustedZones = useMemo(
     () =>
+      activeServerZones ??
       applyCheckIns(
         getCrewAdjustedZones(state.scenarioId, activeCrewMember),
         activeCheckIns
       ),
-    [state.scenarioId, activeCrewMember, activeCheckIns]
+    [activeServerZones, state.scenarioId, activeCrewMember, activeCheckIns]
   );
 
   const checkInStreakDays = useMemo(
@@ -679,31 +817,45 @@ export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [activeCrewMember, latestDay]);
 
   const selectCrewMember = useCallback((crewId: string) => {
+    if (lockedCrewId && crewId !== lockedCrewId) return;
     dispatch({ type: 'SELECT_CREW_MEMBER', payload: crewId });
-  }, []);
+  }, [lockedCrewId]);
 
   const createCrewMember = useCallback(
     (newMember: Omit<CrewMemberProfile, 'id' | 'isCustom'>) => {
-      const created: CrewMemberProfile = {
-        ...newMember,
-        id: `crew-custom-${Date.now()}`,
-        isCustom: true,
-      };
-      dispatch({ type: 'ADD_CREW_MEMBER', payload: created });
-      return created;
+      if (serverBacked) {
+        const { missionDaysLogged: _days, ...profile } = newMember;
+        crewApi
+          .create(profile)
+          .then(({ crewMember }) => dispatch({ type: 'ADD_CREW_MEMBER', payload: crewMember }))
+          .catch((err) => console.warn('[ARGUS] could not create crew member', err));
+        return;
+      }
+      dispatch({
+        type: 'ADD_CREW_MEMBER',
+        payload: { ...newMember, id: `crew-custom-${Date.now()}`, isCustom: true },
+      });
     },
-    []
+    [serverBacked]
   );
 
-  const deleteCrewMember = useCallback((crewId: string) => {
-    dispatch({ type: 'DELETE_CREW_MEMBER', payload: crewId });
-  }, []);
+  const deleteCrewMember = useCallback(
+    (crewId: string) => {
+      if (lockedCrewId) return; // only admins manage the roster
+      if (serverBacked) void crewApi.archive(crewId).catch((err) => console.warn('[ARGUS] could not archive', err));
+      dispatch({ type: 'DELETE_CREW_MEMBER', payload: crewId });
+      setLocations(({ [crewId]: _removed, ...rest }) => rest);
+      onCrewDeleted?.(crewId);
+    },
+    [lockedCrewId, onCrewDeleted, serverBacked]
+  );
 
   const updateCrewMemberSex = useCallback(
     (crewId: string, sex: BiologicalSex) => {
+      if (serverBacked) void crewApi.update(crewId, { sex }).catch((err) => console.warn('[ARGUS] could not update', err));
       dispatch({ type: 'UPDATE_CREW_SEX', payload: { crewId, sex } });
     },
-    []
+    [serverBacked]
   );
 
   const setCrewModalOpen = useCallback((open: boolean) => {
@@ -746,9 +898,20 @@ export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({
     dispatch({ type: 'SET_ACTIVE_TAB', payload: tab });
   }, []);
 
-  const addCheckIn = useCallback((entry: CheckInEntry) => {
-    dispatch({ type: 'ADD_CHECK_IN', payload: entry });
-  }, []);
+  const addCheckIn = useCallback(
+    (entry: CheckInEntry) => {
+      if (serverBacked) {
+        // Stored as observations (origin check_in); zones are re-read from the database.
+        dataApi
+          .checkIn(entry.crewId, entry.values as Record<string, number>, entry.note)
+          .then(() => refreshServerZones([entry.crewId]))
+          .catch((err) => console.warn('[ARGUS] could not save check-in', err));
+        return;
+      }
+      dispatch({ type: 'ADD_CHECK_IN', payload: entry });
+    },
+    [serverBacked, refreshServerZones]
+  );
 
   const deleteCheckIn = useCallback(
     (entryId: string) => {
@@ -1007,6 +1170,13 @@ export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({
       milestones,
       completeScheduledRoutine,
       setActiveTab,
+      isCrewLocked: Boolean(lockedCrewId),
+      serverBacked,
+      zonesSource,
+      zonesForCrew,
+      spaceLocationId,
+      spaceLocation,
+      setSpaceLocation,
       addCheckIn,
       deleteCheckIn,
       zoneStatuses,
@@ -1047,6 +1217,13 @@ export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({
       milestones,
       completeScheduledRoutine,
       setActiveTab,
+      lockedCrewId,
+      serverBacked,
+      zonesSource,
+      zonesForCrew,
+      spaceLocationId,
+      spaceLocation,
+      setSpaceLocation,
       addCheckIn,
       deleteCheckIn,
       logVitalReading,

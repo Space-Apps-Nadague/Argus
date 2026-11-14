@@ -14,9 +14,11 @@ import { type CrewSnapshot, buildCrewSnapshot, formatSnapshotForPrompt } from '.
 import { computeWellbeing, CRISIS_ESCALATION_MESSAGE, detectCrisisLanguage } from '../models/wellbeingModel';
 import { COMPANION_PERSONA } from '../prompts';
 import { ChatRequestSchema } from '../schemas';
+import { getOrStartConversation, latestTriageEventId, logMessage } from '../db/chatLog';
+import type { AppEnv } from '../auth/types';
 import { keyFromHeader, parseBody } from './util';
 
-export const chatRoutes = new Hono();
+export const chatRoutes = new Hono<AppEnv>();
 
 const ZONE_KEYWORDS: Array<[BodyZoneId, RegExp]> = [
   ['neuro', /\b(eye|eyes|vision|blurry|head|headache|onsd|pressure|brain|co2|carbon)\b/i],
@@ -96,8 +98,37 @@ chatRoutes.post('/chat', async (c) => {
     ...req.messages.slice(-20).map((m) => ({ role: m.role, content: m.content }) as ChatMessage),
   ];
 
+  // AI chat link (spec 05 §3.5): store the question now, the reply when the stream ends.
+  const db = c.get('db');
+  const user = c.get('user');
+  const astronautId = req.crewMember?.id;
+  let conversationId: string | null = null;
+  if (db && astronautId && lastUser) {
+    try {
+      conversationId = await getOrStartConversation(db, astronautId, user?.id ?? null);
+      await logMessage(db, { conversationId, role: 'user', authorUserId: user?.id ?? null, content: lastUser, crisisFlag: crisis.crisis });
+    } catch (err) {
+      console.error('[ARGUS chat] could not store message', err);
+      conversationId = null;
+    }
+  }
+  const contextSnapshot = {
+    scenarioId: snapshot.scenarioId,
+    locationId: req.locationId ?? null,
+    readinessScore: snapshot.readinessScore,
+    zoneStatuses: snapshot.zoneStatuses,
+    flaggedMetrics: snapshot.flaggedTrends.map((t) => ({ metricId: t.metricId, value: t.currentValue, status: t.status, z: t.zScore, level: t.level })),
+    wellbeing: wellbeing ? { riskScore: wellbeing.riskScore, status: wellbeing.status, trend: wellbeing.trend } : null,
+  };
+
   return streamSSE(c, async (stream) => {
-    const send = (event: ChatStreamEvent) => stream.writeSSE({ event: event.type, data: JSON.stringify(event) });
+    let replyText = '';
+    let replyMeta: { source?: string; provider?: string; model?: string } = {};
+    const send = (event: ChatStreamEvent) => {
+      if (event.type === 'delta') replyText += event.text;
+      if (event.type === 'meta') replyMeta = { source: event.meta.source, provider: event.meta.provider, model: event.meta.model };
+      return stream.writeSSE({ event: event.type, data: JSON.stringify(event) });
+    };
 
     let metaSent = false;
     const sendMeta = async (meta: Extract<ChatStreamEvent, { type: 'meta' }>['meta']) => {
@@ -126,6 +157,23 @@ chatRoutes.post('/chat', async (c) => {
         for (const piece of chunkText(offlineReply(snapshot, lastUser))) {
           await send({ type: 'delta', text: piece });
         }
+      }
+    }
+    if (db && conversationId && astronautId && replyText) {
+      try {
+        await logMessage(db, {
+          conversationId,
+          role: 'assistant',
+          content: replyText,
+          provider: replyMeta.provider ?? null,
+          model: replyMeta.model ?? null,
+          source: replyMeta.source === 'live_ai' ? 'ai' : 'offline_verified_cache',
+          contextSnapshot,
+          triageEventId: await latestTriageEventId(db, astronautId),
+          crisisFlag: crisis.crisis,
+        });
+      } catch (err) {
+        console.error('[ARGUS chat] could not store reply', err);
       }
     }
     await send({ type: 'done' });

@@ -1,12 +1,24 @@
 import { serve } from '@hono/node-server';
 import { describeProvider, resolveProviderChain } from './ai/providers';
 import { createApp } from './app';
+import { getDbHandle } from './db/client';
 import { loadEnv } from './env';
+import { startAnalyticsTimer } from './jobs/analytics';
 
 loadEnv();
 
 const port = Number(process.env.ARGUS_SERVER_PORT) || 8787;
 const chain = resolveProviderChain(process.env).map(describeProvider);
+
+const dbHandle = getDbHandle();
+if (dbHandle) {
+  // Apply committed migrations on start so every teammate's schema matches (spec 05 §2).
+  await dbHandle.migrate();
+  startAnalyticsTimer(dbHandle.db);
+  console.log(`[ARGUS server] database: ${dbHandle.kind}`);
+} else {
+  console.log('[ARGUS server] No DATABASE_URL — stateless mode (HUD runs the offline demo).');
+}
 
 serve({ fetch: createApp().fetch, port, hostname: process.env.ARGUS_SERVER_HOST ?? '127.0.0.1' }, (info) => {
   console.log(`[ARGUS server] listening on http://${info.address}:${info.port}`);

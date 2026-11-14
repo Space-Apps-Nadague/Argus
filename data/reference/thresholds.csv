@@ -1,0 +1,2 @@
+id,quantity,limit_value,unit,context,source_id,source_locator
+career_effective_dose,career effective dose limit,600,mSv,"NASA career radiation limit for all astronauts (≤3 % risk of exposure-induced death)",SRC-008,"OCHMO Radiation Protection Technical Brief (2023)"

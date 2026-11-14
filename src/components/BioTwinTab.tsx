@@ -96,7 +96,7 @@ export const BioTwinTab: React.FC = () => {
               <p className="text-sm font-medium text-hud-text truncate">{guidance.headline}</p>
               <p className="text-xs text-hud-muted">{guidance.guidedSteps.length} guided steps</p>
             </div>
-            <button type="button" className="hud-btn shrink-0" onClick={() => setActiveTab('surgeon')}>
+            <button type="button" className="hud-btn shrink-0" onClick={() => setActiveTab('ai')}>
               <Stethoscope className="h-4 w-4" aria-hidden="true" />
               Open
             </button>
