@@ -3,6 +3,7 @@
  * Pure data + time helpers; shared by the HUD and the AI backend.
  */
 
+import { earthMarsDistanceKm, earthMoonDistanceKm, LEO_RELAY_KM, lightSeconds } from './lightTime';
 import type { GravityEnvironment, SpaceLocation, SpaceLocationId } from '../types/argus';
 
 export const SPACE_LOCATIONS: Record<SpaceLocationId, SpaceLocation> = {
@@ -10,7 +11,7 @@ export const SPACE_LOCATIONS: Record<SpaceLocationId, SpaceLocation> = {
     id: 'earth_pre',
     label: 'Earth · before mission',
     gravityG: 1,
-    gravityLabel: '1.00g',
+    gravityLabel: '1 g',
     commDelaySec: [0, 0],
     radiation: 'shielded',
     clock: 'earth',
@@ -20,7 +21,7 @@ export const SPACE_LOCATIONS: Record<SpaceLocationId, SpaceLocation> = {
     id: 'earth_post',
     label: 'Earth · after mission',
     gravityG: 1,
-    gravityLabel: '1.00g',
+    gravityLabel: '1 g',
     commDelaySec: [0, 0],
     radiation: 'shielded',
     clock: 'earth',
@@ -104,11 +105,11 @@ export const DEFAULT_SPACE_LOCATION: SpaceLocationId = 'mars_transit';
 
 /**
  * Which threshold set (specs/01-data-schema.md §2, `ENVIRONMENT_METRIC_THRESHOLDS`) applies at a location.
- * Earth pre/post-flight phases use earth_1g; LEO uses iss_leo; open space and transit use 0g.
+ * Earth phases use the ISS/LEO set (shielded, closest to clinical norms); open space and transit use 0g.
  */
 export const LOCATION_ENVIRONMENT: Record<SpaceLocationId, GravityEnvironment> = {
-  earth_pre: 'earth_1g',
-  earth_post: 'earth_1g',
+  earth_pre: 'iss_leo',
+  earth_post: 'iss_leo',
   leo: 'iss_leo',
   gateway: '0g_transit',
   mars_transit: '0g_transit',
@@ -127,21 +128,46 @@ export function isSpaceLocationId(id: unknown): id is SpaceLocationId {
 
 const pad = (n: number) => String(Math.floor(n)).padStart(2, '0');
 
-function formatSeconds(sec: number): string {
+
+export interface CommDelay {
+  /** One-way light time to Earth, seconds. */
+  seconds: number;
+  /** True when only an upper bound is known (Mars transit: position on the trajectory unknown). */
+  upTo: boolean;
+}
+
+/** Live one-way light time to Earth for a location at a given moment (src/data/lightTime.ts). */
+export function commDelayAt(loc: SpaceLocation, date: Date = new Date()): CommDelay {
+  switch (loc.id) {
+    case 'earth_pre':
+    case 'earth_post':
+      return { seconds: 0, upTo: false };
+    case 'leo':
+      return { seconds: lightSeconds(LEO_RELAY_KM), upTo: false };
+    case 'gateway':
+    case 'lunar_surface':
+      return { seconds: lightSeconds(earthMoonDistanceKm(date)), upTo: false };
+    case 'mars_transit':
+      return { seconds: lightSeconds(earthMarsDistanceKm(date)), upTo: true };
+    default:
+      return { seconds: lightSeconds(earthMarsDistanceKm(date)), upTo: false };
+  }
+}
+
+function formatDelaySeconds(sec: number): string {
   if (sec < 1) return `${Math.round(sec * 1000)} ms`;
+  if (sec < 10) return `${sec.toFixed(2)} s`;
   if (sec < 60) return `${sec.toFixed(1)} s`;
   const m = Math.floor(sec / 60);
   const s = Math.round(sec % 60);
-  return s ? `${m}m ${pad(s)}s` : `${m} min`;
+  return s === 60 ? `${m + 1}m 00s` : `${m}m ${pad(s)}s`;
 }
 
-/** Human-readable one-way comm delay, e.g. "none", "1.3 s", "3–22 min". */
-export function formatCommDelay(loc: SpaceLocation): string {
-  const [lo, hi] = loc.commDelaySec;
-  if (hi === 0) return 'none';
-  if (lo === hi) return formatSeconds(lo);
-  if (lo >= 60) return `${Math.round(lo / 60)}–${Math.round(hi / 60)} min`;
-  return `${formatSeconds(lo)}–${formatSeconds(hi)}`;
+/** Human-readable live one-way comm delay, e.g. "none", "240 ms", "1.28 s", "12m 47s", "up to 12m 47s". */
+export function formatCommDelay(loc: SpaceLocation, date: Date = new Date()): string {
+  const d = commDelayAt(loc, date);
+  if (d.seconds === 0) return 'none';
+  return `${d.upTo ? 'up to ' : ''}${formatDelaySeconds(d.seconds)}`;
 }
 
 // ── Local clocks ─────────────────────────────────────────────────────────────
