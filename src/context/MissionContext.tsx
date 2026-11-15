@@ -796,7 +796,7 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
 
   const zonesForCrew = useCallback(
     (member: CrewMemberProfile, scenario: ScenarioId = member.defaultScenarioId) => {
-      if (serverBacked) {
+      if (serverBacked && scenario === member.defaultScenarioId) {
         const z = serverZones[member.id];
         return z ? sanitizeZones(z) : null;
       }
@@ -811,18 +811,19 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
   );
 
   const activeServerZones = serverBacked ? serverZones[activeCrewMember.id] : undefined;
-  const zonesSource: 'database' | 'demo' = activeServerZones ? 'database' : 'demo';
+  const useServerZones = Boolean(activeServerZones && state.scenarioId === activeCrewMember.defaultScenarioId);
+  const zonesSource: 'database' | 'demo' = useServerZones ? 'database' : 'demo';
   const adjustedZones = useMemo(
     () =>
       // Physically impossible points (typos, sensor faults, bad mock data) never reach the UI.
       sanitizeZones(
-        activeServerZones ??
+        (useServerZones ? activeServerZones : undefined) ??
           applyCheckIns(
             getCrewAdjustedZones(state.scenarioId, activeCrewMember),
             scenarioCheckIns
           )
       ),
-    [activeServerZones, state.scenarioId, activeCrewMember, scenarioCheckIns]
+    [useServerZones, activeServerZones, state.scenarioId, activeCrewMember, scenarioCheckIns]
   );
 
   const checkInStreakDays = useMemo(
