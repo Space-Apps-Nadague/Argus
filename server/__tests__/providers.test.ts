@@ -82,7 +82,7 @@ describe('resolveProviderChain', () => {
     expect(info.hasKey).toBe(true);
   });
 
-  it('appends gemini-3.5-flash-lite as fallback after gemini-3.8-flash', () => {
+  it('appends gemini-3.5-flash-lite then gemini-2.5-flash as fallbacks after gemini-3.8-flash', () => {
     const entries = providerChainFor({
       feature: 'chat',
       env: { GEMINI_API_KEY: 'AIza-test' },
@@ -90,6 +90,15 @@ describe('resolveProviderChain', () => {
     expect(entries.map((e) => `${e.cfg.id}:${e.model}`)).toEqual([
       'gemini:gemini-3.8-flash',
       'gemini:gemini-3.5-flash-lite',
+      'gemini:gemini-2.5-flash',
     ]);
+  });
+
+  it('does not duplicate a fallback when GEMINI_MODEL is already a fallback model', () => {
+    const entries = providerChainFor({
+      feature: 'chat',
+      env: { GEMINI_API_KEY: 'AIza-test', GEMINI_MODEL: 'gemini-3.5-flash-lite' },
+    });
+    expect(entries.map((e) => e.model)).toEqual(['gemini-3.5-flash-lite', 'gemini-2.5-flash']);
   });
 });

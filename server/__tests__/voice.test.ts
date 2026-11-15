@@ -195,6 +195,50 @@ describe('Voice & Video AI Flight Surgeon routes', () => {
     expect(liveTtsBody.result.audioBase64).toBe(sampleWavBase64);
   });
 
+  it('POST /api/ai/tts falls back to Gemini 2.5 TTS and wraps its PCM in WAV when the 3.x model fails', async () => {
+    const pcm = Buffer.alloc(480).toString('base64');
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/interactions')) return new Response('quota exceeded', { status: 429 });
+      expect(url).toContain('gemini-2.5-flash-preview-tts:generateContent');
+      return new Response(
+        JSON.stringify({ candidates: [{ content: { parts: [{ inlineData: { data: pcm, mimeType: 'audio/L16;codec=pcm;rate=24000' } }] } }] }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const res = await post('/api/ai/tts', { text: 'Readiness is nominal.', mode: 'live-api' }, { 'X-Argus-Api-Key': 'AIzaSyFakeMasterKey' });
+    const body = (await res.json()) as AiEnvelope<VoiceTtsResponse>;
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(body.result.useBrowserSpeechFallback).toBe(false);
+    expect(body.result.mimeType).toBe('audio/wav');
+    expect(body.meta.model).toBe('gemini-2.5-flash-preview-tts');
+    const wav = Buffer.from(body.result.audioBase64, 'base64');
+    expect(wav.subarray(0, 4).toString('ascii')).toBe('RIFF');
+    expect(wav.readUInt32LE(24)).toBe(24000);
+    expect(wav.length).toBe(44 + 480);
+  });
+
+  it('POST /api/ai/stt falls back to Gemini 2.5 transcription when the 3.x model fails', async () => {
+    globalThis.fetch = vi.fn(async (url: string) => {
+      if (url.includes('/interactions')) return new Response('model not found', { status: 404 });
+      expect(url).toContain('gemini-2.5-flash:generateContent');
+      return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: 'My vision is blurry.' }] } }] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }) as unknown as typeof fetch;
+
+    const res = await post(
+      '/api/ai/stt',
+      { scenarioId: 'nominal', crewMember, audioBase64: 'AAAA', mimeType: 'audio/webm', mode: 'live-api', tier: 'live' },
+      { 'X-Argus-Api-Key': 'AIzaSyFakeMasterKey' }
+    );
+    const body = (await res.json()) as AiEnvelope<VoiceSttResponse>;
+    expect(body.result.transcript).toBe('My vision is blurry.');
+    expect(body.meta.model).toBe('gemini-2.5-flash');
+  });
+
   it('POST /api/ai/voice-tool executes get_crew_snapshot and log_checkin_reading deterministically', async () => {
     const snapRes = await post('/api/ai/voice-tool', {
       scenarioId: 'sans_alert',
