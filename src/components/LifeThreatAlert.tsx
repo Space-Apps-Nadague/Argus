@@ -4,7 +4,7 @@
  * When the active crew member's latest reading is possible but immediately dangerous
  * (`LIFE_THREAT_LIMITS`, e.g. 42 °C body temperature), an EMERGENCY ALERT card pops up over
  * whatever tab is open; a fever of 38.5 °C or more raises an amber HEALTH ALERT the same way.
- * Sound: beep + "Alert" three times, then a voice says what was detected and what to do. One alarm beep plays when it appears, then a voice says what is wrong and
+ * Sound: one beep + "Alert", then a voice says what was detected and what to do. One alarm beep plays when it appears, then a voice says what is wrong and
  * what to do ("Emergency alert. Body temperature 42 degrees Celsius. Stop all work…"). It stays until the crew presses
  * OK. A new value for the same metric raises a new alert. Settings → "Test emergency alert"
  * shows a clearly labelled test alert (`triggerTestAlert`).

@@ -41,11 +41,9 @@ describe('spoken alert', () => {
     expect(s.match(/You should give oxygen now\./g)).toHaveLength(1);
   });
 
-  it('plays beep + "Alert" three times, then the explanation', () => {
+  it('rings once, says "Alert", then the explanation', () => {
     const steps = alertSteps('38.5 degrees Celsius body temperature detected.');
-    expect(steps.map((s) => (s.kind === 'beep' ? 'beep' : s.text))).toEqual([
-      'beep', 'Alert!', 'beep', 'Alert!', 'beep', 'Alert!', '38.5 degrees Celsius body temperature detected.',
-    ]);
+    expect(steps.map((s) => (s.kind === 'beep' ? 'beep' : s.text))).toEqual(['beep', 'Alert!', '38.5 degrees Celsius body temperature detected.']);
   });
 
   it('is silent with nothing to report', () => {

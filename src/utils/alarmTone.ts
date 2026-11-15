@@ -1,5 +1,5 @@
 /**
- * Alarm for dangerous readings: beep + spoken "Alert", three times, then a spoken message saying what
+ * Alarm for dangerous readings: one beep + spoken "Alert", then a spoken message saying what
  * was detected and what to do (WebAudio beeps, the browser's built-in speech synthesis; on the device,
  * no audio files, no online service).
  * Browsers only allow sound after a user gesture, so `primeAlarmAudio` unlocks the
@@ -154,8 +154,8 @@ function englishVoice(synth: SpeechSynthesis): SpeechSynthesisVoice | null {
 /** One step of the alert sequence. */
 export type AlertStep = { kind: 'beep' } | { kind: 'say'; text: string };
 
-/** Beep + "Alert", three times, then the explanation. */
-export function alertSteps(message: string, repeats = 3): AlertStep[] {
+/** Beep + "Alert" (once by default), then the explanation. */
+export function alertSteps(message: string, repeats = 1): AlertStep[] {
   const steps: AlertStep[] = [];
   for (let i = 0; i < repeats; i++) steps.push({ kind: 'beep' }, { kind: 'say', text: 'Alert!' });
   if (message) steps.push({ kind: 'say', text: message });
@@ -163,11 +163,11 @@ export function alertSteps(message: string, repeats = 3): AlertStep[] {
 }
 
 /**
- * Plays the alert: beep, "Alert", three times, then the spoken explanation. Each step waits for
+ * Plays the alert: one beep, "Alert", then the spoken explanation. Each step waits for
  * the previous one (speech `onend`, with a time-out in case a browser never fires it).
  * Without speech support only the beeps play. Returns a function that stops everything.
  */
-export function runAlertSequence(message: string, repeats = 3): () => void {
+export function runAlertSequence(message: string, repeats = 1): () => void {
   if (typeof window === 'undefined') return () => undefined;
   const synth = 'speechSynthesis' in window ? window.speechSynthesis : null;
   const steps = alertSteps(message, repeats).filter((s) => s.kind === 'beep' || synth);
