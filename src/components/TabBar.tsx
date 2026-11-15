@@ -5,9 +5,10 @@
  */
 
 import React, { useRef } from 'react';
-import { Activity, Bot, Brain, Camera, Eye, LineChart, Siren, Telescope, UserCog, Users } from 'lucide-react';
+import { Activity, Bot, Brain, Camera, Dumbbell, Eye, LineChart, Siren, Telescope, UserCog, Users } from 'lucide-react';
 import { HudTabId } from '../types/argus';
 import { useMission } from '../context/MissionContext';
+import { recommendTraining } from '../features/training/recommend';
 
 export interface HudTabDef {
   id: HudTabId;
@@ -31,6 +32,7 @@ export const HUD_TAB_DEFS: HudTabDef[] = [
   { id: 'ai', label: 'ARGUS AI', icon: <Bot className="w-4 h-4" /> },
   { id: 'cognition', label: 'Cognition', icon: <Brain className="w-4 h-4" /> },
   { id: 'emergency', label: 'Emergency', icon: <Siren className="w-4 h-4" /> },
+  { id: 'training', label: 'Training', icon: <Dumbbell className="w-4 h-4" /> },
   { id: 'crew', label: 'Crew', icon: <Users className="w-4 h-4" />, needs: 'roster' },
   { id: 'users', label: 'Users', icon: <UserCog className="w-4 h-4" />, needs: 'users' },
   { id: 'photobooth', label: 'Photobooth', icon: <Camera className="w-4 h-4" /> },
@@ -45,13 +47,22 @@ export const tabId = (id: HudTabId) => `hud-tab-${id}`;
 export const panelId = (id: HudTabId) => `hud-panel-${id}`;
 
 export const TabBar: React.FC<{ access: TabAccess; activeTab: HudTabId }> = ({ access, activeTab }) => {
-  const { setActiveTab, zoneStatuses } = useMission();
+  const { setActiveTab, zoneStatuses, zones, environment } = useMission();
+  const trainingState = recommendTraining(zones, zoneStatuses, environment).state;
   const refs = useRef<Record<string, HTMLButtonElement | null>>({});
   const tabs = visibleTabs(access);
   const redCount = Object.values(zoneStatuses).filter((s) => s === 'red').length;
 
   const badge = (id: HudTabId): React.ReactNode =>
-    id === 'biotwin' && redCount > 0 ? (
+    id === 'training' && trainingState !== 'optional' ? (
+      <span
+        className={`ml-auto inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-bold text-white ${
+          trainingState === 'unsafe' ? 'bg-red-600' : 'bg-amber-500'
+        }`}
+      >
+        !<span className="sr-only">{trainingState === 'unsafe' ? ' do not exercise now' : ' training required today'}</span>
+      </span>
+    ) : id === 'biotwin' && redCount > 0 ? (
       <span className="ml-auto inline-flex min-w-[18px] h-[18px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">
         {redCount}
         <span className="sr-only"> zones in alert</span>

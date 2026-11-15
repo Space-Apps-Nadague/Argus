@@ -4,7 +4,7 @@
  *
  * - Sign-in: `AuthGate.tsx` (first-run admin setup, then username + password)
  * - Top bar: `TopMissionBar.tsx` (brand, location, comm delay, clock, readiness, user menu, admin crew strip)
- * - Left tab rail: `TabBar.tsx` (Bio-Twin · Trends · Forecast · Eyes · ARGUS AI · Emergency · Crew/Users for admins)
+ * - Left tab rail: `TabBar.tsx` (Bio-Twin · Trends · Forecast · Eyes · ARGUS AI · Emergency · Training · Crew/Users for admins)
  * - Panels: one panel per tab; only the active panel is mounted
  */
 
@@ -23,6 +23,7 @@ import { EyesTab } from './components/EyesTab';
 import { AiTab } from './components/AiTab';
 import { EmergencyTab } from './components/EmergencyTab';
 import { CognitionTab } from './components/CognitionTab';
+import { TrainingTab } from './components/TrainingTab';
 import { CrewTab } from './components/CrewTab';
 import { UsersTab } from './components/UsersTab';
 import { PhotoboothTab } from './components/PhotoboothTab';
@@ -37,6 +38,7 @@ const PANELS: Record<HudTabId, React.FC> = {
   ai: AiTab,
   emergency: EmergencyTab,
   cognition: CognitionTab,
+  training: TrainingTab,
   crew: CrewTab,
   users: UsersTab,
   photobooth: PhotoboothTab,
