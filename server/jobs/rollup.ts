@@ -43,6 +43,7 @@ export const LAST_OF_DAY_METRICS = [
   'reaction_time',
   'headache_severity',
   'hyperopic_shift',
+  'vocal_jitter',
 ];
 
 /** Metrics whose daily value is the mean of the day's spot readings (watch blood pressure). */

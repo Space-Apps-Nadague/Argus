@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { downsample, encodeWav, float32ToPcm16, pcm16ToFloat32, pcmRateFromMime, rms } from '../audio';
+import { downsample, encodeWav, estimateVocalJitterPct, float32ToPcm16, pcm16ToFloat32, pcmRateFromMime, rms } from '../audio';
 import { LiveSession } from '../liveSession';
 import { cleanForSpeech, SentenceChunker } from '../sentenceChunker';
 import { SpeechOutput, pickBrowserVoice, type SynthResult } from '../speechOutput';
@@ -60,6 +60,25 @@ describe('audio helpers', () => {
     expect(pcmRateFromMime('audio/l16; rate=16000')).toBe(16000);
     expect(pcmRateFromMime(undefined)).toBe(24000);
     expect(rms(new Float32Array([1, -1]))).toBe(1);
+  });
+
+  it('estimates low vocal jitter for a steady sine wave and higher jitter when perturbed', () => {
+    const sr = 16000;
+    const n = 3200; // 200 ms
+    const steady = new Float32Array(n);
+    const jittered = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      steady[i] = 0.5 * Math.sin((2 * Math.PI * 160 * i) / sr);
+      const f = 160 + (i % 200 < 100 ? 6 : -6);
+      jittered[i] = 0.5 * Math.sin((2 * Math.PI * f * i) / sr);
+    }
+    const low = estimateVocalJitterPct(steady, sr);
+    const high = estimateVocalJitterPct(jittered, sr);
+    expect(low).not.toBeNull();
+    expect(low!).toBeLessThan(0.2);
+    expect(high).not.toBeNull();
+    expect(high!).toBeGreaterThan(1.0);
+    expect(estimateVocalJitterPct(new Float32Array(n), sr)).toBeNull();
   });
 });
 

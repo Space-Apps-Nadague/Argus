@@ -85,6 +85,45 @@ export function rms(samples: Float32Array): number {
   return Math.sqrt(sum / samples.length);
 }
 
+/**
+ * Local vocal pitch jitter (%) via positive-going zero-crossing period perturbation
+ * across voiced speech (F0 75–400 Hz). Returns null when the clip is too quiet or
+ * has fewer than 4 voiced pitch periods. (Source: SRC-109)
+ */
+export function estimateVocalJitterPct(samples: Float32Array, sampleRate = 16000): number | null {
+  if (samples.length < sampleRate * 0.05 || rms(samples) < 0.01) return null;
+  const minPeriod = sampleRate / 400;
+  const maxPeriod = sampleRate / 75;
+  const periods: number[] = [];
+  let prevCross = -1;
+  for (let i = 1; i < samples.length; i++) {
+    const a = samples[i - 1];
+    const b = samples[i];
+    if (a <= 0 && b > 0) {
+      const frac = a === b ? 0 : -a / (b - a);
+      const cross = i - 1 + frac;
+      if (prevCross >= 0) {
+        const period = cross - prevCross;
+        if (period >= minPeriod && period <= maxPeriod) {
+          periods.push(period);
+        }
+      }
+      prevCross = cross;
+    }
+  }
+  if (periods.length < 4) return null;
+  let diffSum = 0;
+  let periodSum = 0;
+  for (let i = 0; i < periods.length; i++) {
+    periodSum += periods[i];
+    if (i > 0) diffSum += Math.abs(periods[i] - periods[i - 1]);
+  }
+  const meanPeriod = periodSum / periods.length;
+  if (meanPeriod <= 0) return null;
+  const jitterPct = (diffSum / (periods.length - 1) / meanPeriod) * 100;
+  return Math.round(jitterPct * 100) / 100;
+}
+
 /** Sample rate from a mime type such as `audio/pcm;rate=24000` or `audio/l16; rate=24000`. */
 export function pcmRateFromMime(mime: string | undefined, fallback = 24000): number {
   const m = /rate=(\d+)/i.exec(mime ?? '');

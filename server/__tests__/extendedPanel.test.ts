@@ -13,7 +13,7 @@ describe('extended 31-metric panel', () => {
     for (const id of SCENARIOS) {
       const readings = Object.values(TELEMETRY_SCENARIOS[id].zones).flat();
       expect(new Set(readings.map((r) => r.metricId))).toEqual(new Set(METRIC_IDS));
-      expect(readings).toHaveLength(31);
+      expect(readings).toHaveLength(32);
       for (const r of readings) {
         expect(r.history).toHaveLength(30);
         expect(r.history[29].value).toBe(r.currentValue);

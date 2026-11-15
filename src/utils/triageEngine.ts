@@ -150,6 +150,8 @@ export const METRIC_THRESHOLDS_0G: Record<string, ThresholdRange> = {
   reaction_time: { nominalMin: 200, nominalMax: 300, yellowMin: 180, yellowMax: 360 },
   headache_severity: { nominalMin: 0, nominalMax: 2, yellowMin: 0, yellowMax: 4 },
   hyperopic_shift: { nominalMin: -0.25, nominalMax: 0.5, yellowMin: -0.5, yellowMax: 1.0 },
+  // Source: SRC-109 (Teixeira et al. 2013 local vocal jitter < 1.04% normal clinical cutoff)
+  vocal_jitter: { nominalMin: 0.2, nominalMax: 1.04, yellowMin: 0.0, yellowMax: 1.8 },
 };
 
 export const METRIC_THRESHOLDS = METRIC_THRESHOLDS_0G;
@@ -245,6 +247,7 @@ export const METRIC_TYPICAL_SD: Record<MetricId, number> = {
   reaction_time: 15,
   headache_severity: 0.7,
   hyperopic_shift: 0.1,
+  vocal_jitter: 0.15,
 };
 
 export interface MetricInputRange {
@@ -293,6 +296,7 @@ export const METRIC_INPUT_RANGES: Record<MetricId, MetricInputRange> = {
   reaction_time: { min: 100, max: 1000, how: 'Mean reaction time from the 3-minute Psychomotor Vigilance Test on the watch (ms).' },
   headache_severity: { min: 0, max: 10, how: 'One tap on the watch each evening (0 = none, 10 = worst).' },
   hyperopic_shift: { min: -3, max: 4, how: 'Digital near-vision acuity check vs pre-flight prescription (diopters).' },
+  vocal_jitter: { min: 0, max: 10, how: 'Short sustained vowel or voice check-in on the Console mic (%).' },
 };
 
 export const METRIC_IDS = Object.keys(METRIC_TYPICAL_SD) as MetricId[];

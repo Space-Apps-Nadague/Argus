@@ -158,6 +158,7 @@ export function simulate(opts: SimulationOptions): SimulatedBatch {
       const daily: Array<[DeviceKind, string, number, number, number]> = [
         ['smartwatch', 'pvt_lapses', 8 * 60 + 30, Math.max(0, Math.round(T('pvt_lapses'))), 1],
         ['smartwatch', 'reaction_time', 8 * 60 + 33, Math.round(T('reaction_time') + gauss() * 8), 1],
+        ['smartwatch', 'vocal_jitter', 8 * 60 + 36, Math.max(0.1, r2(T('vocal_jitter') + gauss() * 0.05)), 1],
         ['smartwatch', 'mood_index', 21 * 60, clamp(Math.round(T('mood_index') + gauss() * 0.5), 1, 10), 1],
         ['smartwatch', 'headache_severity', 21 * 60 + 5, clamp(r1(T('headache_severity') + gauss() * 0.3), 0, 10), 1],
         ['exercise_device', 'vo2_max', 18 * 60 + 15, r1(T('vo2_max') + gauss() * 0.6), 3],
