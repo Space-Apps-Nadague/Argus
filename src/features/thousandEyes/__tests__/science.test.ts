@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { INDICATOR_BY_KEY, INDICATORS, RING_ORDER } from '../indicators';
+import { INDICATOR_BY_KEY, INDICATORS, RING_ORDER, SENSOR_INDICATORS, SENSOR_RING_ORDER } from '../indicators';
 import { expectedShift } from '../locationShift';
 import {
   badness,
@@ -8,6 +8,8 @@ import {
   deviationIndex,
   findLinks,
   indicatorStatus,
+  isResearchLink,
+  linkText,
   phaseAt,
   readiness,
   sdv,
@@ -167,5 +169,65 @@ describe('adapter (real data only)', () => {
   it('marks pre-flight readings as the baseline phase', () => {
     const p = buildPerson({ locationId: 'earth_pre', now: NOW, metrics: [{ metricId: 'spo2', history: [{ missionDay: 1, value: 97 }] }] });
     expect(p.checkIns[0].phase).toBe('pre');
+  });
+});
+
+describe('sensor ring', () => {
+  it('adds 26 sensor indicators with unique keys, sources and no red-flag limits', () => {
+    expect(SENSOR_INDICATORS).toHaveLength(26);
+    expect(SENSOR_RING_ORDER).toHaveLength(26);
+    const keys = [...INDICATORS, ...SENSOR_INDICATORS].map((i) => i.key);
+    expect(new Set(keys).size).toBe(keys.length);
+    for (const ind of SENSOR_INDICATORS) {
+      expect(ind.sensor, ind.key).toBeDefined();
+      expect(ind.sensor!.sources.length, ind.key).toBeGreaterThan(0);
+      ind.sensor!.sources.forEach((id) => expect(id).toMatch(/^SRC-\d{3}$/));
+      expect(ind.redLow, ind.key).toBeUndefined();
+      expect(ind.redHigh, ind.key).toBeUndefined();
+      expect(ind.lo).toBeLessThan(ind.hi);
+      expect(ind.sd).toBeGreaterThan(0);
+    }
+    expect(INDICATOR_BY_KEY.ecg.sensor!.readiness).toBe('flight-proven');
+  });
+
+  it('feeds HUD CGM glucose into the glucose eye', () => {
+    expect(indicatorKeyFor('blood_glucose')).toBe('glu');
+  });
+
+  it('shows drift on a sensor eye but keeps it out of the deviation index', () => {
+    const p = personWith('cort', [40, 42, 38, 41, 39, 40, 41], [40, 90, 110, 120]);
+    const s = indicatorStatus(p, 'cort', NOW);
+    expect(s.status).toBe(1);
+    expect(s.red).toBe(false);
+    expect(Number.isNaN(deviationIndex([s]))).toBe(true);
+  });
+
+  it('links a sensor eye to a related core metric, marked as research', () => {
+    const stress = [1, 2, 3, 2, 4, 5, 3, 1, 2, 4];
+    const checkIns: CheckIn[] = stress.map((v, i) => ({
+      t: NOW - (stress.length - i) * DAY + 1,
+      phase: 'mis',
+      env: 'mtr',
+      values: { stress: v, cort: 30 + 15 * v + (i % 2) },
+    }));
+    const p: Person = { checkIns, env: 'mtr', created: NOW - 20 * DAY, launch: NOW - 11 * DAY };
+    const link = findLinks(p).find((l) => [l.a, l.b].includes('cort') && [l.a, l.b].includes('stress') && l.lagDays === 0);
+    expect(link).toBeDefined();
+    expect(link!.r).toBeGreaterThan(0.9);
+    expect(isResearchLink(link!)).toBe(true);
+    expect(linkText(link!)).toContain('correlation only');
+  });
+
+  it('keeps at most 4 research-sensor links so core links are not crowded out', () => {
+    const days = [1, 2, 3, 2, 4, 5, 3, 1, 2, 4, 5, 3];
+    const checkIns: CheckIn[] = days.map((v, i) => ({
+      t: NOW - (days.length - i) * DAY + 1,
+      phase: 'mis',
+      env: 'mtr',
+      values: { stress: v, mood: 6 - v + (i % 2) * 0.2, cort: 30 + 15 * v, eda: 2 + v, lac: 1 + v / 2, swr: 0.5 + v / 5 },
+    }));
+    const links = findLinks({ checkIns, env: 'mtr', created: NOW - 20 * DAY, launch: NOW - 13 * DAY });
+    expect(links.filter(isResearchLink).length).toBeLessThanOrEqual(4);
+    expect(links.some((l) => !isResearchLink(l))).toBe(true);
   });
 });

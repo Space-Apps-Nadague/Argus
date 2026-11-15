@@ -40,6 +40,13 @@ export interface EyePopoverProps {
   onClose: () => void;
 }
 
+
+const READINESS_TEXT = {
+  'flight-proven': 'Flown on crew',
+  cleared: 'Cleared device',
+  research: 'Research sensor, trend only',
+} as const;
+
 export const EyePopover: React.FC<EyePopoverProps> = ({ status: s, anchor, locationLabel, containerRef, onClose }) => {
   const mobile = useIsMobile();
   const boxRef = useRef<HTMLDivElement>(null);
@@ -161,6 +168,22 @@ export const EyePopover: React.FC<EyePopoverProps> = ({ status: s, anchor, locat
               {ind.how}
             </div>
           </div>
+        )}
+
+        {ind.sensor && (
+          <dl className="mt-2.5 grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-0.5 border-t border-slate-800 pt-2 text-[11px]">
+            <dt className="text-slate-400">Sample</dt>
+            <dd className="text-slate-200">{ind.sensor.sample}</dd>
+            <dt className="text-slate-400">Sensor</dt>
+            <dd className="text-slate-200">{ind.sensor.device}</dd>
+            <dt className="text-slate-400">Cadence</dt>
+            <dd className="text-slate-200">{ind.sensor.cadence}</dd>
+            <dt className="text-slate-400">Status</dt>
+            <dd className="text-slate-200">
+              {READINESS_TEXT[ind.sensor.readiness]} · <span className="font-mono text-slate-400">{ind.sensor.sources.join(', ')}</span>
+            </dd>
+            {ind.sensor.caveat && <dd className="col-span-2 mt-1 text-amber-200/90">{ind.sensor.caveat}</dd>}
+          </dl>
         )}
       </div>
     </>

@@ -52,6 +52,30 @@ export interface Indicator {
   how: string;
   /** Short advice when abnormal. */
   tip?: { above?: string; below?: string };
+  /** Set on the sensor ring (specs/02 §2.4b): where the reading comes from and how mature the sensor is. */
+  sensor?: SensorInfo;
+}
+
+/** What the sensor samples. */
+export type SampleMatrix = 'Interstitial fluid' | 'Sweat' | 'Skin' | 'Skin headspace' | 'Breath' | 'Ultrasound' | 'ECG electrodes' | 'Optical';
+
+/**
+ * How far the sensor is from routine use. `flight-proven`: flown on crew. `cleared`: a regulator-cleared
+ * consumer/medical device exists. `research`: shown only in research papers; trend only.
+ */
+export type SensorReadiness = 'flight-proven' | 'cleared' | 'research';
+
+export interface SensorInfo {
+  sample: SampleMatrix;
+  /** Development / device family, e.g. "Microneedle patch". */
+  device: string;
+  /** Typical sampling interval, e.g. "every 5 min". */
+  cadence: string;
+  readiness: SensorReadiness;
+  /** `SRC-xxx` IDs from SOURCES.md. */
+  sources: string[];
+  /** Caveat shown in the details box. */
+  caveat?: string;
 }
 
 export interface CheckIn {
