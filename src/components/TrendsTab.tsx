@@ -9,6 +9,7 @@ import { ArrowDown, ArrowRight, ArrowUp, GitBranch, Telescope } from 'lucide-rea
 import { useMission } from '../context/MissionContext';
 import { BodyZoneId, MetricLink, VitalSignReading } from '../types/argus';
 import { computeDrift, forecastMetric, formatSigma } from '../utils/driftAnalytics';
+import { CgmPanel } from './CgmPanel';
 import { TelemetryPanel } from './TelemetryPanel';
 import { InfoTip } from './InfoTip';
 import { Card } from './ui/Card';
@@ -57,8 +58,9 @@ export const TrendsTab: React.FC = () => {
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
       {/* Telemetry Panel: Zone/Metric selectors, + Log Vital Reading, Longitudinal Chart */}
-      <div className="xl:col-span-2 min-w-0">
+      <div className="xl:col-span-2 flex flex-col gap-4 min-w-0">
         <TelemetryPanel />
+        {reading.metricId === 'blood_glucose' && <CgmPanel />}
       </div>
 
       {/* Side Column: Drift analytics & "Why" links */}

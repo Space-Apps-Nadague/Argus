@@ -86,8 +86,7 @@ No public dataset has per-astronaut, minute-level vitals. NASA LSDA and LSAH dat
 - A current smartwatch measures heart rate, HRV, SpO₂, breathing rate, sleep, activity, ECG, overnight wrist temperature against a personal baseline [SRC-074] and cuff-calibrated blood pressure [SRC-075].
 - Watches have flown: an Apple Watch on Inspiration4 [SRC-027] and a Garmin on Polaris Dawn [SRC-028]. NASA crews already wear wrist actigraphs continuously [SRC-009, SRC-023, SRC-024].
 - A watch **cannot** measure radiation, so a personal dosimeter stays [SRC-026, SRC-079]. A dosimeter with a wristwatch display is in development [SRC-078].
-- A watch **cannot** measure blood sugar: no non-invasive watch is authorized [SRC-076]. Glucose therefore comes from a weekly finger-prick on a glucometer, read from a **photo** of the meter. The challenge names camera images and blood sugar in mg/dL as an input [SRC-077].
-- A CGM patch flew on Polaris Dawn [SRC-028] but was not adopted. It would be a third device and needs replacing every 10–15 days, while healthy crews' fasting glucose changes slowly.
+- A watch **cannot** measure blood sugar: no non-invasive watch is authorized [SRC-076]. A **CGM patch** (continuous glucose monitor, as flown on Polaris Dawn [SRC-028]) streams 5-minute interstitial `blood_glucose` readings automatically, catching postprandial excursions and spaceflight insulin resistance during comm blackouts [SRC-072, SRC-073]. A weekly finger-prick glucometer photo (`manual`) remains as a calibration/backup modality [SRC-077].
 
 ### 4.1 Sources of data (`devices.kind`)
 | Kind | Worn? | Streams | Cadence stored |
@@ -99,10 +98,11 @@ No public dataset has per-astronaut, minute-level vitals. NASA LSDA and LSAH dat
 | | | `pvt_lapses` (reaction-time app) | daily |
 | | | wellbeing tap-survey | daily |
 | `dosimeter` | worn | `dose_rate` (µGy/h); the daily `rad_dose` is derived from it | every 1 min |
+| `cgm` | worn | `blood_glucose` (interstitial mg/dL, trend, Time-in-Range) [SRC-028, SRC-072, SRC-073] | every 5 min |
 | `habitat_sensor` | no | `cabin_co2` | automatic |
 | `exercise_device` | no | `ared_load` from the device log | automatic, per session |
 | `clinical_exam` | no | `onsd`, `iop`, `wbc_lymph`, `bmd_delta`. Ultrasound and retina images go through the camera (Eyes tab) | every 3–7 days |
-| `manual` | no | `glucose` from a glucometer photo, fasting | weekly |
+| `manual` | no | `blood_glucose` backup from a glucometer photo, fasting [SRC-077] | as needed |
 
 Devices from the earlier kit (`smart_shirt`, `bp_cuff`, `wrist_actigraph`, `ring`, `core_temp_patch`) are retired: `devices.retired_at` is set. Their enum values remain so historic rows stay valid.
 

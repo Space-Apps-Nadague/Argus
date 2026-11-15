@@ -133,7 +133,7 @@ export interface ThresholdRange {
 ### Passive Wearable Metrics (non-triage) and how each indicator is collected
 With the two-device kit (`specs/05-data-platform.md` §4) nothing needs typing:
 - **From the watch:** `systolic_bp` (cuff-calibrated every 28 days [SRC-075]), `daily_sleep_hours`, `core_temp`, `mood_index` and `pvt_lapses`. Body temperature is *estimated* from overnight wrist temperature against the personal baseline [SRC-074]; a watch does not measure true core temperature. Mood is one tap a day.
-- **From a weekly glucometer photo:** `blood_glucose` [SRC-077], since watches cannot measure glucose [SRC-076].
+- **From the CGM patch:** `blood_glucose` every 5 min [SRC-072, SRC-073], with a finger-prick glucometer photo (`manual`) as backup [SRC-077], since watches cannot measure glucose [SRC-076].
 - **Clinical reference for the team bands** (PR #20): AHA blood pressure categories [SRC-070, SRC-071]; ADA glucose ranges [SRC-072, SRC-073].
 - **Minute-level streams with no thresholds of their own:** `heart_rate` (bpm), `resp_rate` (breaths/min), `activity` (g), `sleep_state` (0/1), `wrist_temp` (°C), `diastolic_bp` (mmHg) and `dose_rate` (µGy/h). They feed the daily values of `resting_hr`, `spo2`, `sleep_eff`, `core_temp` and `rad_dose` (spec 05 §5.1) and the AI context.
 - **Time:** timestamps are real UTC `timestamptz`, and `missionDay` is derived from the mission start.
@@ -154,7 +154,7 @@ Both tables live in `src/utils/triageEngine.ts` next to `METRIC_THRESHOLDS`. Nei
 | `systolic_bp` | `4` | `60` | `240` | Automatic: watch spot readings, seated (watch cuff-calibrated every 28 days). |
 | `bmd_delta` | `0.15` | `-5` | `3` | Monthly QCT/DXA-equivalent scan result vs previous scan (%). |
 | `ared_load` | `2.5` | `0` | `60` | Total from the ARED/resistance device log for today. |
-| `blood_glucose` | `5` | `40` | `400` | Weekly fasting finger-prick, then a photo of the meter screen. |
+| `blood_glucose` | `5` | `40` | `400` | Continuous Glucose Monitor (CGM) 5-min patch; finger-prick glucometer photo backup. |
 | `rad_dose` | `0.15` | `0` | `50` | Personal dosimeter: last 24 h reading. |
 | `wbc_lymph` | `0.2` | `0.1` | `10` | Point-of-care blood analyzer, finger-prick sample. |
 | `core_temp` | `0.15` | `34.0` | `42.0` | Automatic: estimated from overnight watch wrist temperature. |
@@ -193,6 +193,46 @@ Calculated deterministically in `src/utils/triageEngine.ts`:
 - Each metric in `'yellow'` status deducts `3%`
 - Each metric in `'red'` status deducts `8%`
 - Completed countermeasure checklist items in the active session add `+3%` each (capped at `100%`, minimum `15%`).
+
+### Continuous Glucose Monitor (CGM) Crew Mock Stream (`src/data/cgmMockData.ts`)
+Deterministic 5-minute interstitial glucose mock data (288 readings per 24h day) for each crew member in `DEFAULT_CREW_ROSTER`, grounded in ADA glycemic bands [SRC-072, SRC-073] (Issue #57):
+
+```typescript
+export type CgmTrendArrow =
+  | 'double_up'
+  | 'single_up'
+  | 'forty_five_up'
+  | 'flat'
+  | 'forty_five_down'
+  | 'single_down'
+  | 'double_down';
+
+export type CgmEventTag = 'sleep' | 'fasting' | 'post_meal' | 'ared_exercise' | 'eva_stress';
+
+export interface CgmReading {
+  timestampIso: string;
+  missionDay: number;
+  minuteOfDay: number;
+  glucoseMgDl: number;
+  trendArrow: CgmTrendArrow;
+  rateOfChangeMgDlPerMin: number;
+  eventTag?: CgmEventTag;
+}
+
+export interface CrewCgmMockDataset {
+  crewId: string;
+  callsign: string;
+  sensorModel: string;
+  sensorSerial: string;
+  sampleIntervalMinutes: 5;
+  meanGlucoseMgDl: number;
+  timeInRangePct: number; // % of readings within 70–140 mg/dL
+  lowPct: number;         // % of readings < 70 mg/dL
+  highPct: number;        // % of readings > 140 mg/dL
+  cvPct: number;          // coefficient of variation (%)
+  readings: CgmReading[];
+}
+```
 
 ---
 
