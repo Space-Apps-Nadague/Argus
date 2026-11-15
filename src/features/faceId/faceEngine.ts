@@ -6,7 +6,7 @@
  * `scripts/copy-face-models.mjs` and loaded only when Face ID is used.
  */
 
-import { eyeAspectRatio } from './faceStore';
+import { eyeAspectRatio, headYaw } from './faceStore';
 
 type FaceApi = typeof import('@vladmandic/face-api');
 
@@ -64,5 +64,29 @@ export async function readFace(faceapi: FaceApi, video: HTMLVideoElement): Promi
     ear,
     score: detection.score,
     box: { x: b.x / video.videoWidth, y: b.y / video.videoHeight, width: b.width / video.videoWidth, height: b.height / video.videoHeight },
+  };
+}
+
+export interface LivenessFrame {
+  ear: number;
+  yaw: number;
+}
+
+/**
+ * Landmarks only (no face descriptor): about 3× faster, so a quick blink is not missed
+ * between frames. Used for the liveness step after the face is recognised.
+ */
+export async function readLiveness(faceapi: FaceApi, video: HTMLVideoElement): Promise<LivenessFrame | null> {
+  if (!video.videoWidth) return null;
+  const result = await faceapi
+    .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.4 }))
+    .withFaceLandmarks();
+  if (!result) return null;
+  const lm = result.landmarks;
+  const pts = lm.positions;
+  return {
+    ear: (eyeAspectRatio(lm.getLeftEye()) + eyeAspectRatio(lm.getRightEye())) / 2,
+    // 68-point model: 36 = left eye outer corner, 45 = right eye outer corner, 30 = nose tip.
+    yaw: headYaw(pts[36], pts[45], pts[30]),
   };
 }

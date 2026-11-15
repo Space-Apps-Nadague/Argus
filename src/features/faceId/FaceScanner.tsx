@@ -3,18 +3,19 @@
  *
  * Round camera view with an iPhone-style ring of ticks that fill as the scan progresses.
  *  - enroll: captures 5 clear frames and averages them into one face template.
- *  - verify: needs the same face in 2 frames plus one blink (liveness) within 20 s.
+ *  - verify: needs the same face in 2 frames, then a blink or a small head turn (liveness), within 20 s.
+ *    The liveness step reads landmarks only, so it is fast enough to catch a quick blink.
  * Camera frames never leave the browser.
  */
 
 import React, { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, ScanFace, X } from 'lucide-react';
-import { loadFaceEngine, readFace } from './faceEngine';
-import { averageDescriptors, detectBlink, FaceEnrollment, matchFace } from './faceStore';
+import { loadFaceEngine, readFace, readLiveness } from './faceEngine';
+import { averageDescriptors, detectBlink, detectHeadTurn, FaceEnrollment, matchFace } from './faceStore';
 
 const TICKS = 60;
 const ENROLL_FRAMES = 5;
-const VERIFY_TIMEOUT_MS = 20_000;
+const VERIFY_TIMEOUT_MS = 25_000;
 
 type Phase = 'camera' | 'models' | 'scanning' | 'success' | 'error';
 
@@ -81,36 +82,59 @@ export const FaceScanner: React.FC<Props> = (props) => {
         return;
       }
 
-      setMessage('Look at the camera and blink');
-      const ears: number[] = [];
+      setMessage('Look at the camera');
+      const started = Date.now();
+      const timeLeft = () => Date.now() - started < VERIFY_TIMEOUT_MS;
+
+      // 1) Who is it? Same enrolled face in 2 frames.
       let matches = 0;
       let matched: FaceEnrollment | null = null;
-      const started = Date.now();
-      while (!cancelled && Date.now() - started < VERIFY_TIMEOUT_MS) {
+      while (!cancelled && timeLeft() && matches < 2) {
         const f = await readFace(faceapi, video);
         if (f) {
-          ears.push(f.ear);
-          if (ears.length > 60) ears.shift();
           const m = matchFace(f.descriptor, p.enrollments);
           if (m && (!matched || matched.userId === m.enrollment.userId)) {
             matched = m.enrollment;
             matches += 1;
+            setProgress(matches * 0.3);
+          } else {
+            setMessage('Face not recognised yet. Look straight at the camera');
           }
-          const blinked = detectBlink(ears);
-          setProgress(Math.min(1, (Math.min(matches, 2) / 2) * 0.6 + (blinked ? 0.4 : 0)));
-          if (matched && matches >= 2 && blinked) {
+        } else {
+          setMessage('Move your face into the circle');
+        }
+        await sleep(30);
+      }
+      if (cancelled) return;
+      if (!matched || matches < 2) throw new Error('Face not recognised. Try again or use your password.');
+
+      // 2) Is it a live person? A blink or a small head turn (fast landmark-only frames).
+      setMessage('Face recognised. Now blink, or turn your head slightly');
+      const ears: number[] = [];
+      const yaws: number[] = [];
+      while (!cancelled && timeLeft()) {
+        const l = await readLiveness(faceapi, video);
+        if (l) {
+          ears.push(l.ear);
+          yaws.push(l.yaw);
+          if (ears.length > 90) {
+            ears.shift();
+            yaws.shift();
+          }
+          if (detectBlink(ears) || detectHeadTurn(yaws)) {
+            setProgress(1);
             setPhase('success');
             setMessage(`Welcome, ${matched.username}`);
             await p.onMatch(matched);
             return;
           }
-          setMessage(matched ? 'Face recognised. Now blink once' : 'Look at the camera and blink');
+          setProgress(0.6 + Math.min(0.3, ears.length / 100));
         } else {
-          setMessage('Move your face into the circle');
+          setMessage('Keep your face in the circle, then blink or turn your head slightly');
         }
-        await sleep(40);
+        await sleep(0);
       }
-      if (!cancelled) throw new Error(matched ? 'No blink detected. Try again or use your password.' : 'Face not recognised. Try again or use your password.');
+      if (!cancelled) throw new Error('No blink or head turn detected. Try again or use your password.');
     };
 
     run().catch((err: unknown) => {

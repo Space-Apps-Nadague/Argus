@@ -9,8 +9,11 @@
 export const FACE_ID_STORAGE_KEY = 'argus_face_id_v1';
 /** Euclidean distance below which two descriptors are the same person (face-api.js recommends 0.6; we are stricter). */
 export const FACE_MATCH_THRESHOLD = 0.45;
-/** Eye aspect ratio below this counts as closed (blink liveness check). */
-export const EYE_CLOSED_EAR = 0.21;
+/** Blink = eyes drop below this share of the person's own open-eye ratio, then reopen. */
+export const BLINK_CLOSED_RATIO = 0.75;
+export const BLINK_REOPEN_RATIO = 0.88;
+/** Head turn = nose moves this share of the eye distance sideways (left-right range). */
+export const HEAD_TURN_RANGE = 0.22;
 
 export interface FaceEnrollment {
   userId: string;
@@ -69,17 +72,35 @@ export function eyeAspectRatio(eye: Point[]): number {
 }
 
 /**
- * Blink liveness: true once the eyes were seen open, then closed, then open again.
+ * Blink liveness: the eyes close and reopen relative to this person's own open-eye ratio
+ * (the highest recent value), so it works for any eye shape and camera distance.
  * A printed photo or a still image on a screen cannot do this.
  */
-export function detectBlink(earSeries: number[], closed = EYE_CLOSED_EAR): boolean {
-  let phase: 'open' | 'closed' | 'reopened' | 'start' = 'start';
+export function detectBlink(earSeries: number[]): boolean {
+  let open = 0;
+  let closed = false;
   for (const ear of earSeries) {
-    if (phase === 'start' && ear > closed + 0.04) phase = 'open';
-    else if (phase === 'open' && ear < closed) phase = 'closed';
-    else if (phase === 'closed' && ear > closed + 0.04) return true;
+    if (!closed) {
+      open = Math.max(open, ear);
+      if (open >= 0.15 && ear < open * BLINK_CLOSED_RATIO) closed = true;
+    } else if (ear > open * BLINK_REOPEN_RATIO) {
+      return true;
+    }
   }
   return false;
+}
+
+/** Head-turn liveness: the nose moved sideways relative to the eyes (yaw proxy series). */
+export function detectHeadTurn(yawSeries: number[]): boolean {
+  if (yawSeries.length < 2) return false;
+  return Math.max(...yawSeries) - Math.min(...yawSeries) >= HEAD_TURN_RANGE;
+}
+
+/** Nose offset from the eye midpoint, in eye distances: about 0 facing the camera, ± when the head turns. */
+export function headYaw(leftEyeOuter: Point, rightEyeOuter: Point, noseTip: Point): number {
+  const iod = Math.hypot(rightEyeOuter.x - leftEyeOuter.x, rightEyeOuter.y - leftEyeOuter.y);
+  if (iod === 0) return 0;
+  return (noseTip.x - (leftEyeOuter.x + rightEyeOuter.x) / 2) / iod;
 }
 
 export function loadEnrollments(): FaceEnrollment[] {
