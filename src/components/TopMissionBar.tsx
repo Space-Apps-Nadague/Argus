@@ -9,6 +9,7 @@ import { useMission } from '../context/MissionContext';
 import { useAuth } from '../context/AuthContext';
 import { formatCommDelay, SPACE_LOCATION_ORDER, SPACE_LOCATIONS } from '../data/spaceLocations';
 import { MissionClock } from './MissionClock';
+import { FaceIdSettings } from '../features/faceId/FaceIdSettings';
 import { SettingsMenu } from './SettingsMenu';
 import { ScenarioId, SpaceLocationId, TriageStatus, UserRole } from '../types/argus';
 import { getCrewAdjustedZones, TELEMETRY_SCENARIOS } from '../data/telemetryScenarios';
@@ -232,6 +233,7 @@ export const TopMissionBar: React.FC = () => {
               <div className="text-xs font-semibold text-hud-text">{currentUser?.username}</div>
               <div className="text-[10px] text-hud-muted">{ROLE_LABELS[currentUser?.role ?? 'astronaut']}</div>
             </div>
+            <FaceIdSettings />
             <button
               type="button"
               onClick={logout}
