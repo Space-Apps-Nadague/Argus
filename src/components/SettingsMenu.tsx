@@ -1,10 +1,13 @@
 /**
- * ARGUS — Settings menu in the top bar. For now: test the emergency alert.
+ * ARGUS — Settings menu in the top bar: test the emergency alert, and the spacecraft scenarios where
+ * ARGUS changes the ship's (simulated) systems and explains it out loud.
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Settings, Siren } from 'lucide-react';
+import { Satellite, Settings, Siren } from 'lucide-react';
 import { triggerTestAlert } from './LifeThreatAlert';
+import { triggerSpacecraftEvent } from './SpacecraftAlert';
+import { SPACECRAFT_EVENT_IDS, SPACECRAFT_EVENTS } from '../features/spacecraft/habitat';
 
 export const SettingsMenu: React.FC = () => {
   const [open, setOpen] = useState(false);
@@ -38,7 +41,7 @@ export const SettingsMenu: React.FC = () => {
         <Settings className="h-4 w-4" aria-hidden="true" />
       </button>
       {open && (
-        <div role="menu" className="hud-card absolute right-0 top-full z-50 mt-1 w-64 p-2">
+        <div role="menu" className="hud-card absolute right-0 top-full z-50 mt-1 w-72 p-2">
           <p className="px-2 pb-1 pt-0.5 text-[10px] font-semibold uppercase tracking-widest text-hud-muted">Settings</p>
           <button
             type="button"
@@ -55,6 +58,32 @@ export const SettingsMenu: React.FC = () => {
               <span className="block text-[11px] text-hud-muted">Shows the alert and plays the alarm. Nothing is logged.</span>
             </span>
           </button>
+          <p className="mt-2 border-t border-hud-line px-2 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-widest text-hud-muted">
+            Spacecraft · ARGUS takes action (demo)
+          </p>
+          {SPACECRAFT_EVENT_IDS.map((id) => {
+            const ev = SPACECRAFT_EVENTS[id];
+            return (
+              <button
+                key={id}
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setOpen(false);
+                  triggerSpacecraftEvent(id);
+                }}
+                className="hud-focus flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left text-sm text-hud-text hover:bg-hud-bg"
+              >
+                <Satellite className={`mt-0.5 h-4 w-4 shrink-0 ${ev.severity === 'red' ? 'text-red-400' : 'text-amber-400'}`} aria-hidden="true" />
+                <span>
+                  {ev.title}
+                  <span className="block text-[11px] text-hud-muted">
+                    {ev.reading.value} {ev.reading.unit} in {ev.module} · {ev.actions.filter((a) => a.tier === 'auto').length} automatic, {ev.actions.filter((a) => a.tier === 'confirm').length} to confirm
+                  </span>
+                </span>
+              </button>
+            );
+          })}
         </div>
       )}
     </div>

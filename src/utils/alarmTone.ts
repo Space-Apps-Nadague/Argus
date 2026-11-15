@@ -155,9 +155,9 @@ function englishVoice(synth: SpeechSynthesis): SpeechSynthesisVoice | null {
 export type AlertStep = { kind: 'beep' } | { kind: 'say'; text: string };
 
 /** Beep + "Alert" (once by default), then the explanation. */
-export function alertSteps(message: string, repeats = 1): AlertStep[] {
+export function alertSteps(message: string, repeats = 1, intro = 'Alert!'): AlertStep[] {
   const steps: AlertStep[] = [];
-  for (let i = 0; i < repeats; i++) steps.push({ kind: 'beep' }, { kind: 'say', text: 'Alert!' });
+  for (let i = 0; i < repeats; i++) steps.push({ kind: 'beep' }, { kind: 'say', text: intro });
   if (message) steps.push({ kind: 'say', text: message });
   return steps;
 }
@@ -167,14 +167,18 @@ export function alertSteps(message: string, repeats = 1): AlertStep[] {
  * the previous one (speech `onend`, with a time-out in case a browser never fires it).
  * Without speech support only the beeps play. Returns a function that stops everything.
  */
-export function runAlertSequence(message: string, repeats = 1): () => void {
+export function runAlertSequence(message: string, repeats = 1, opts: { intro?: string; onDone?: () => void } = {}): () => void {
   if (typeof window === 'undefined') return () => undefined;
   const synth = 'speechSynthesis' in window ? window.speechSynthesis : null;
-  const steps = alertSteps(message, repeats).filter((s) => s.kind === 'beep' || synth);
+  const steps = alertSteps(message, repeats, opts.intro).filter((s) => s.kind === 'beep' || synth);
   let cancelled = false;
   let timer = 0;
   const next = (i: number) => {
-    if (cancelled || i >= steps.length) return;
+    if (cancelled) return;
+    if (i >= steps.length) {
+      opts.onDone?.();
+      return;
+    }
     const step = steps[i];
     if (step.kind === 'beep') {
       playBeep(0.4);
@@ -184,7 +188,7 @@ export function runAlertSequence(message: string, repeats = 1): () => void {
     try {
       const u = new SpeechSynthesisUtterance(step.text);
       u.lang = 'en-US';
-      u.rate = step.text === 'Alert!' ? 1 : 0.95;
+      u.rate = step.text === (opts.intro ?? 'Alert!') ? 1 : 0.95;
       u.volume = 1;
       const voice = englishVoice(synth!);
       if (voice) u.voice = voice;
@@ -228,4 +232,9 @@ export function runAlertSequence(message: string, repeats = 1): () => void {
     }
     utterance = null;
   };
+}
+
+/** Speaks one short line (e.g. a reply after "confirm"). Returns a function that stops it. */
+export function sayLine(text: string): () => void {
+  return runAlertSequence(text, 0);
 }
