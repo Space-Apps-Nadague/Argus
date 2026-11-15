@@ -39,6 +39,8 @@ export interface MeResponse {
   user: UserAccount | null;
   setupNeeded: boolean;
   minPasswordLength: number;
+  /** Server allows `POST /api/auth/guest` (shared read-all flight-surgeon view). */
+  guestLogin?: boolean;
 }
 
 /** `null` = no database on the server (or server unreachable): run in offline demo mode. */
@@ -54,6 +56,7 @@ export async function fetchMe(): Promise<MeResponse | null> {
 export const authApi = {
   setup: (username: string, password: string) => apiJson<{ user: UserAccount }>('/api/auth/setup', { body: { username, password } }),
   login: (username: string, password: string) => apiJson<{ user: UserAccount }>('/api/auth/login', { body: { username, password } }),
+  guest: () => apiJson<{ user: UserAccount }>('/api/auth/guest', { body: {} }),
   logout: () => apiJson<{ ok: true }>('/api/auth/logout', { body: {} }),
   /** Face ID: issues a device sign-in token for the signed-in user (only its hash is stored). */
   faceEnroll: () => apiJson<{ token: string }>('/api/auth/face/enroll', { body: {} }),

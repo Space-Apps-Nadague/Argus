@@ -56,6 +56,31 @@ async function login(username: string, password: string): Promise<string> {
 }
 
 describe('auth', () => {
+  it('guest sign-in opens a flight-surgeon session without a password', async () => {
+    const me = await (await req('/api/auth/me')).json();
+    expect(me.guestLogin).toBe(true);
+    const res = await req('/api/auth/guest', { body: {} });
+    expect(res.status).toBe(200);
+    expect((await res.json()).user).toMatchObject({ username: 'guest', role: 'flight_surgeon' });
+    const cookie = /argus_session=([^;]+)/.exec(res.headers.get('set-cookie') ?? '');
+    expect(cookie).toBeTruthy();
+    const after = await (await req('/api/auth/me', { cookie: `argus_session=${cookie![1]}` })).json();
+    expect(after.user).toMatchObject({ username: 'guest', role: 'flight_surgeon' });
+    // A second guest sign-in reuses the same account.
+    const again = await (await req('/api/auth/guest', { body: {} })).json();
+    expect(again.user.id).toBe(after.user.id);
+  });
+
+  it('guest sign-in can be turned off', async () => {
+    process.env.ARGUS_GUEST_LOGIN = 'off';
+    try {
+      expect((await req('/api/auth/guest', { body: {} })).status).toBe(403);
+      expect((await (await req('/api/auth/me')).json()).guestLogin).toBe(false);
+    } finally {
+      delete process.env.ARGUS_GUEST_LOGIN;
+    }
+  });
+
   it('reports server mode and no setup needed after seeding', async () => {
     const res = await req('/api/auth/me');
     expect(res.status).toBe(200);

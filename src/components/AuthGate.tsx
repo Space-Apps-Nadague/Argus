@@ -1,11 +1,12 @@
 /**
  * ARGUS — Sign-in gate (specs/02-ui-dashboard.md §6)
  * First run: create the admin account. Afterwards: username + password sign-in, or Face ID
- * on a device where the user set it up (src/features/faceId).
+ * on a device where the user set it up (src/features/faceId), or "Continue as guest" when the
+ * server allows it (read-all flight-surgeon view, specs/05-data-platform.md §6).
  */
 
 import React, { useState } from 'react';
-import { Activity, LogIn, ScanFace, ShieldCheck } from 'lucide-react';
+import { Activity, LogIn, ScanFace, ShieldCheck, UserRound } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { AuthError } from '../auth/authStore';
 import { FaceScanner } from '../features/faceId/FaceScanner';
@@ -33,7 +34,7 @@ const Field: React.FC<{
 );
 
 export const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUser, needsSetup, setupAdmin, login, minPasswordLength, mode, faceEnrollments, loginWithFace } = useAuth();
+  const { currentUser, needsSetup, setupAdmin, login, minPasswordLength, mode, faceEnrollments, loginWithFace, guestAvailable, loginAsGuest } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -148,6 +149,28 @@ export const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) 
           <LogIn className="h-4 w-4" aria-hidden="true" />
           {busy ? 'Checking…' : needsSetup ? 'Create admin & sign in' : 'Sign in'}
         </button>
+
+        {guestAvailable && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={async () => {
+              setError(null);
+              setBusy(true);
+              try {
+                await loginAsGuest();
+              } catch (err) {
+                setError(err instanceof AuthError ? err.message : 'Guest sign-in failed. Try again.');
+              } finally {
+                setBusy(false);
+              }
+            }}
+            className="hud-btn w-full"
+          >
+            <UserRound className="h-4 w-4" aria-hidden="true" />
+            Continue as guest
+          </button>
+        )}
 
         {faceAvailable && (
           <button
