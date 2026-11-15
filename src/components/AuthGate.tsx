@@ -1,12 +1,14 @@
 /**
  * ARGUS — Sign-in gate (specs/02-ui-dashboard.md §6)
- * First run: create the admin account. Afterwards: username + password sign-in.
+ * First run: create the admin account. Afterwards: username + password sign-in, or Face ID
+ * on a device where the user set it up (src/features/faceId).
  */
 
 import React, { useState } from 'react';
-import { Activity, LogIn, ShieldCheck } from 'lucide-react';
+import { Activity, LogIn, ScanFace, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { AuthError } from '../auth/authStore';
+import { FaceScanner } from '../features/faceId/FaceScanner';
 
 const Field: React.FC<{
   id: string;
@@ -31,12 +33,14 @@ const Field: React.FC<{
 );
 
 export const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUser, needsSetup, setupAdmin, login, minPasswordLength, mode } = useAuth();
+  const { currentUser, needsSetup, setupAdmin, login, minPasswordLength, mode, faceEnrollments, loginWithFace } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [faceOpen, setFaceOpen] = useState(false);
+  const faceAvailable = !needsSetup && faceEnrollments.length > 0;
 
   if (currentUser) return <>{children}</>;
   if (mode === 'loading') {
@@ -66,6 +70,31 @@ export const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) 
       setBusy(false);
     }
   };
+
+  if (faceOpen) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-hud-bg px-4 text-hud-text hud-grid-bg">
+        <div className="hud-card w-full max-w-sm space-y-4 p-6" role="region" aria-labelledby="faceid-signin-title">
+          <h1 id="faceid-signin-title" className="font-display text-lg font-bold tracking-[0.2em]">
+            FACE ID
+          </h1>
+          <FaceScanner
+            mode="verify"
+            enrollments={faceEnrollments}
+            onMatch={async (enrollment) => {
+              try {
+                await loginWithFace(enrollment);
+              } catch (err) {
+                setFaceOpen(false);
+                setError(err instanceof AuthError ? err.message : 'Face ID sign-in failed. Use your password.');
+              }
+            }}
+            onCancel={() => setFaceOpen(false)}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-hud-bg px-4 text-hud-text hud-grid-bg">
@@ -119,6 +148,20 @@ export const AuthGate: React.FC<{ children: React.ReactNode }> = ({ children }) 
           <LogIn className="h-4 w-4" aria-hidden="true" />
           {busy ? 'Checking…' : needsSetup ? 'Create admin & sign in' : 'Sign in'}
         </button>
+
+        {faceAvailable && (
+          <button
+            type="button"
+            onClick={() => {
+              setError(null);
+              setFaceOpen(true);
+            }}
+            className="hud-btn w-full"
+          >
+            <ScanFace className="h-4 w-4" aria-hidden="true" />
+            Sign in with Face ID
+          </button>
+        )}
 
         <p className="text-[11px] leading-relaxed text-hud-muted">
           {mode === 'server'

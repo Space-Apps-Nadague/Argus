@@ -25,3 +25,6 @@ data/exports/
 # WhatsApp bot local session DB & compiled binary
 tools/whatsapp-bot/whatsapp.db*
 tools/whatsapp-bot/argus-wa-bot
+
+# Face ID models, copied from node_modules by scripts/copy-face-models.mjs
+public/models/face/

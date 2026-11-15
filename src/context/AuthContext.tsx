@@ -26,6 +26,7 @@ import {
   verifyLogin,
 } from '../auth/authStore';
 import { adminApi, authApi, DataApiError, fetchMe } from '../services/dataApi';
+import { type FaceEnrollment, loadEnrollments, saveEnrollments, upsertEnrollment } from '../features/faceId/faceStore';
 
 export type AuthMode = 'loading' | 'server' | 'local';
 
@@ -47,6 +48,13 @@ interface AuthContextValue {
   canViewHealth: boolean;
   setupAdmin: (username: string, password: string) => Promise<void>;
   login: (username: string, password: string) => Promise<void>;
+  /** Face ID enrollments stored on this device (any user). */
+  faceEnrollments: FaceEnrollment[];
+  /** The signed-in user has Face ID on this device. */
+  hasFaceId: boolean;
+  enrollFace: (descriptor: number[]) => Promise<void>;
+  loginWithFace: (enrollment: FaceEnrollment) => Promise<void>;
+  removeFaceId: () => Promise<void>;
   logout: () => void;
   addAccount: (input: NewAccount) => Promise<void>;
   changePassword: (userId: string, password: string) => Promise<void>;
@@ -170,6 +178,62 @@ export const AuthProvider: React.FC<{ children: React.ReactNode; storage?: Accou
     [mode, localUsers]
   );
 
+  // ── Face ID (device-local templates; specs/02-ui-dashboard.md §6) ──
+  const [faceEnrollments, setFaceEnrollments] = useState<FaceEnrollment[]>(() => loadEnrollments());
+  const storeEnrollments = useCallback((list: FaceEnrollment[]) => {
+    saveEnrollments(list);
+    setFaceEnrollments(list);
+  }, []);
+
+  const enrollFace = useCallback(
+    async (descriptor: number[]) => {
+      const user = mode === 'server' ? serverUser : localUsers.find((u) => u.id === sessionUserId);
+      if (!user) throw new AuthError('Sign in first.');
+      const previous = faceEnrollments.find((e) => e.userId === user.id);
+      const token = mode === 'server' ? (await asAuthError(() => authApi.faceEnroll())).token : undefined;
+      if (mode === 'server' && previous?.token) void authApi.faceRemove(previous.token).catch(() => {});
+      storeEnrollments(
+        upsertEnrollment(faceEnrollments, { userId: user.id, username: user.username, descriptor, token, createdAtIso: new Date().toISOString() })
+      );
+    },
+    [mode, serverUser, localUsers, sessionUserId, faceEnrollments, storeEnrollments]
+  );
+
+  const loginWithFace = useCallback(
+    async (enrollment: FaceEnrollment) => {
+      const forget = () => storeEnrollments(faceEnrollments.filter((e) => e.userId !== enrollment.userId));
+      if (mode === 'server') {
+        if (!enrollment.token) {
+          forget();
+          throw new AuthError('Face ID needs to be set up again on this device. Sign in with your password.');
+        }
+        try {
+          const { user } = await authApi.faceLogin(enrollment.token);
+          setServerUser(user);
+        } catch (err) {
+          if (err instanceof DataApiError && err.status === 401) forget();
+          throw err instanceof DataApiError ? new AuthError(err.message) : err;
+        }
+        return;
+      }
+      const user = localUsers.find((u) => u.id === enrollment.userId);
+      if (!user || user.disabled) {
+        forget();
+        throw new AuthError('This Face ID belongs to an account that no longer exists. Sign in with your password.');
+      }
+      setSessionUserId(user.id);
+    },
+    [mode, localUsers, faceEnrollments, storeEnrollments]
+  );
+
+  const removeFaceId = useCallback(async () => {
+    const userId = mode === 'server' ? serverUser?.id : sessionUserId;
+    const mine = faceEnrollments.find((e) => e.userId === userId);
+    if (!mine) return;
+    if (mode === 'server' && mine.token) await authApi.faceRemove(mine.token).catch(() => undefined);
+    storeEnrollments(faceEnrollments.filter((e) => e.userId !== userId));
+  }, [mode, serverUser, sessionUserId, faceEnrollments, storeEnrollments]);
+
   const logout = useCallback(() => {
     if (mode === 'server') {
       void authApi.logout().catch(() => {});
@@ -240,6 +304,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode; storage?: Accou
     canViewHealth: !(mode === 'server' && isAdmin && !currentUser?.crewId),
     setupAdmin,
     login,
+    faceEnrollments,
+    hasFaceId: Boolean(currentUser && faceEnrollments.some((e) => e.userId === currentUser.id)),
+    enrollFace,
+    loginWithFace,
+    removeFaceId,
     logout,
     addAccount,
     changePassword,

@@ -152,6 +152,22 @@ export const sessions = pgTable(
   (t) => [index('sessions_user_idx').on(t.userId)]
 );
 
+/** Face ID device sign-in tokens (spec 05 §6). The face template stays on the device; only the token hash is here. */
+export const faceLogins = pgTable(
+  'face_logins',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    tokenHash: text('token_hash').notNull().unique(),
+    createdAt: tsz('created_at').notNull().defaultNow(),
+    lastUsedAt: tsz('last_used_at'),
+    userAgent: text('user_agent'),
+  },
+  (t) => [index('face_logins_user_idx').on(t.userId)]
+);
+
 export const auditLog = pgTable(
   'audit_log',
   {
