@@ -10,7 +10,7 @@
  * - `autonomous` deep space, blackout or no network: everything runs on the ship
  *                (local LLM, local STT/TTS); Earth is reached by store-and-forward packets.
  *
- * Cut-offs: ITU-T G.114 puts acceptable one-way mouth-to-ear delay at ≤ 400 ms [SRC-090];
+ * Cut-offs: ITU-T G.114 puts acceptable one-way mouth-to-ear delay at ≤ 400 ms [SRC-100];
  * above ~5 s one-way even turn-taking with Earth is slower than a local model's reply.
  */
 
@@ -19,7 +19,7 @@ export type CommTier = 'live' | 'relay' | 'autonomous';
 export const COMM_TIERS: CommTier[] = ['live', 'relay', 'autonomous'];
 
 export const COMM_TIER_LIMITS = {
-  /** One-way seconds at or below which a full-duplex Earth session is used [SRC-090]. */
+  /** One-way seconds at or below which a full-duplex Earth session is used [SRC-100]. */
   liveMaxOneWaySec: 0.4,
   /** One-way seconds at or below which turn-by-turn Earth cloud calls are used. */
   relayMaxOneWaySec: 5,

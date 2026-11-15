@@ -113,6 +113,14 @@ export const BODY_ZONES: Record<BodyZoneId, BodyZoneMetadata> = {
     nasaHazardFocus:
       'Unloaded osteoclastic bone mineral loss (~1–1.5%/mo in 0g), intervertebral disc expansion, and EVA suit strain.',
   },
+  metabolic: {
+    id: 'metabolic',
+    name: 'Metabolic & Nutrition',
+    shortLabel: 'METAB / NUTR',
+    anatomicalSubtitle: 'Hepatic Core, Pancreatic Islets & Glycemic Balance',
+    nasaHazardFocus:
+      'Spaceflight insulin resistance, altered energy expenditure, hepatic lipid shifts, and closed-loop nutritional adequacy.',
+  },
   immune: {
     id: 'immune',
     name: 'Immune, Radiation & Dermal',
@@ -135,6 +143,7 @@ export const ZONE_ORDER: BodyZoneId[] = [
   'neuro',
   'cardio',
   'musculo',
+  'metabolic',
   'immune',
   'behavioral',
 ];
@@ -297,17 +306,6 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
           history: build30DaySeries(22.5, 24.2, 1, 1.1),
         },
         {
-          metricId: 'blood_glucose',
-          label: 'Blood Glucose',
-          unit: 'mg/dL',
-          currentValue: 92,
-          deltaFromBaseline: 'Euglycemic Post-ARED',
-          flightNormLabel: '0g Norm: 70–110 mg/dL',
-          plainDescription:
-            'Fasting blood glucose concentration. Tracks metabolic insulin sensitivity in unloaded muscle.',
-          history: build30DaySeries(89, 92, 0, 1.5),
-        },
-        {
           metricId: 'caloric_intake',
           label: 'Daily Caloric Intake',
           unit: 'kcal/day',
@@ -317,6 +315,19 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
           plainDescription:
             'Total daily dietary energy intake. Sustains lean muscle mass and offsets ARED exercise expenditure.',
           history: build30DaySeries(2620, 2680, 0, 80),
+        },
+      ],
+      metabolic: [
+        {
+          metricId: 'blood_glucose',
+          label: 'Blood Glucose',
+          unit: 'mg/dL',
+          currentValue: 92,
+          deltaFromBaseline: 'Euglycemic Post-ARED',
+          flightNormLabel: '0g Norm: 70–110 mg/dL',
+          plainDescription:
+            'Fasting blood glucose concentration. Tracks metabolic insulin sensitivity in unloaded muscle.',
+          history: build30DaySeries(89, 92, 0, 1.5),
         },
       ],
       immune: [
@@ -398,6 +409,238 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
           plainDescription:
             'Standardized psychological self-assessment index of mood, morale, and cognitive stress.',
           history: build30DaySeries(8.1, 8.5, 1, 0.2),
+        },
+      ],
+    },
+  },
+
+  unexplained_fatigue: {
+    id: 'unexplained_fatigue',
+    label: 'Cdr. Vance — Unexplained Fatigue',
+    shortTag: 'FATIGUE WORKUP',
+    description:
+      'Subtle multi-system drift during 0g transit: HRV drop, fasting glucose 118 mg/dL, Node 2 CO₂ 4.4 mmHg, slower PVT reaction latency, vocal stress jitter, and early SANS (ONSD 5.8 mm).',
+    recommendedFocusZone: 'neuro',
+    zones: {
+      neuro: [
+        {
+          metricId: 'onsd',
+          label: 'Optic Nerve Sheath Diam.',
+          unit: 'mm',
+          currentValue: 5.8,
+          deltaFromBaseline: '+1.0 mm vs Pre-Flight (Early SANS)',
+          flightNormLabel: '0g Norm: 4.5–5.5 mm',
+          plainDescription:
+            'Early optic nerve sheath distension (5.8 mm) indicating incipient cephalad fluid pressure before Grade II papilledema.',
+          history: build30DaySeries(4.85, 5.8, 2, 0.06),
+        },
+        {
+          metricId: 'iop',
+          label: 'Intraocular Pressure',
+          unit: 'mmHg',
+          currentValue: 18.8,
+          deltaFromBaseline: '+4.8 mmHg vs Pre-Flight',
+          flightNormLabel: '0g Norm: 11–18 mmHg',
+          plainDescription:
+            'Borderline elevated intraocular pressure measured via handheld tonometer.',
+          history: build30DaySeries(14.5, 18.8, 1, 0.35),
+        },
+        {
+          metricId: 'cabin_co2',
+          label: 'Inspired ppCO₂ (Node 2)',
+          unit: 'mmHg',
+          currentValue: 4.4,
+          deltaFromBaseline: '+2.0 mmHg Above Nominal',
+          flightNormLabel: '0g Norm: 1.5–3.5 mmHg',
+          plainDescription:
+            'Elevated Node 2 ambient CO₂ partial pressure driving mild cerebral vasodilation and nocturnal fatigue.',
+          history: build30DaySeries(2.5, 4.4, 2, 0.14),
+        },
+      ],
+      cardio: [
+        {
+          metricId: 'resting_hr',
+          label: 'Resting Heart Rate',
+          unit: 'bpm',
+          currentValue: 74,
+          deltaFromBaseline: '+13 bpm vs Pre-Flight',
+          flightNormLabel: '0g Norm: 52–74 bpm',
+          plainDescription:
+            'Subtle resting heart rate elevation reflecting autonomic strain.',
+          history: build30DaySeries(61, 74, 0, 1.8),
+        },
+        {
+          metricId: 'hrv_rmssd',
+          label: 'Heart Rate Variability',
+          unit: 'ms',
+          currentValue: 36,
+          deltaFromBaseline: '-22 ms vs 30d Avg',
+          flightNormLabel: '0g Norm: 42–85 ms',
+          plainDescription:
+            'Vagal recovery index drifting downward over 10 days alongside sleep fragmentation.',
+          history: build30DaySeries(58, 36, 0, 2.2),
+        },
+        {
+          metricId: 'spo2',
+          label: 'Arterial SpO₂',
+          unit: '%',
+          currentValue: 97.6,
+          deltaFromBaseline: 'Normoxic (Rules Out Hypoxia)',
+          flightNormLabel: '0g Norm: 96–100 %',
+          plainDescription:
+            'Normal arterial oxygenation, ruling out simple cabin hypoxia as the cause of fatigue.',
+          history: build30DaySeries(98.2, 97.6, 1, 0.25),
+        },
+        {
+          metricId: 'systolic_bp',
+          label: 'Systolic Blood Pressure',
+          unit: 'mmHg',
+          currentValue: 128,
+          deltaFromBaseline: '+8 mmHg Cephalad Drift',
+          flightNormLabel: '0g Norm: 100–130 mmHg',
+          plainDescription:
+            'Upper-normal brachial systolic pressure consistent with cephalad fluid shift.',
+          history: build30DaySeries(119, 128, 0, 1.5),
+        },
+        {
+          metricId: 'hydration_intake',
+          label: 'Daily Hydration Intake',
+          unit: 'L/day',
+          currentValue: 2.4,
+          deltaFromBaseline: '-0.4 L vs Baseline',
+          flightNormLabel: '0g Norm: 2.5–3.8 L/day',
+          plainDescription:
+            'Slightly reduced daily potable water intake.',
+          history: build30DaySeries(2.8, 2.4, 1, 0.15),
+        },
+      ],
+      musculo: [
+        {
+          metricId: 'bmd_delta',
+          label: 'Femoral BMD Monthly Δ',
+          unit: '%',
+          currentValue: -0.45,
+          deltaFromBaseline: 'Expected 0g Unloading',
+          flightNormLabel: '0g Norm: -0.8–0.2 %',
+          plainDescription:
+            'Estimated monthly change in hip bone mineral density.',
+          history: build30DaySeries(-0.25, -0.45, 2, 0.04),
+        },
+        {
+          metricId: 'ared_load',
+          label: 'Daily ARED Resistance Load',
+          unit: 'kN·reps',
+          currentValue: 21.0,
+          deltaFromBaseline: '88% Target (Fatigue-Limited)',
+          flightNormLabel: '0g Norm: 18–30 kN·reps',
+          plainDescription:
+            'Slightly reduced resistive exercise impulse due to reported fatigue.',
+          history: build30DaySeries(24.0, 21.0, 1, 1.2),
+        },
+        {
+          metricId: 'caloric_intake',
+          label: 'Daily Caloric Intake',
+          unit: 'kcal/day',
+          currentValue: 2350,
+          deltaFromBaseline: '88% EER Target',
+          flightNormLabel: '0g Norm: 2200–3200 kcal/day',
+          plainDescription:
+            'Total daily dietary energy intake.',
+          history: build30DaySeries(2620, 2350, 0, 90),
+        },
+      ],
+      metabolic: [
+        {
+          metricId: 'blood_glucose',
+          label: 'Blood Glucose',
+          unit: 'mg/dL',
+          currentValue: 118,
+          deltaFromBaseline: '+26 mg/dL Fasting Drift',
+          flightNormLabel: '0g Norm: 70–110 mg/dL',
+          plainDescription:
+            'Fasting blood glucose elevated to 118 mg/dL — consistent with spaceflight stress and autonomic drift.',
+          history: build30DaySeries(92, 118, 0, 2.1),
+        },
+      ],
+      immune: [
+        {
+          metricId: 'rad_dose',
+          label: '24h Radiation Dose Rate',
+          unit: 'mSv/d',
+          currentValue: 0.72,
+          deltaFromBaseline: 'Quiet GCR Baseline',
+          flightNormLabel: '0g Norm: 0.4–1.2 mSv/d',
+          plainDescription:
+            'Personal active dosimeter reading in deep-space transit.',
+          history: build30DaySeries(0.68, 0.72, 2, 0.04),
+        },
+        {
+          metricId: 'wbc_lymph',
+          label: 'Lymphocyte Count',
+          unit: 'k/µL',
+          currentValue: 2.15,
+          deltaFromBaseline: 'Immune Panel Stable',
+          flightNormLabel: '0g Norm: 1.5–3.5 k/µL',
+          plainDescription:
+            'Point-of-care lymphocyte concentration.',
+          history: build30DaySeries(2.35, 2.15, 2, 0.07),
+        },
+        {
+          metricId: 'core_temp',
+          label: 'Core Body Temperature',
+          unit: '°C',
+          currentValue: 37.2,
+          deltaFromBaseline: 'Normothermic',
+          flightNormLabel: '0g Norm: 36.5–37.5 °C',
+          plainDescription:
+            'Deep core body temperature.',
+          history: build30DaySeries(37.0, 37.2, 1, 0.06),
+        },
+      ],
+      behavioral: [
+        {
+          metricId: 'sleep_eff',
+          label: 'Circadian Sleep Efficiency',
+          unit: '%',
+          currentValue: 74.0,
+          deltaFromBaseline: '-14.5% Fragmented Sleep',
+          flightNormLabel: '0g Norm: 82–96 %',
+          plainDescription:
+            'Reduced sleep efficiency linked to elevated Node 2 CO₂ and retro-orbital discomfort.',
+          history: build30DaySeries(88.0, 74.0, 1, 1.8),
+        },
+        {
+          metricId: 'pvt_lapses',
+          label: 'Psychomotor Vigilance Lapses',
+          unit: 'lapses',
+          currentValue: 4,
+          deltaFromBaseline: 'Reaction Latency 398 ms (+156 ms)',
+          flightNormLabel: '0g Norm: 0–2 lapses',
+          plainDescription:
+            'Slower reaction time and 4 vigilance lapses (>355 ms) on PVT-B concentration testing.',
+          history: build30DaySeries(1, 4, 0, 0.5),
+        },
+        {
+          metricId: 'daily_sleep_hours',
+          label: 'Daily Sleep Duration',
+          unit: 'hours',
+          currentValue: 6.1,
+          deltaFromBaseline: '-1.3h vs Baseline',
+          flightNormLabel: '0g Norm: 7.0–9.0 hours',
+          plainDescription:
+            'Consolidated sleep duration logged via actigraphy.',
+          history: build30DaySeries(7.4, 6.1, 1, 0.25),
+        },
+        {
+          metricId: 'mood_index',
+          label: 'Behavioral Mood Index',
+          unit: '/10',
+          currentValue: 6.4,
+          deltaFromBaseline: 'Fatigue & Near-Blur Reported',
+          flightNormLabel: '0g Norm: 7.0–10.0 /10',
+          plainDescription:
+            'Self-reported mood and cognitive fatigue score.',
+          history: build30DaySeries(8.4, 6.4, 1, 0.25),
         },
       ],
     },
@@ -524,17 +767,6 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
           history: build30DaySeries(24.0, 21.0, 1, 0.8),
         },
         {
-          metricId: 'blood_glucose',
-          label: 'Blood Glucose',
-          unit: 'mg/dL',
-          currentValue: 96,
-          deltaFromBaseline: 'Fasting Glucose Stable',
-          flightNormLabel: '0g Norm: 70–110 mg/dL',
-          plainDescription:
-            'Metabolic glucose levels within spaceflight expectations.',
-          history: build30DaySeries(90, 96, 0, 1.4),
-        },
-        {
           metricId: 'caloric_intake',
           label: 'Daily Caloric Intake',
           unit: 'kcal/day',
@@ -544,6 +776,19 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
           plainDescription:
             'Caloric intake adequate; monitor for cranial-discomfort-related appetite suppression.',
           history: build30DaySeries(2600, 2450, 0, 75),
+        },
+      ],
+      metabolic: [
+        {
+          metricId: 'blood_glucose',
+          label: 'Blood Glucose',
+          unit: 'mg/dL',
+          currentValue: 96,
+          deltaFromBaseline: 'Fasting Glucose Stable',
+          flightNormLabel: '0g Norm: 70–110 mg/dL',
+          plainDescription:
+            'Metabolic glucose levels within spaceflight expectations.',
+          history: build30DaySeries(90, 96, 0, 1.4),
         },
       ],
       immune: [
@@ -745,17 +990,6 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
           history: build30DaySeries(24.0, 14.5, 1, 1.0, 22),
         },
         {
-          metricId: 'blood_glucose',
-          label: 'Blood Glucose',
-          unit: 'mg/dL',
-          currentValue: 104,
-          deltaFromBaseline: 'Mild Sympathetic Glycemia',
-          flightNormLabel: '0g Norm: 70–110 mg/dL',
-          plainDescription:
-            'Slight elevation in fasting glucose secondary to systemic hypercapnic stress response.',
-          history: build30DaySeries(90, 104, 0, 1.3, 22),
-        },
-        {
           metricId: 'caloric_intake',
           label: 'Daily Caloric Intake',
           unit: 'kcal/day',
@@ -765,6 +999,19 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
           plainDescription:
             'Sub-target caloric intake caused by hypercapnic nausea and fatigue; risks lean mass catabolism.',
           history: build30DaySeries(2650, 2050, 0, 85, 22),
+        },
+      ],
+      metabolic: [
+        {
+          metricId: 'blood_glucose',
+          label: 'Blood Glucose',
+          unit: 'mg/dL',
+          currentValue: 104,
+          deltaFromBaseline: 'Mild Sympathetic Glycemia',
+          flightNormLabel: '0g Norm: 70–110 mg/dL',
+          plainDescription:
+            'Slight elevation in fasting glucose secondary to systemic hypercapnic stress response.',
+          history: build30DaySeries(90, 104, 0, 1.3, 22),
         },
       ],
       immune: [
@@ -1004,17 +1251,6 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
           history: build30DaySeries(24.0, 13.2, 1, 1.2, 24),
         },
         {
-          metricId: 'blood_glucose',
-          label: 'Blood Glucose',
-          unit: 'mg/dL',
-          currentValue: 102,
-          deltaFromBaseline: 'Stress Counter-Regulatory Glycemia',
-          flightNormLabel: '0g Norm: 70–110 mg/dL',
-          plainDescription:
-            'Mild metabolic counter-regulatory hormone release during emergency shelter protocol.',
-          history: build30DaySeries(91, 102, 0, 1.2, 24),
-        },
-        {
           metricId: 'caloric_intake',
           label: 'Daily Caloric Intake',
           unit: 'kcal/day',
@@ -1024,6 +1260,19 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
           plainDescription:
             'Reduced caloric intake in radiation storm shelter; supplement with compact high-protein meal bars.',
           history: build30DaySeries(2640, 2100, 0, 80, 24),
+        },
+      ],
+      metabolic: [
+        {
+          metricId: 'blood_glucose',
+          label: 'Blood Glucose',
+          unit: 'mg/dL',
+          currentValue: 102,
+          deltaFromBaseline: 'Stress Counter-Regulatory Glycemia',
+          flightNormLabel: '0g Norm: 70–110 mg/dL',
+          plainDescription:
+            'Mild metabolic counter-regulatory hormone release during emergency shelter protocol.',
+          history: build30DaySeries(91, 102, 0, 1.2, 24),
         },
       ],
       behavioral: [
@@ -1135,6 +1384,7 @@ export function getCrewAdjustedZones(
     neuro: baseZones.neuro.map(adjustReading),
     cardio: baseZones.cardio.map(adjustReading),
     musculo: baseZones.musculo.map(adjustReading),
+    metabolic: baseZones.metabolic.map(adjustReading),
     immune: baseZones.immune.map(adjustReading),
     behavioral: baseZones.behavioral.map(adjustReading),
   };
@@ -1180,6 +1430,53 @@ export function getOfflineFlightSurgeonGuidance(
   };
 
   // Specific crisis guidance overrides
+  if (
+    scenarioId === 'unexplained_fatigue' &&
+    (zoneId === 'neuro' || zoneId === 'cardio' || zoneId === 'metabolic' || zoneId === 'behavioral')
+  ) {
+    return {
+      zoneId,
+      environment,
+      scenarioId,
+      triageStatus,
+      headline: 'EARLY SANS & NODE 2 CO₂ WORKUP: ONSD 5.8 mm · ppCO₂ 4.4 mmHg',
+      hazardContextSummary: `${envContextMap[environment]} Multi-system drift (HRV 36 ms, fasting glucose 118 mg/dL, vocal pitch jitter stress marker, PVT latency 398 ms) converges on early optic nerve sheath swelling (5.8 mm) amplified by Node 2 ppCO₂ (4.4 mmHg).`,
+      plainLanguageExplanation:
+        'What initially looked like simple fatigue is actually early Spaceflight-Associated Neuro-ocular Syndrome (ONSD 5.8 mm) compounded by elevated Node 2 CO₂ (4.4 mmHg), vocal stress jitter, slower PVT reaction latency, and a fasting glucose drift to 118 mg/dL.',
+      earthConsultUrgency: 'priority_packet',
+      guidedSteps: [
+        {
+          id: 'fatigue-1',
+          stepNumber: 1,
+          title: 'Apply LBNP Countermeasure Cuff (-25 mmHg)',
+          plainInstruction:
+            'Don the Lower Body Negative Pressure (LBNP) garment at -25 mmHg for 45 minutes to shift cephalad venous fluid back toward the lower extremities.',
+          hardwareRequired: 'LBNP Countermeasure Cuff / Chibis',
+          estimatedMinutes: 45,
+        },
+        {
+          id: 'fatigue-2',
+          stepNumber: 2,
+          title: 'Inspect Node 2 CO₂ Scrubber & Sleeping Rack Airflow',
+          plainInstruction:
+            'Inspect the Node 2 CO₂ scrubber bed and verify sleeping-rack ventilation fan alignment to reduce local ppCO₂ from 4.4 mmHg below 3.0 mmHg.',
+          hardwareRequired: 'Node 2 CDRA Scrubber & Airflow Meter',
+          estimatedMinutes: 12,
+        },
+        {
+          id: 'fatigue-3',
+          stepNumber: 3,
+          title: 'Queue Earth Telemetry Packet (Store-and-Forward)',
+          plainInstruction:
+            'Bundle the 5.8 mm ocular ultrasound, PVT reaction drift, vocal stress markers, and CGM curve into an Earth Flight Surgeon packet.',
+          hardwareRequired: 'ARGUS Telemetry Downlink Queue',
+          estimatedMinutes: 5,
+        },
+      ],
+      source: 'offline_verified_cache',
+    };
+  }
+
   if (scenarioId === 'sans_alert' && zoneId === 'neuro') {
     return {
       zoneId,
@@ -1418,6 +1715,36 @@ export function getOfflineFlightSurgeonGuidance(
           plainInstruction:
             'If daily caloric intake drops below 2200 kcal/day (2400 kcal/day on EVA days), add a high-protein spaceflight meal bar and rehydrated entrée to prevent muscle catabolism.',
           hardwareRequired: 'Galley Food Warmer + Crew Nutrition Log',
+          estimatedMinutes: 10,
+        },
+      ],
+    },
+    metabolic: {
+      headline:
+        triageStatus === 'green'
+          ? 'Glycemic & Metabolic Balance Nominal'
+          : 'Glycemic Excursion Detected — Metabolic Countermeasure Protocol',
+      hazardContextSummary: `${envContextMap[environment]} Microgravity muscle unloading and altered circadian meal timing can induce subclinical insulin resistance and glycemic variability.`,
+      plainLanguageExplanation:
+        'Your Continuous Glucose Monitor (CGM) tracks how your body processes fuel in space. Keep blood glucose steady with balanced protein-fiber meals and post-meal resistive or aerobic activity.',
+      earthConsultUrgency: triageStatus === 'green' ? 'routine_downlink' : 'priority_packet',
+      guidedSteps: [
+        {
+          id: 'met-def-1',
+          stepNumber: 1,
+          title: 'Verify CGM Patch & Finger-Prick Glucometer Calibration',
+          plainInstruction:
+            'Confirm CGM interstitial glucose trend arrow and perform a backup capillary finger-prick check if readings are < 70 or > 140 mg/dL.',
+          hardwareRequired: 'CGM Patch + Capillary Glucometer',
+          estimatedMinutes: 4,
+        },
+        {
+          id: 'met-def-2',
+          stepNumber: 2,
+          title: 'Post-Meal Glycemic Stabilization & Hydration',
+          plainInstruction:
+            'Pair complex carbohydrates with lean protein and 300 mL water; avoid isolated simple-sugar boluses outside EVA recovery.',
+          hardwareRequired: 'Galley Nutrition Pack + Potable Water Dispenser',
           estimatedMinutes: 10,
         },
       ],

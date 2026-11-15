@@ -1,5 +1,5 @@
 /**
- * Gemini prebuilt TTS voices and their style notes [SRC-096]. The same names work for the
+ * Gemini prebuilt TTS voices and their style notes [SRC-106]. The same names work for the
  * Gemini Live session and the `/api/ai/tts` route.
  */
 

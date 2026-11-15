@@ -261,3 +261,31 @@ describe('countermeasure card matches the reply', () => {
     expect(cards).toEqual(['box_breathing']);
   });
 });
+
+describe('knowledge retrieval for the conversation', () => {
+  it('finds protocols for clinical questions and nothing for feelings', async () => {
+    const { retrieveForTurn } = await import('../routes/converse');
+    const clinical = await retrieveForTurn('CO2 is high and I have a headache, what should I do?', undefined, null);
+    expect(clinical.length).toBeGreaterThan(0);
+    expect(clinical.every((h) => h.keywordRank !== null)).toBe(true);
+    const feelings = await retrieveForTurn('I miss my family', undefined, null);
+    expect(feelings).toEqual([]);
+  });
+
+  it('always looks up the running emergency protocol', async () => {
+    const { retrieveForTurn } = await import('../routes/converse');
+    const hits = await retrieveForTurn('done', 'Fire or smoke emergency', null);
+    expect(hits.length).toBeGreaterThan(0);
+  });
+
+  it('sends verified sources in meta for a clinical question', async () => {
+    const res = await app.request('/api/ai/converse', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scenarioId: 'nominal', crewMember, modality: 'text', messages: [{ role: 'user', content: 'My eyes feel blurry, could this be SANS?' }] }),
+    });
+    const events = (await res.text()).split('\n').filter((l) => l.startsWith('data:')).map((l) => JSON.parse(l.slice(5)) as ConverseEvent);
+    const meta = events.find((e) => e.type === 'meta') as Extract<ConverseEvent, { type: 'meta' }>;
+    expect(meta.ragHits?.length).toBeGreaterThan(0);
+  });
+});

@@ -1,6 +1,6 @@
 /**
  * On-ship speech (specs/04-ai-backend.md §4.2): a local OpenAI-compatible speech server
- * (Speaches: faster-whisper for STT, Kokoro for TTS) [SRC-095]. Used for the `autonomous`
+ * (Speaches: faster-whisper for STT, Kokoro for TTS) [SRC-105]. Used for the `autonomous`
  * comm tier and as the fallback when Earth speech services cannot be reached.
  *
  * Off unless `AI_LOCAL_SPEECH_BASE_URL` is set, so machines without the stack never wait

@@ -22,7 +22,7 @@ export interface FaceSample {
   /** Milliseconds (monotonic). */
   t: number;
   facePresent: boolean;
-  /** Eye aspect ratio, mean of both eyes [SRC-097]. Open ≈ 0.3, closed < 0.2. */
+  /** Eye aspect ratio, mean of both eyes [SRC-107]. Open ≈ 0.3, closed < 0.2. */
   ear?: number;
   /** Mouth aspect ratio: inner-lip opening / mouth width. */
   mar?: number;
@@ -33,7 +33,7 @@ export interface FaceSample {
   cx?: number;
   cy?: number;
   size?: number;
-  /** Emotion probabilities from the expression classifier [SRC-092]. */
+  /** Emotion probabilities from the expression classifier [SRC-102]. */
   expressions?: Partial<Record<EmotionLabel, number>>;
   /** Mean green value of the forehead region (0–255), for the pulse estimate. */
   green?: number;
@@ -42,10 +42,10 @@ export interface FaceSample {
 export const SIGNAL_LIMITS = {
   /** Eyes count as closed below this share of the person's own open-eye EAR. */
   closedEarRatio: 0.62,
-  /** PERCLOS above these shares = moderate / high drowsiness signs [SRC-091]. */
+  /** PERCLOS above these shares = moderate / high drowsiness signs [SRC-101]. */
   perclosModerate: 0.08,
   perclosHigh: 0.15,
-  /** Resting blink rate is roughly 12–20/min; well above suggests strain or dry eyes [SRC-098]. */
+  /** Resting blink rate is roughly 12–20/min; well above suggests strain or dry eyes [SRC-108]. */
   blinkRateHigh: 30,
   /** Mouth open this wide for this long counts as a yawn. */
   yawnMar: 0.55,
@@ -54,7 +54,7 @@ export const SIGNAL_LIMITS = {
   yawnsHigh: 2,
   /** Longest eye closure still counted as a blink rather than a doze. */
   blinkMaxMs: 500,
-  /** Pulse band, Hz (42–180 bpm) [SRC-093]. */
+  /** Pulse band, Hz (42–180 bpm) [SRC-103]. */
   pulseMinHz: 0.7,
   pulseMaxHz: 3,
   pulseMinWindowSec: 10,
@@ -171,7 +171,7 @@ export interface PulseEstimate {
 }
 
 /**
- * Estimates pulse from the forehead's green-channel brightness [SRC-093]: skin gets
+ * Estimates pulse from the forehead's green-channel brightness [SRC-103]: skin gets
  * very slightly darker in green with each heartbeat. Resamples to a fixed rate,
  * detrends, and takes the strongest frequency in the pulse band.
  */

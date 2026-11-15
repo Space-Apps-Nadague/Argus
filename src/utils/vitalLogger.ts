@@ -25,7 +25,7 @@ export interface CoreVitalShortcut {
  */
 export const CORE_VITAL_SHORTCUTS: readonly CoreVitalShortcut[] = [
   { metricId: 'systolic_bp', zoneId: 'cardio', shortLabel: 'Blood Pressure' },
-  { metricId: 'blood_glucose', zoneId: 'musculo', shortLabel: 'Blood Sugar' },
+  { metricId: 'blood_glucose', zoneId: 'metabolic', shortLabel: 'Blood Sugar' },
   { metricId: 'core_temp', zoneId: 'immune', shortLabel: 'Body Temp' },
   { metricId: 'daily_sleep_hours', zoneId: 'behavioral', shortLabel: 'Sleep Hours' },
   { metricId: 'mood_index', zoneId: 'behavioral', shortLabel: 'Mood' },

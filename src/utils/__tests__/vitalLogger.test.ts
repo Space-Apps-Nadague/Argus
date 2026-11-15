@@ -94,7 +94,7 @@ describe('vitalLogger', () => {
     const updated = applyCheckIns(baseZones, [entry]);
 
     const sbp = updated.cardio.find((r) => r.metricId === 'systolic_bp');
-    const bg = updated.musculo.find((r) => r.metricId === 'blood_glucose');
+    const bg = updated.metabolic.find((r) => r.metricId === 'blood_glucose');
     const temp = updated.immune.find((r) => r.metricId === 'core_temp');
     const sleep = updated.behavioral.find((r) => r.metricId === 'daily_sleep_hours');
     const mood = updated.behavioral.find((r) => r.metricId === 'mood_index');

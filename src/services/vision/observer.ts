@@ -3,7 +3,7 @@
  *
  * Every ~200 ms it reads the crew member's face with face-api (TensorFlow.js, in the
  * browser): 68 landmarks for eyes, mouth and head pose, the expression classifier for
- * emotion [SRC-092], and the forehead's green brightness for a pulse estimate [SRC-093].
+ * emotion [SRC-102], and the forehead's green brightness for a pulse estimate [SRC-103].
  * Samples stay in memory for one minute; only the rolled-up `VisualObservation` and,
  * per the comm tier, a downscaled JPEG frame are ever sent to the assistant.
  */

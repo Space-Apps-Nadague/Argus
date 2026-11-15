@@ -9,7 +9,7 @@ const text = (max = 2000) => z.string().max(max);
 const num = () => z.coerce.number().refine(Number.isFinite, 'must be a finite number');
 
 export const ScenarioIdSchema = z.enum(['nominal', 'sans_alert', 'high_co2', 'solar_storm']);
-export const ZoneIdSchema = z.enum(['neuro', 'cardio', 'musculo', 'immune', 'behavioral']);
+export const ZoneIdSchema = z.enum(['neuro', 'cardio', 'musculo', 'metabolic', 'immune', 'behavioral']);
 export const EnvironmentSchema = z.enum(['0g_transit', 'iss_leo', 'lunar_base', 'mars_base', 'earth_1g']);
 export const TriageStatusSchema = z.enum(['green', 'yellow', 'red']);
 export const UrgencySchema = z.enum(['routine_downlink', 'priority_packet', 'immediate_emergency_packet']);
@@ -133,7 +133,7 @@ export const VoiceTtsRequestSchema = z.object({
 });
 
 export const VoiceToolCallRequestSchema = CrewContextSchema.extend({
-  toolName: z.enum(['get_crew_snapshot', 'log_checkin_reading']),
+  toolName: z.enum(['get_crew_snapshot', 'log_checkin_reading', 'lookup_medical_protocol']),
   callId: text(120).optional(),
   args: z
     .object({
@@ -141,6 +141,7 @@ export const VoiceToolCallRequestSchema = CrewContextSchema.extend({
       metricId: text(80).optional(),
       value: num().optional(),
       note: text(1000).optional(),
+      query: text(1000).optional(),
     })
     .optional(),
 });

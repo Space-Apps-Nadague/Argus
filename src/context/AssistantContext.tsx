@@ -897,7 +897,10 @@ export const AssistantProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         if (controller.signal.aborted) return;
         switch (e.type) {
           case 'meta':
-            setMessages((prev) => prev.map((m) => (m.id === replyId ? { ...m, meta: e.meta, tier: e.tier, crisis: e.crisis } : m)));
+            setMessages((prev) => prev.map((m) => (m.id === replyId ? { ...m, meta: e.meta, tier: e.tier, crisis: e.crisis, sources: e.ragHits?.length ? e.ragHits : m.sources } : m)));
+            break;
+          case 'sources':
+            setMessages((prev) => prev.map((m) => (m.id === replyId ? { ...m, sources: [...(m.sources ?? []), ...e.ragHits] } : m)));
             break;
           case 'action':
             applyAction(e.action, replyId);
@@ -1132,6 +1135,10 @@ export const AssistantProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           if (r.action) {
             liveTurnActions.current.push(r.action);
             applyAction(r.action, ensureReply());
+          }
+          if (r.ragHits?.length) {
+            const id = ensureReply();
+            setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, sources: [...(m.sources ?? []), ...r.ragHits!] } : m)));
           }
           return r.result;
         },

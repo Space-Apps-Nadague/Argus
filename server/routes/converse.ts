@@ -35,6 +35,10 @@ import { pickCountermeasure } from '../../shared/countermeasures';
 import { combineAssessment, shouldAutoReport, urgencyForConcern } from '../../shared/mentalState';
 import { detectRedFlags } from '../../shared/redFlags';
 import { ASSISTANT_TOOLS, runAssistantTool, type ToolContext } from '../ai/assistantTools';
+import { logCitations } from '../rag/citations';
+import { searchKnowledge } from '../rag/retriever';
+import { formatKnowledgeForPrompt, LOOKUP_MEDICAL_PROTOCOL, lookupMedicalProtocol } from '../rag/tool';
+import type { RagHit } from '../../src/types/aiApi';
 import { type ChatMessage, completeJson, providerChainFor, streamChat } from '../ai/llm';
 import type { AppEnv } from '../auth/types';
 import { getOrStartConversation, latestTriageEventId, logMessage } from '../db/chatLog';
@@ -58,6 +62,15 @@ import {
 } from './voice';
 
 export const converseRoutes = new Hono<AppEnv>();
+
+const EMERGENCY_TITLES: Record<string, string> = {
+  fire: 'Fire or smoke emergency',
+  depress: 'Rapid depressurisation emergency',
+  toxic: 'Toxic atmosphere ammonia leak emergency',
+  medical: 'Crew medical emergency',
+  radiation: 'Solar particle event radiation emergency',
+  co2: 'High CO2 hypercapnia emergency',
+};
 
 /** Tier the server will actually use: distance from the location, moved only toward autonomy. */
 export function tierForRequest(req: Pick<ConverseRequest, 'locationId' | 'tierOverride'>, now = new Date()): { tier: CommTier; oneWaySec: number } {
@@ -205,6 +218,31 @@ function chunkText(text: string, size = 28): string[] {
   return out;
 }
 
+/**
+ * Verified protocol chunks for this turn (spec 04 §4.5). Only keyword-matched chunks are kept,
+ * so a conversation about feelings is not given (or shown) unrelated clinical references.
+ * During an emergency the protocol itself is always looked up.
+ */
+export async function retrieveForTurn(lastUser: string, protocolTitle: string | undefined, db: Parameters<typeof searchKnowledge>[0]['db']): Promise<RagHit[]> {
+  const queries = [protocolTitle, lastUser].filter((q): q is string => Boolean(q && q.trim().length >= 4));
+  const seen = new Set<string>();
+  const out: RagHit[] = [];
+  for (const query of queries) {
+    try {
+      const { hits } = await searchKnowledge({ query, limit: 3, db });
+      for (const h of hits) {
+        const key = h.chunkId ?? `${h.documentId}#${h.heading}`;
+        if (h.keywordRank === null || seen.has(key)) continue;
+        seen.add(key);
+        out.push(h);
+      }
+    } catch (err) {
+      console.warn('[ARGUS converse] knowledge lookup failed:', (err as Error).message);
+    }
+  }
+  return out.slice(0, 3);
+}
+
 converseRoutes.post('/converse', async (c) => {
   const body = await parseBody(c, ConverseRequestSchema);
   if (!body.ok) return body.response;
@@ -244,6 +282,9 @@ converseRoutes.post('/converse', async (c) => {
       : null;
   const startedProtocol = fast.find((a) => a.type === 'start_emergency_protocol');
 
+  const db = c.get('db');
+  const ragHits = await retrieveForTurn(lastUser, req.activeProtocol?.title ?? (startedProtocol ? EMERGENCY_TITLES[startedProtocol.protocolId] : undefined), db);
+
   const useVision = Boolean(req.frame) && providerChainFor({ feature: 'chat', keyOverride, tier, vision: true }).length > 0;
   const toolsAvailable = providerChainFor({ feature: 'chat', keyOverride, tier, vision: useVision }).length > 0;
 
@@ -270,6 +311,7 @@ converseRoutes.post('/converse', async (c) => {
     crisis: flags.crisis,
     redFlag: Boolean(startedProtocol),
     toolsAvailable,
+    knowledge: ragHits.length ? formatKnowledgeForPrompt(ragHits) : undefined,
   });
 
   const history = req.messages.slice(-profile.historyTurns);
@@ -289,7 +331,6 @@ converseRoutes.post('/converse', async (c) => {
     } else messages.push({ role: 'user', content: m.content });
   });
 
-  const db = c.get('db');
   const user = c.get('user');
   const astronautId = req.crewMember?.id;
   let conversationId: string | null = null;
@@ -321,7 +362,7 @@ converseRoutes.post('/converse', async (c) => {
     const sendMeta = async (meta: Extract<ConverseEvent, { type: 'meta' }>['meta']) => {
       if (metaSent) return;
       metaSent = true;
-      await send({ type: 'meta', meta, tier, crisis: flags.crisis, redFlag: flags.flagged, earthConsultUrgency: urgency });
+      await send({ type: 'meta', meta, tier, crisis: flags.crisis, redFlag: flags.flagged, earthConsultUrgency: urgency, ragHits });
       if (flags.crisis) await send({ type: 'delta', text: `${CRISIS_ESCALATION_MESSAGE}\n\n` });
     };
 
@@ -337,9 +378,18 @@ converseRoutes.post('/converse', async (c) => {
       temperature: emergency ? 0.3 : 0.6,
       maxTokens: emergency ? 400 : 1600,
       tools: ASSISTANT_TOOLS,
-      executeTool: (name, args) => {
-        const outcome = runAssistantTool(name, args, ctx);
-        return outcome.result;
+      executeTool: async (name, args) => {
+        if (name === LOOKUP_MEDICAL_PROTOCOL) {
+          const r = await lookupMedicalProtocol(args, { db, astronautId: req.crewMember?.id ?? null, mode: 'chat' });
+          const fresh = r.hits.filter((h) => !ragHits.some((x) => x.documentId === h.documentId && x.heading === h.heading));
+          if (fresh.length) {
+            ragHits.push(...fresh);
+            await send({ type: 'sources', ragHits: fresh });
+          }
+          const { hits: _hits, ...forModel } = r;
+          return forModel;
+        }
+        return runAssistantTool(name, args, ctx).result;
       },
     })) {
       if (chunk.type === 'start') {
@@ -347,6 +397,7 @@ converseRoutes.post('/converse', async (c) => {
       } else if (chunk.type === 'text') {
         await send({ type: 'delta', text: chunk.text });
       } else if (chunk.type === 'tool_call') {
+        if (chunk.name === LOOKUP_MEDICAL_PROTOCOL) continue;
         const outcome = runAssistantTool(chunk.name, chunk.args, ctx);
         const action = outcome.action;
         // The fast path already did it: do not repeat the same action from the model.
@@ -411,7 +462,7 @@ converseRoutes.post('/converse', async (c) => {
 
     if (db && conversationId && astronautId && replyText) {
       try {
-        await logMessage(db, {
+        const assistantMessageId = await logMessage(db, {
           conversationId,
           role: 'assistant',
           content: replyText,
@@ -432,6 +483,9 @@ converseRoutes.post('/converse', async (c) => {
           triageEventId: await latestTriageEventId(db, astronautId),
           crisisFlag: flags.crisis,
         });
+        if (ragHits.length) {
+          await logCitations(db, { mode: 'chat', query: lastUser, hits: ragHits, astronautId, messageId: assistantMessageId });
+        }
       } catch (err) {
         console.error('[ARGUS converse] could not store reply', err);
       }
@@ -507,6 +561,11 @@ converseRoutes.post('/assistant-tool', async (c) => {
   const body = await parseBody(c, AssistantToolRequestSchema);
   if (!body.ok) return body.response;
   const req = body.data as AssistantToolRequest;
+  if (req.name === LOOKUP_MEDICAL_PROTOCOL) {
+    const r = await lookupMedicalProtocol(req.args, { db: c.get('db'), astronautId: req.crewMember?.id ?? null, mode: 'live-api' });
+    const { hits, ...forModel } = r;
+    return c.json({ result: forModel as unknown as Record<string, unknown>, ragHits: hits } satisfies AssistantToolResponse);
+  }
   const full = { ...req, messages: [], modality: 'voice' } as ConverseRequest;
   const outcome = runAssistantTool(req.name, req.args, toolContext(full, buildCrewSnapshot(req)));
   return c.json({ result: outcome.result, action: outcome.action } satisfies AssistantToolResponse);

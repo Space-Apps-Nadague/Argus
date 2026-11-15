@@ -16,6 +16,7 @@ const reading = (metricId: string, values: number[]): VitalSignReading => ({
 
 const zonesWith = (immune: VitalSignReading[], cardio: VitalSignReading[] = []): Record<BodyZoneId, VitalSignReading[]> => ({
   neuro: [],
+  metabolic: [],
   cardio,
   musculo: [],
   immune,

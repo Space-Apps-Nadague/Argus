@@ -1,7 +1,7 @@
 /**
  * Behavioural-health countermeasures the assistant can put on screen as a "do this now"
  * card (specs/04-ai-backend.md §4.4). Short, doable on a spacecraft, and drawn from the
- * NASA HRP behavioural-health countermeasure themes [SRC-094]: sleep hygiene, exercise,
+ * NASA HRP behavioural-health countermeasure themes [SRC-104]: sleep hygiene, exercise,
  * family contact, crew cohesion, workload management and self-regulation skills.
  */
 

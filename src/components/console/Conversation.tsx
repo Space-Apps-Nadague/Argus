@@ -6,6 +6,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   AudioLines,
+  BookOpen,
   CheckCircle2,
   ClipboardList,
   Earth,
@@ -28,6 +29,7 @@ import { useMission } from '../../context/MissionContext';
 import { COMM_TIER_PROFILES } from '../../../shared/commProfile';
 import { EMERGENCY_PROTOCOLS } from '../../data/emergencyProtocols';
 import type { AssistantAction, AssistantMessage } from '../../types/assistant';
+import type { RagDocKind, RagHit } from '../../types/aiApi';
 
 const URGENCY_WORD = { routine_downlink: 'routine', priority_packet: 'priority', immediate_emergency_packet: 'emergency' } as const;
 
@@ -67,6 +69,48 @@ export function renderLightMarkdown(text: string): React.ReactNode[] {
     part.startsWith('**') && part.endsWith('**') && part.length > 4 ? <strong key={i}>{part.slice(2, -2)}</strong> : part.replace(/^#{1,4}\s+/gm, '')
   );
 }
+
+const RAG_KIND: Record<RagDocKind, string> = {
+  emergency_checklist: 'Checklist',
+  countermeasure: 'Countermeasure',
+  clinical_reference: 'Clinical reference',
+  medication: 'Medication',
+};
+
+/** Verified protocol chunks behind a reply: the full text is always one tap away. */
+const Sources: React.FC<{ sources: RagHit[] }> = ({ sources }) => {
+  const [open, setOpen] = useState<number | null>(null);
+  return (
+    <div className="mt-1.5 max-w-[88%]">
+      <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Verified sources">
+        <span className="flex items-center gap-1 text-[11px] text-hud-muted">
+          <BookOpen className="h-3 w-3" aria-hidden="true" />
+          Sources
+        </span>
+        {sources.map((s, i) => (
+          <button
+            key={`${s.documentId}-${i}`}
+            type="button"
+            aria-expanded={open === i}
+            onClick={() => setOpen(open === i ? null : i)}
+            className={`hud-focus rounded-full border px-2 py-0.5 text-[11px] ${open === i ? 'border-hud-accent text-hud-accent' : 'border-hud-line text-hud-text hover:border-hud-accent/50'}`}
+          >
+            {s.title}
+            {s.sourceId && <span className="ml-1 font-mono text-hud-muted">{s.sourceId}</span>}
+          </button>
+        ))}
+      </div>
+      {open !== null && sources[open] && (
+        <div className="mt-1.5 rounded-lg border border-hud-line bg-hud-bg/70 p-2.5 text-xs">
+          <p className="font-semibold text-hud-text">
+            {sources[open].heading} <span className="font-normal text-hud-muted">· {RAG_KIND[sources[open].kind]} · {sources[open].origin}</span>
+          </p>
+          <p className="mt-1 whitespace-pre-wrap text-hud-muted">{sources[open].content}</p>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const time = (iso: string) => new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 
@@ -117,6 +161,7 @@ const Bubble: React.FC<{ m: AssistantMessage }> = ({ m }) => {
           })}
         </ul>
       ) : null}
+      {m.sources?.length ? <Sources sources={m.sources} /> : null}
       <span className="mt-1 flex items-center gap-1.5 px-1 text-[10px] text-hud-muted">
         {m.modality === 'voice' && <AudioLines className="h-3 w-3" aria-label="Spoken" />}
         {time(m.timestampIso)}

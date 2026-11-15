@@ -6,7 +6,7 @@
 import type { CommTier } from '../../shared/commProfile';
 import type { RedFlagProtocolId } from '../../shared/redFlags';
 import type { BodyZoneId, TriageStatus } from './argus';
-import type { AiResultMeta, CrewContextRequest, EarthConsultUrgency, WellbeingCheckIn } from './aiApi';
+import type { AiResultMeta, CrewContextRequest, EarthConsultUrgency, RagHit, WellbeingCheckIn } from './aiApi';
 
 // ── Conversation ─────────────────────────────────────────────────────────────
 
@@ -30,6 +30,8 @@ export interface AssistantMessage {
   streaming?: boolean;
   /** Earth doctor's name for `role: 'earth'`. */
   author?: string;
+  /** Verified protocol chunks the reply drew on (spec 04 §4.5). */
+  sources?: RagHit[];
 }
 
 // ── Actions ──────────────────────────────────────────────────────────────────
@@ -84,7 +86,7 @@ export type ObservedLevel = 'low' | 'moderate' | 'high';
 export type ObservedAffect = 'neutral' | 'positive' | 'tense' | 'flat' | 'unknown';
 export type ObservedPosture = 'upright' | 'slumped' | 'leaning' | 'unknown';
 
-/** Facial-expression emotion classes recognised on-device [SRC-092]. */
+/** Facial-expression emotion classes recognised on-device [SRC-102]. */
 export type EmotionLabel = 'neutral' | 'happy' | 'sad' | 'angry' | 'fearful' | 'surprised' | 'disgusted';
 
 export const EMOTION_LABELS: EmotionLabel[] = ['neutral', 'happy', 'sad', 'angry', 'fearful', 'surprised', 'disgusted'];
@@ -107,7 +109,7 @@ export interface VisualObservation {
   /** Share of the window with a face in frame, 0–1. */
   presenceRatio: number;
   blinkRatePerMin: number | null;
-  /** Share of time the eyes were ≥ 80 % closed, 0–1 (PERCLOS) [SRC-091]. */
+  /** Share of time the eyes were ≥ 80 % closed, 0–1 (PERCLOS) [SRC-101]. */
   perclos: number | null;
   yawnsPerMin: number | null;
   affect: ObservedAffect;
@@ -117,7 +119,7 @@ export interface VisualObservation {
   posture: ObservedPosture;
   /** Head movement: fidgeting vs still. */
   restlessness: ObservedLevel | null;
-  /** Camera pulse estimate (rPPG). An estimate only: never logged as a vital [SRC-093]. */
+  /** Camera pulse estimate (rPPG). An estimate only: never logged as a vital [SRC-103]. */
   pulseBpmEstimate: number | null;
   pulseConfidence: number | null;
   /** Short plain-language notes shown as overlay chips. */
@@ -200,8 +202,12 @@ export type ConverseEvent =
       crisis: boolean;
       redFlag: boolean;
       earthConsultUrgency: EarthConsultUrgency;
+      /** Verified protocol chunks given to the model this turn. */
+      ragHits?: RagHit[];
     }
   | { type: 'action'; action: AssistantAction }
+  /** More verified protocol chunks, found by a tool call mid-reply. */
+  | { type: 'sources'; ragHits: RagHit[] }
   | { type: 'delta'; text: string }
   /** The spoken/written reply is complete; the assessment may still follow. */
   | { type: 'reply_end' }
@@ -258,6 +264,8 @@ export interface AssistantToolRequest extends Omit<ConverseRequest, 'messages' |
 export interface AssistantToolResponse {
   result: Record<string, unknown>;
   action?: AssistantAction;
+  /** Protocol chunks found by `lookup_medical_protocol`. */
+  ragHits?: RagHit[];
 }
 
 /**

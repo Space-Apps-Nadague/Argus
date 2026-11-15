@@ -17,8 +17,9 @@ import type {
 import { DEFAULT_CREW_ROSTER } from '../../src/data/telemetryScenarios';
 import { createApp } from '../app';
 import { openDb, setDbHandle } from '../db/client';
-import { conversations, messages } from '../db/schema';
+import { conversations, messages, ragCitations } from '../db/schema';
 import { seedDatabase } from '../db/seed';
+import { ingestKnowledge } from '../rag/ingest';
 import { parseSpokenVitalLogCommand, synthesizeOfflineCueWavBase64 } from '../routes/voice';
 
 const AI_ENV_PREFIXES = ['AI_', 'OPENROUTER_', 'GEMINI_', 'GROQ_'];
@@ -60,6 +61,7 @@ describe('Voice & Video AI Flight Surgeon routes', () => {
     expect(body.result.tools.map((t) => t.name)).toEqual([
       'get_crew_snapshot',
       'log_checkin_reading',
+      'lookup_medical_protocol',
     ]);
     expect(body.result.tools.every((t) => t.behavior === 'NON_BLOCKING')).toBe(true);
   });
@@ -226,6 +228,23 @@ describe('Voice & Video AI Flight Surgeon routes', () => {
       value: 68,
       status: 'green',
     });
+
+    const ragToolRes = await post('/api/ai/voice-tool', {
+      scenarioId: 'sans_alert',
+      crewMember,
+      toolName: 'lookup_medical_protocol',
+      callId: 'call-rag-1',
+      args: {
+        query: 'sumatriptan migraine nasal spray dosage',
+        zoneId: 'neuro',
+      },
+    });
+    expect(ragToolRes.status).toBe(200);
+    const ragToolBody = (await ragToolRes.json()) as AiEnvelope<VoiceToolCallResponse>;
+    expect(ragToolBody.result.ok).toBe(true);
+    expect(ragToolBody.result.ragHits?.length).toBeGreaterThan(0);
+    expect(ragToolBody.result.ragHits?.[0].documentId).toBe('reference/spaceflight-med-kit-formulary');
+    expect(ragToolBody.result.ragHits?.[0].sourceId).toBe('SRC-004');
   });
 
   it('parseSpokenVitalLogCommand extracts spoken vital check-in commands', () => {
@@ -249,6 +268,7 @@ describe('Voice & Video AI Flight Surgeon routes', () => {
       adminPassword: 'admin-password-123',
       demoPassword: 'demo-password-123',
     });
+    await ingestKnowledge(h.db);
     setDbHandle(h);
 
     try {
@@ -284,6 +304,12 @@ describe('Voice & Video AI Flight Surgeon routes', () => {
         value: 68,
       });
       expect(turnBody.result.audioBase64).toBeTruthy();
+      expect(turnBody.result.ragHits?.length).toBeGreaterThan(0);
+      expect(
+        turnBody.result.ragHits?.some(
+          (h) => (h.sourceId && /^SRC-\d{3}$/.test(h.sourceId)) || h.documentId.startsWith('countermeasure/')
+        )
+      ).toBe(true);
       expect(turnBody.result.disclaimer).toMatch(/Decision support, not a medical diagnosis/i);
 
       // 2. Crisis phrase escalation (never lowered by AI)
@@ -305,9 +331,10 @@ describe('Voice & Video AI Flight Surgeon routes', () => {
       expect(crisisBody.result.earthConsultUrgency).toBe('immediate_emergency_packet');
       expect(crisisBody.result.replyText).toMatch(/Crew Medical Officer/);
 
-      // 3. Verify PostgreSQL persistence in `conversations` and `messages`
+      // 3. Verify PostgreSQL persistence in `conversations`, `messages`, and `rag_citations`
       const savedConvs = await h.db.select().from(conversations);
       const savedMsgs = await h.db.select().from(messages);
+      const savedCitations = await h.db.select().from(ragCitations);
       expect(savedConvs.length).toBeGreaterThanOrEqual(1);
       expect(
         savedMsgs.some(
@@ -320,6 +347,8 @@ describe('Voice & Video AI Flight Surgeon routes', () => {
         )
       ).toBe(true);
       expect(savedMsgs.some((m) => m.crisisFlag === true)).toBe(true);
+      expect(savedCitations.length).toBeGreaterThan(0);
+      expect(savedCitations.some((c) => c.mode === 'on-ship-pipeline')).toBe(true);
     } finally {
       setDbHandle(null);
       await h.close();

@@ -75,6 +75,8 @@ export interface AssistantPromptParts {
   crisis?: boolean;
   redFlag?: boolean;
   toolsAvailable: boolean;
+  /** `formatKnowledgeForPrompt` block of verified protocol chunks. */
+  knowledge?: string;
 }
 
 /** Stable persona first, volatile context last (prompt-cache friendly). */
@@ -108,6 +110,9 @@ export function buildAssistantPrompt(p: AssistantPromptParts): string {
       : '',
     p.mentalState ? `HOW THEY SEEM TO BE DOING (screening, not a diagnosis)\n${p.mentalState}` : '',
     p.observation ? `WHAT THE CAMERA SHOWS (on-device estimates)\n${p.observation}` : '',
+    p.knowledge
+      ? `${p.knowledge}\nUse this only where it fits what they asked. Steps and doses come from here, never from memory; say which protocol you are following in plain words. The full text is shown on their screen.`
+      : '',
     p.guidedSteps ? `STEPS ON THEIR SCREEN\n${p.guidedSteps}` : '',
     p.countermeasures ? `THINGS TO TRY\n${p.countermeasures}` : '',
     `THEIR CHART\n${p.data}`,

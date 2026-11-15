@@ -86,4 +86,5 @@ The following capabilities are recommended considerations to strengthen crew eng
 | `REQ-13` | Personal baselines, averages and anomaly detection per astronaut | **In progress** | `specs/05-data-platform.md` §5 |
 | `REQ-14` | Privacy: pseudonymized health data, no names or medical notes to cloud LLMs, audit log, data export | **In progress** | `specs/05-data-platform.md` §1, §6 |
 | `REQ-15` | Traceable sources for every external fact and dataset | **Implemented** (`SOURCES.md` IDs, `npm run check:sources`) | `AGENTS.md` §7 |
+| `REQ-16` | Daily gamified cognitive readiness testing with crew leaderboard and decline alerts routed on board or to the Earth Flight Surgeon | **Implemented** (Cognition tab: 9 NASA Cognition–based games, one per day shuffled, personal-baseline decline detection, CMO vs Flight Surgeon routing [SRC-089..095]) | `specs/01-data-schema.md` §12, `specs/02-ui-dashboard.md` §2.8, `src/features/cognition/` |
 

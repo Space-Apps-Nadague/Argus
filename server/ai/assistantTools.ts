@@ -10,11 +10,12 @@ import type { ActiveProtocolContext, AssistantAction, CountermeasureKind } from 
 import { COUNTERMEASURES, countermeasureById } from '../../shared/countermeasures';
 import type { RedFlagProtocolId } from '../../shared/redFlags';
 import type { ChatTool } from './llm';
+import { LOOKUP_MEDICAL_PROTOCOL_OPENAI_TOOL } from '../rag/tool';
 
 const PROTOCOL_IDS: RedFlagProtocolId[] = ['fire', 'depress', 'toxic', 'medical', 'radiation', 'co2'];
 const URGENCIES: EarthConsultUrgency[] = ['routine_downlink', 'priority_packet', 'immediate_emergency_packet'];
 const KINDS: CountermeasureKind[] = ['breathing', 'sleep', 'exercise', 'social', 'workload', 'grounding', 'nutrition', 'medical'];
-const ZONES: BodyZoneId[] = ['neuro', 'cardio', 'musculo', 'immune', 'behavioral'];
+const ZONES: BodyZoneId[] = ['neuro', 'cardio', 'musculo', 'immune', 'behavioral', 'metabolic'];
 
 const fn = (name: string, description: string, properties: Record<string, unknown>, required: string[] = []): ChatTool => ({
   type: 'function',
@@ -82,6 +83,7 @@ export const ASSISTANT_TOOLS: ChatTool[] = [
     { target: { type: 'string', description: 'What to show, e.g. "left eye, close up".' } },
     ['target']
   ),
+  LOOKUP_MEDICAL_PROTOCOL_OPENAI_TOOL as unknown as ChatTool,
   fn(
     'queue_earth_packet',
     'Send a report about this conversation to the doctors on Earth. Use when something needs their review, or when the crew member asks.',

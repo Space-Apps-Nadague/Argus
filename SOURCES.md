@@ -24,13 +24,13 @@ Columns:
 | SRC-001 | [5 Hazards of Human Spaceflight](https://www.nasa.gov/hrp/hazards/) (NASA HRP) | web | open | `specs/01-data-schema.md` §1 (zones and hazards), `src/data/telemetryScenarios.ts` (`BODY_ZONES`) |
 | SRC-002 | [Risks of Human Spaceflight](https://www.nasa.gov/hrp/risks/) (NASA HRP) | web | open | `server/models/diagnosticsRules.ts` (HRP risk candidates) |
 | SRC-003 | [Ongoing HRP Research in Space](https://www.nasa.gov/hrp/ongoing-hrp-research/) | web | open | `specs/05-data-platform.md` §4 (sensor kit context) |
-| SRC-004 | [Exploration Medical Condition List, NTRS 20110008645](https://ntrs.nasa.gov/api/citations/20110008645/downloads/20110008645.pdf) (Watkins, Barr & Kerstman, 2011) | paper | open | `src/data/emergencyProtocols.ts`, `server/models/diagnosticsRules.ts` |
+| SRC-004 | [Exploration Medical Condition List, NTRS 20110008645](https://ntrs.nasa.gov/api/citations/20110008645/downloads/20110008645.pdf) (Watkins, Barr & Kerstman, 2011) | paper | open | `src/data/emergencyProtocols.ts`, `server/models/diagnosticsRules.ts`, `server/rag/corpus.ts` (`rag_documents` `emergency/*`), `server/rag/corpus/spaceflight-med-kit-formulary.md` |
 | SRC-005 | [NASA Life Sciences Portal: Experiments Explorer](https://nlsp.nasa.gov/explore?dataType=EXPERIMENTS) (NLSP / LSDA) | dataset | request | `specs/05-data-platform.md` §7 (why per-astronaut data must be simulated) |
 | SRC-006 | [Lifetime Surveillance of Astronaut Health (LSAH)](https://nlsp.nasa.gov/resources/lsah) | dataset | restricted | `specs/01-data-schema.md` §1–§2, `specs/05-data-platform.md` §7, `src/utils/triageEngine.ts` |
-| SRC-007 | [NASA-STD-3001 Vol 1 Rev C: Crew Health](https://standards.nasa.gov/sites/default/files/standards/NASA/C//nasa-std-3001-vol-1-rev-c-signature.pdf) (2023) | standard | open | `specs/05-data-platform.md` §7 (source for further limits; each must be checked against the PDF before it is added to `data/reference/thresholds.csv`) |
-| SRC-008 | [OCHMO Radiation Protection Technical Brief](https://www.nasa.gov/wp-content/uploads/2023/03/radiation-protection-technical-brief-ochmo.pdf) (600 mSv career limit) | standard | open | `data/reference/thresholds.csv`, `ref_thresholds`, `analysis/notebooks/01_radiation_reference.ipynb` |
+| SRC-007 | [NASA-STD-3001 Vol 1 Rev C: Crew Health](https://standards.nasa.gov/sites/default/files/standards/NASA/C//nasa-std-3001-vol-1-rev-c-signature.pdf) (2023) | standard | open | `specs/05-data-platform.md` §7 (source for further limits; each must be checked against the PDF before it is added to `data/reference/thresholds.csv`), `server/rag/corpus/hypercapnia-co2-exposure.md` |
+| SRC-008 | [OCHMO Radiation Protection Technical Brief](https://www.nasa.gov/wp-content/uploads/2023/03/radiation-protection-technical-brief-ochmo.pdf) (600 mSv career limit) | standard | open | `data/reference/thresholds.csv`, `ref_thresholds`, `analysis/notebooks/01_radiation_reference.ipynb`, `server/rag/corpus/radiation-alara-protection.md` |
 | SRC-009 | [Spaceflight Standard Measures](https://www.nasa.gov/humans-in-space/spaceflight-standard-measures-characterizing-how-humans-adapt-in-space) (NASA) | web | open | `specs/01-data-schema.md` §1–§2, `specs/05-data-platform.md` §4 (sensor kit: actigraphy, surveys, cognition), `src/utils/triageEngine.ts` |
-| SRC-010 | [HRP Evidence Reports / Human Research Roadmap](https://humanresearchroadmap.nasa.gov/evidence/) | paper | open | `specs/05-data-platform.md` §8 (AI context, future RAG) |
+| SRC-010 | [HRP Evidence Reports / Human Research Roadmap](https://humanresearchroadmap.nasa.gov/evidence/) | paper | open | `specs/05-data-platform.md` §3.6 & §8 (AI context & RAG corpus), `server/rag/corpus/sans-neuro-ocular.md` |
 
 ## Wearables and passive monitoring flown in space
 
@@ -69,8 +69,8 @@ Columns:
 | SRC-060 | [OWASP Password Storage Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html) (argon2id parameters) | standard | open | `server/auth/passwords.ts` |
 | SRC-061 | [Azure PostgreSQL Flexible Server on the free account](https://learn.microsoft.com/azure/postgresql/flexible-server/how-to-deploy-on-azure-free-account) | web | open | `scripts/azure/provision.sh`, `docs/DATABASE.md` |
 | SRC-062 | [Azure PostgreSQL extensions by engine version](https://learn.microsoft.com/azure/postgresql/extensions/concepts-extensions-by-engine) | web | open | `specs/05-data-platform.md` §2, `scripts/azure/provision.sh` |
-| SRC-063 | [Robust z-score with MAD (Iglewicz & Hoaglin, NIST e-Handbook 1.3.5.17)](https://www.itl.nist.gov/div898/handbook/eda/section3/eda35h.htm) | standard | open | `shared/analytics/detectors.ts` (robust z), `server/jobs/analytics.ts` |
-| SRC-064 | [EWMA and CUSUM control charts (NIST e-Handbook 6.3.2)](https://www.itl.nist.gov/div898/handbook/pmc/section3/pmc32.htm) | standard | open | `shared/analytics/detectors.ts` (EWMA, CUSUM), `server/jobs/analytics.ts` |
+| SRC-063 | [Robust z-score with MAD (Iglewicz & Hoaglin, NIST e-Handbook 1.3.5.17)](https://www.itl.nist.gov/div898/handbook/eda/section3/eda35h.htm) | standard | open | `shared/analytics/detectors.ts` (robust z), `server/jobs/analytics.ts`, `src/features/cognition/scoring.ts` (decline z) |
+| SRC-064 | [EWMA and CUSUM control charts (NIST e-Handbook 6.3.2)](https://www.itl.nist.gov/div898/handbook/pmc/section3/pmc32.htm) | standard | open | `shared/analytics/detectors.ts` (EWMA, CUSUM), `server/jobs/analytics.ts`, `src/features/cognition/scoring.ts` (2σ caution band) |
 
 ## Smartwatch capabilities and clinical thresholds (challenge core indicators)
 
@@ -95,17 +95,39 @@ Columns:
 | SRC-081 | [NASA-STD-3001 Vol 2 Rev D: Human Factors, Habitability, and Environmental Health](https://standards.nasa.gov/standard/NASA/NASA-STD-3001-VOL-2) (EER caloric equations, +200 kcal/hr EVA, 2.5 L/day baseline potable water) | standard | open | `specs/01-data-schema.md` §2, `src/utils/triageEngine.ts` (`caloric_intake`, `hydration_intake`), `server/db/catalog.ts` |
 | SRC-082 | [NASA HRP Risk of Inadequate Food and Nutrition](https://humanresearchroadmap.nasa.gov/Risks/risk.aspx?i=93) (spaceflight energy balance, flavor fatigue, hypohydration & renal stone risk) | web | open | `specs/01-data-schema.md` §2, `src/utils/triageEngine.ts`, `src/data/telemetryScenarios.ts` |
 
+## AI knowledge base (RAG)
+
+| ID | Source | Type | Access | Used in |
+|---|---|---|---|---|
+| SRC-083 | [Weinberger et al. 2009, Feature Hashing for Large Scale Multitask Learning](https://arxiv.org/abs/0902.2206) | paper | open | `server/rag/embeddings.ts` (offline `hash` embedder), `specs/05-data-platform.md` §3.6 |
+| SRC-084 | [PostgreSQL: Controlling Text Search (`ts_rank_cd`)](https://www.postgresql.org/docs/current/textsearch-controls.html) | standard | open | `server/db/schema.ts` (`rag_chunks.search_tsv`), `server/rag/retriever.ts`, `specs/05-data-platform.md` §3.6 |
+| SRC-085 | [Ollama OpenAI compatibility (`/v1/embeddings`)](https://docs.ollama.com/openai) (`nomic-embed-text`) | api | open | `server/rag/embeddings.ts` (`local` embedder), `specs/05-data-platform.md` §3.6 |
+| SRC-086 | [Gemini API: Embeddings (`gemini-embedding-001`)](https://ai.google.dev/gemini-api/docs/embeddings) | api | open | `server/rag/embeddings.ts` (`gemini` embedder), `specs/05-data-platform.md` §3.6 |
+| SRC-087 | [Robertson & Zaragoza 2009, The Probabilistic Relevance Framework: BM25 and Beyond](https://doi.org/10.1561/1500000019) (k1 = 1.2, b = 0.75) | paper | open | `server/rag/memoryIndex.ts` (BM25), `specs/05-data-platform.md` §3.6 |
+| SRC-088 | [Cormack, Clarke & Büttcher 2009, Reciprocal Rank Fusion](https://doi.org/10.1145/1571941.1572114) (k = 60) | paper | open | `server/rag/retriever.ts` (fusion), `specs/05-data-platform.md` §3.6 |
+
+## Cognition testing & crew medical care
+
+| ID | Source | Type | Access | Used in |
+|---|---|---|---|---|
+| SRC-089 | [Cognition vs WinSCAT validation, NTRS 20180003970](https://ntrs.nasa.gov/api/citations/20180003970/downloads/20180003970.pdf) (the 10 Cognition tests, domains, typical durations) | paper | open | `src/features/cognition/catalog.ts`, `src/features/cognition/games/*`, `specs/01-data-schema.md` §12.1 |
+| SRC-090 | [Basner, Mollicone & Dinges 2011: Brief PVT (PVT-B), Acta Astronautica](https://pmc.ncbi.nlm.nih.gov/articles/PMC3197786) (3 min, ISI 1–4 s, lapse ≥ 355 ms) | paper | open | `src/features/cognition/games/Pvt.tsx`, `src/features/cognition/catalog.ts`, `specs/01-data-schema.md` §12.1 |
+| SRC-091 | [Basner et al. 2020: practice and stimulus-set effects with repeated Cognition administration](https://pmc.ncbi.nlm.nih.gov/articles/PMC7375457) (learning trend in 6 of 10 tests) | paper | open | `src/features/cognition/scoring.ts` (rolling personal baseline), `specs/01-data-schema.md` §12.3 |
+| SRC-092 | [Assessing Crew Medical Officer Preparedness for ISS Missions, NTRS 20230013415](https://ntrs.nasa.gov/citations/20230013415) (CMO as healthcare extender to ground flight surgeons) | paper | open | `src/features/cognition/routing.ts`, `specs/01-data-schema.md` §12.4 |
+| SRC-093 | [JAXA: Medical operations system on the ISS](https://humans-in-space.jaxa.jp/en/biz-lab/med-in-space/healthcare/medops/system) (CMO treats with onboard supplies following ground flight-surgeon advice) | web | open | `src/features/cognition/routing.ts`, `specs/01-data-schema.md` §12.4 |
+| SRC-094 | [Cognition task descriptions (supplementary table, Research Square preprint rs-8959949)](https://assets-eu.researchsquare.com/files/rs-8959949/v1/49a00054858a43a9120f8546.docx) (MP 20 shrinking squares, VOLT 10 learn/20 test, LOT 12 pairs, AM pairs) | paper | open | `src/features/cognition/games/*` |
+| SRC-095 | [Basner et al. 2020: Cognition performance and simulated 6-DOF docking, AMHP 91(11)](https://asma.kglmeridian.com/view/journals/amhp/91/11/article-p861.xml) (DSST best single predictor) | paper | open | `src/features/cognition/games/Dsst.tsx` |
 
 ## ARGUS assistant: comm tiers, voice and camera analysis
 
 | ID | Source | Type | Access | Used in |
 |---|---|---|---|---|
-| SRC-090 | [ITU-T G.114: One-way transmission time](https://www.itu.int/rec/T-REC-G.114) (≤ 400 ms one-way for interactive speech) | standard | open | `shared/commProfile.ts` (`live` tier cut-off) |
-| SRC-091 | [Dinges et al., PERCLOS: A Valid Psychophysiological Measure of Alertness (FHWA-MCRT-98-006, 1998)](https://rosap.ntl.bts.gov/view/dot/113) (share of time eyes ≥ 80 % closed) | paper | open | `src/services/vision/signals.ts` (PERCLOS, fatigue levels), `src/types/assistant.ts` |
-| SRC-092 | [vladmandic/face-api](https://github.com/vladmandic/face-api) (TinyFaceDetector, 68-point landmarks, 7-class facial expression model, in-browser TensorFlow.js) | software | open | `src/services/vision/observer.ts`, `src/services/vision/signals.ts` (emotion), `src/types/assistant.ts` |
-| SRC-093 | [Verkruysse, Svaasand & Nelson, Remote plethysmographic imaging using ambient light, Optics Express 16(26) 2008](https://pmc.ncbi.nlm.nih.gov/articles/PMC2717852) (green channel carries the pulse) | paper | open | `src/services/vision/signals.ts` (`estimatePulse`), `src/services/vision/observer.ts` |
-| SRC-094 | [NASA HRP: Risk of Adverse Cognitive or Behavioral Conditions and Psychiatric Disorders](https://www.nasa.gov/directorates/esdmd/hhp/risk-of-adverse-cognitive-or-behavioral-conditions-and-psychiatric-disorders) (isolation and confinement; behavioural-health countermeasures) | web | open | `shared/countermeasures.ts`, `shared/mentalState.ts`, `server/prompts.ts` (`ASSISTANT_PERSONA`) |
-| SRC-095 | [Speaches: OpenAI-compatible local speech server](https://speaches.ai/) (faster-whisper STT, Kokoro TTS) | software | open | `server/ai/localSpeech.ts`, `docker-compose.yml` |
-| SRC-096 | [Gemini API: Speech generation](https://aistudio.google.com/docs/speech-generation) (30 prebuilt voices and their styles, 24 kHz PCM output) | web | open | `server/ai/geminiVoices.ts`, `server/routes/voice.ts` (`/tts`, `/voices`) |
-| SRC-097 | [Soukupová & Čech, Real-Time Eye Blink Detection using Facial Landmarks (CVWW 2016)](https://vision.fe.uni-lj.si/cvww2016/proceedings/papers/05.pdf) (eye aspect ratio) | paper | open | `src/services/vision/signals.ts`, `src/services/vision/observer.ts` |
-| SRC-098 | [The distribution of blink rate among young adults: a cross-sectional study (2023)](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9899223/) (normal spontaneous blink rate 6–30/min) | paper | open | `src/services/vision/signals.ts` (`blinkRateHigh`) |
+| SRC-100 | [ITU-T G.114: One-way transmission time](https://www.itu.int/rec/T-REC-G.114) (≤ 400 ms one-way for interactive speech) | standard | open | `shared/commProfile.ts` (`live` tier cut-off) |
+| SRC-101 | [Dinges et al., PERCLOS: A Valid Psychophysiological Measure of Alertness (FHWA-MCRT-98-006, 1998)](https://rosap.ntl.bts.gov/view/dot/113) (share of time eyes ≥ 80 % closed) | paper | open | `src/services/vision/signals.ts` (PERCLOS, fatigue levels), `src/types/assistant.ts` |
+| SRC-102 | [vladmandic/face-api](https://github.com/vladmandic/face-api) (TinyFaceDetector, 68-point landmarks, 7-class facial expression model, in-browser TensorFlow.js) | software | open | `src/services/vision/observer.ts`, `src/services/vision/signals.ts` (emotion), `src/types/assistant.ts` |
+| SRC-103 | [Verkruysse, Svaasand & Nelson, Remote plethysmographic imaging using ambient light, Optics Express 16(26) 2008](https://pmc.ncbi.nlm.nih.gov/articles/PMC2717852) (green channel carries the pulse) | paper | open | `src/services/vision/signals.ts` (`estimatePulse`), `src/services/vision/observer.ts` |
+| SRC-104 | [NASA HRP: Risk of Adverse Cognitive or Behavioral Conditions and Psychiatric Disorders](https://www.nasa.gov/directorates/esdmd/hhp/risk-of-adverse-cognitive-or-behavioral-conditions-and-psychiatric-disorders) (isolation and confinement; behavioural-health countermeasures) | web | open | `shared/countermeasures.ts`, `shared/mentalState.ts`, `server/prompts.ts` (`ASSISTANT_PERSONA`) |
+| SRC-105 | [Speaches: OpenAI-compatible local speech server](https://speaches.ai/) (faster-whisper STT, Kokoro TTS) | software | open | `server/ai/localSpeech.ts`, `docker-compose.yml` |
+| SRC-106 | [Gemini API: Speech generation](https://aistudio.google.com/docs/speech-generation) (30 prebuilt voices and their styles, 24 kHz PCM output) | web | open | `server/ai/geminiVoices.ts`, `server/routes/voice.ts` (`/tts`, `/voices`) |
+| SRC-107 | [Soukupová & Čech, Real-Time Eye Blink Detection using Facial Landmarks (CVWW 2016)](https://vision.fe.uni-lj.si/cvww2016/proceedings/papers/05.pdf) (eye aspect ratio) | paper | open | `src/services/vision/signals.ts`, `src/services/vision/observer.ts` |
+| SRC-108 | [The distribution of blink rate among young adults: a cross-sectional study (2023)](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9899223/) (normal spontaneous blink rate 6–30/min) | paper | open | `src/services/vision/signals.ts` (`blinkRateHigh`) |

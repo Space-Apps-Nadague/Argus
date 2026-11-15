@@ -27,6 +27,7 @@ import {
 } from 'drizzle-orm/pg-core';
 
 const citext = customType<{ data: string }>({ dataType: () => 'citext' });
+const tsvector = customType<{ data: string }>({ dataType: () => 'tsvector' });
 const tsz = (name: string) => timestamp(name, { withTimezone: true, mode: 'date' });
 
 // ── Enums ────────────────────────────────────────────────────────────────────
@@ -62,6 +63,7 @@ export const anomalyDetector = pgEnum('anomaly_detector', ['robust_z', 'ewma', '
 export const anomalySeverity = pgEnum('anomaly_severity', ['watch', 'drifting']);
 export const triageStatus = pgEnum('triage_status', ['green', 'yellow', 'red']);
 export const chatRole = pgEnum('chat_role', ['user', 'assistant']);
+export const ragDocKind = pgEnum('rag_doc_kind', ['emergency_checklist', 'countermeasure', 'clinical_reference', 'medication']);
 
 // ── 3.3 Sources, catalog, devices, ingest runs ──────────────────────────────
 export const dataSources = pgTable('data_sources', {
@@ -470,7 +472,7 @@ export const messages = pgTable(
   (t) => [index('messages_conversation_ts_idx').on(t.conversationId, t.ts)]
 );
 
-// ── 3.6 Reports to Earth and mental-state history (specs/04-ai-backend.md §4.4) ──
+// ── 3.8 Reports to Earth and mental-state history (specs/04-ai-backend.md §4.4) ──
 /**
  * A report queued for the doctors on Earth. It becomes visible to flight surgeons at
  * `deliverAt` (creation + one-way light time); their reply becomes visible to the crew
@@ -518,4 +520,61 @@ export const mentalStateAssessments = pgTable(
     assessment: jsonb('assessment').notNull(),
   },
   (t) => [index('mental_state_astronaut_ts_idx').on(t.astronautId, t.ts)]
+);
+
+// ── 3.7 AI knowledge base (RAG) ─────────────────────────────────────────────
+// Embeddings are real[] (not pgvector) so the same schema runs on Azure, Docker and PGlite.
+export const ragDocuments = pgTable('rag_documents', {
+  id: text('id').primaryKey(), // stable slug, e.g. 'emergency/fire'
+  sourceId: text('source_id').references(() => dataSources.id),
+  title: text('title').notNull(),
+  kind: ragDocKind('kind').notNull(),
+  origin: text('origin').notNull(),
+  url: text('url'),
+  zoneIds: text('zone_ids').array().notNull().default(sql`'{}'::text[]`),
+  contentHash: text('content_hash').notNull(),
+  ingestRunId: uuid('ingest_run_id').references(() => ingestRuns.id),
+  updatedAt: tsz('updated_at').notNull().defaultNow(),
+});
+
+export const ragChunks = pgTable(
+  'rag_chunks',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    documentId: text('document_id')
+      .notNull()
+      .references(() => ragDocuments.id, { onDelete: 'cascade' }),
+    ordinal: integer('ordinal').notNull(),
+    heading: text('heading').notNull(),
+    content: text('content').notNull(),
+    tokenCount: integer('token_count').notNull(),
+    embedding: real('embedding').array(),
+    embeddingModel: text('embedding_model'),
+    // Source: SRC-084 (PostgreSQL text search)
+    searchTsv: tsvector('search_tsv').generatedAlwaysAs(
+      sql`to_tsvector('english', coalesce(heading, '') || ' ' || coalesce(content, ''))`
+    ),
+  },
+  (t) => [
+    uniqueIndex('rag_chunks_document_ordinal_idx').on(t.documentId, t.ordinal),
+    index('rag_chunks_search_idx').using('gin', t.searchTsv),
+  ]
+);
+
+export const ragCitations = pgTable(
+  'rag_citations',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    ts: tsz('ts').notNull().defaultNow(),
+    astronautId: text('astronaut_id').references(() => astronauts.id, { onDelete: 'cascade' }),
+    messageId: uuid('message_id').references(() => messages.id, { onDelete: 'set null' }),
+    mode: text('mode').notNull(), // 'search' | 'chat' | 'live-api' | 'on-ship-pipeline'
+    query: text('query').notNull(),
+    chunkId: uuid('chunk_id').references(() => ragChunks.id, { onDelete: 'set null' }),
+    documentId: text('document_id').references(() => ragDocuments.id, { onDelete: 'set null' }),
+    sourceId: text('source_id'),
+    rank: smallint('rank').notNull(),
+    score: real('score').notNull(),
+  },
+  (t) => [index('rag_citations_astronaut_ts_idx').on(t.astronautId, t.ts), index('rag_citations_message_idx').on(t.messageId)]
 );

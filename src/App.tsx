@@ -23,8 +23,10 @@ import { ForecastTab } from './components/ForecastTab';
 import { EyesTab } from './components/EyesTab';
 import { ConsoleTab } from './components/console/ConsoleTab';
 import { AssistantProvider } from './context/AssistantContext';
+import { CognitionTab } from './components/CognitionTab';
 import { CrewTab } from './components/CrewTab';
 import { UsersTab } from './components/UsersTab';
+import { PhotoboothTab } from './components/PhotoboothTab';
 import { CrewManagerModal } from './components/CrewManagerModal';
 import { LifeThreatAlert } from './components/LifeThreatAlert';
 
@@ -34,8 +36,10 @@ const PANELS: Record<HudTabId, React.FC> = {
   forecast: ForecastTab,
   eyes: EyesTab,
   console: ConsoleTab,
+  cognition: CognitionTab,
   crew: CrewTab,
   users: UsersTab,
+  photobooth: PhotoboothTab,
 };
 
 const Hud: React.FC = () => {

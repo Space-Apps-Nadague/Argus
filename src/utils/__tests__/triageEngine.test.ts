@@ -15,11 +15,13 @@ import {
   environmentForLocation,
 } from '../../data/spaceLocations';
 import {
+  BODY_ZONES,
   DEFAULT_CREW_ROSTER,
   getCrewAdjustedZones,
   getOfflineFlightSurgeonGuidance,
   TELEMETRY_SCENARIOS,
   VISUAL_EXAM_SAMPLES,
+  ZONE_ORDER,
 } from '../../data/telemetryScenarios';
 import {
   createSculptedHeadAndNeckGeometry,
@@ -34,7 +36,7 @@ describe('ARGUS Deterministic Triage Engine (specs/01-data-schema.md)', () => {
     expect(evaluateMetricStatus('onsd', 6.42, '0g_transit')).toBe('red');
   });
 
-  it('evaluates all 5 zones as green in the nominal scenario under 0g_transit', () => {
+  it('evaluates all 6 zones as green in the nominal scenario under 0g_transit', () => {
     const statuses = evaluateAllZones(
       TELEMETRY_SCENARIOS.nominal.zones,
       '0g_transit'
@@ -43,6 +45,7 @@ describe('ARGUS Deterministic Triage Engine (specs/01-data-schema.md)', () => {
       neuro: 'green',
       cardio: 'green',
       musculo: 'green',
+      metabolic: 'green',
       immune: 'green',
       behavioral: 'green',
     });
@@ -171,7 +174,7 @@ describe('ARGUS Deterministic Triage Engine (specs/01-data-schema.md)', () => {
       expect(evaluateMetricStatus('systolic_bp', 150, '0g_transit')).toBe('red');
     });
 
-    it('evaluates blood_glucose (musculo) thresholds deterministically', () => {
+    it('evaluates blood_glucose (metabolic) thresholds deterministically and places it in metabolic zone', () => {
       // Nominal: 70-110, Yellow: 60-140, Red: <60 or >140
       expect(evaluateMetricStatus('blood_glucose', 92, '0g_transit')).toBe('green');
       expect(evaluateMetricStatus('blood_glucose', 70, '0g_transit')).toBe('green');
@@ -180,6 +183,23 @@ describe('ARGUS Deterministic Triage Engine (specs/01-data-schema.md)', () => {
       expect(evaluateMetricStatus('blood_glucose', 65, '0g_transit')).toBe('yellow');
       expect(evaluateMetricStatus('blood_glucose', 55, '0g_transit')).toBe('red');
       expect(evaluateMetricStatus('blood_glucose', 155, '0g_transit')).toBe('red');
+
+      expect(ZONE_ORDER).toHaveLength(6);
+      expect(ZONE_ORDER).toContain('metabolic');
+      expect(BODY_ZONES.metabolic.name).toBe('Metabolic & Nutrition');
+
+      for (const scenario of Object.values(TELEMETRY_SCENARIOS)) {
+        expect(scenario.zones.metabolic.some((r) => r.metricId === 'blood_glucose')).toBe(true);
+        expect(scenario.zones.musculo.some((r) => r.metricId === 'blood_glucose')).toBe(false);
+      }
+
+      const statuses = evaluateAllZones(TELEMETRY_SCENARIOS.nominal.zones, '0g_transit');
+      expect(Object.keys(statuses).sort()).toEqual([...ZONE_ORDER].sort());
+      expect(statuses.metabolic).toBe('green');
+
+      const metabolicGuidance = getOfflineFlightSurgeonGuidance('nominal', 'metabolic', '0g_transit');
+      expect(metabolicGuidance.zoneId).toBe('metabolic');
+      expect(metabolicGuidance.guidedSteps.length).toBeGreaterThan(0);
     });
 
     it('evaluates core_temp (immune) thresholds deterministically', () => {

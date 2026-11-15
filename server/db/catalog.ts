@@ -67,7 +67,7 @@ export const TRIAGE_METRICS: MetricDef[] = [
   triage('pvt_lapses', 'Psychomotor Vigilance Lapses', 'lapses', 'behavioral', 'self_report', 'SRC-009'),
   // Challenge core indicators (spec 03 §2, metric ids from PR #20): watch, glucometer photo, watch tap-survey.
   triage('systolic_bp', 'Systolic Blood Pressure', 'mmHg', 'cardio', 'passive', 'SRC-075'),
-  triage('blood_glucose', 'Blood Glucose', 'mg/dL', 'musculo', 'passive', 'SRC-072'),
+  triage('blood_glucose', 'Blood Glucose', 'mg/dL', 'metabolic', 'passive', 'SRC-072'),
   triage('core_temp', 'Body Temperature (watch estimate)', '°C', 'immune', 'derived', 'SRC-074'),
   triage('daily_sleep_hours', 'Daily Sleep Duration', 'hours', 'behavioral', 'passive', 'SRC-074'),
   triage('mood_index', 'Mood Index (watch tap)', '/10', 'behavioral', 'self_report', 'SRC-009'),
