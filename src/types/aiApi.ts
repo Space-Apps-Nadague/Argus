@@ -319,6 +319,8 @@ export interface VoiceSttRequest extends CrewContextRequest {
   fallbackTranscript?: string;
   mode?: VoiceTransportMode;
   languageCode?: string;
+  /** Comm tier; `autonomous` keeps transcription on the ship. */
+  tier?: 'live' | 'relay' | 'autonomous';
 }
 
 export interface VoiceSttResponse {
@@ -338,6 +340,9 @@ export interface VoiceTtsRequest {
   voice?: string;
   style?: string;
   mode?: VoiceTransportMode;
+  /** Comm tier; `autonomous` keeps synthesis on the ship. */
+  tier?: 'live' | 'relay' | 'autonomous';
+  speed?: number;
 }
 
 export interface VoiceTtsResponse {

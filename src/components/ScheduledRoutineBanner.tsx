@@ -9,6 +9,7 @@
 import React, { useState } from 'react';
 import {
   AlertCircle,
+  Brain,
   Award,
   Check,
   CheckCircle2,
@@ -24,6 +25,9 @@ import {
 } from 'lucide-react';
 import { useMission } from '../context/MissionContext';
 import { ReadinessMilestone } from '../types/argus';
+import { useCognitionStore } from '../features/cognition/store';
+import { dateKeyOf, gameOfTheDay } from '../features/cognition/schedule';
+import { GAME_BY_ID } from '../features/cognition/catalog';
 
 const MILESTONE_ICON_MAP: Record<ReadinessMilestone['icon'], React.FC<{ className?: string }>> = {
   flame: Flame,
@@ -44,6 +48,11 @@ export const ScheduledRoutineBanner: React.FC = () => {
   } = useMission();
 
   const [showMilestones, setShowMilestones] = useState(false);
+  // Daily cognition game is part of the routine (specs/01-data-schema.md §12.2).
+  const { byCrew } = useCognitionStore();
+  const todayKey = dateKeyOf(new Date());
+  const cognitionGame = GAME_BY_ID[gameOfTheDay(activeCrewMember.id, todayKey)];
+  const cognitionDone = (byCrew[activeCrewMember.id] ?? []).some((s) => s.daily && s.dateKey === todayKey);
   const [justLogged, setJustLogged] = useState(false);
 
   const unlockedCount = milestones.filter((m) => m.unlocked).length;
@@ -137,6 +146,15 @@ export const ScheduledRoutineBanner: React.FC = () => {
 
         {/* Right: Actions */}
         <div className="flex flex-wrap items-center gap-2 shrink-0 pt-1 lg:pt-0">
+          <button
+            type="button"
+            onClick={() => setActiveTab('cognition')}
+            className={`hud-btn ${cognitionDone ? 'text-status-green' : 'border-hud-accent/60 text-hud-accent'}`}
+            aria-label={cognitionDone ? `Cognition game done today: ${cognitionGame.title}` : `Play today's cognition game: ${cognitionGame.title}`}
+          >
+            {cognitionDone ? <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" /> : <Brain className="h-3.5 w-3.5" aria-hidden="true" />}
+            <span>{cognitionDone ? 'Game done' : `Game: ${cognitionGame.title}`}</span>
+          </button>
           {routineStatus.isDue ? (
             <>
               <button

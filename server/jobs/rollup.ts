@@ -32,6 +32,18 @@ export const LAST_OF_DAY_METRICS = [
   'mood_index',
   'hydration_intake',
   'caloric_intake',
+  'sleep_resp_rate',
+  'vo2_max',
+  'hemoglobin',
+  'urine_sg',
+  'grip_strength',
+  'body_mass_delta',
+  'crp',
+  'cortisol',
+  'reaction_time',
+  'headache_severity',
+  'hyperopic_shift',
+  'vocal_jitter',
 ];
 
 /** Metrics whose daily value is the mean of the day's spot readings (watch blood pressure). */

@@ -144,6 +144,10 @@ describe('readiness & links', () => {
 describe('adapter (real data only)', () => {
   it('maps HUD metric ids and indicator keys, ignores unknown ids', () => {
     expect(indicatorKeyFor('resting_hr')).toBe('rhr');
+    expect(indicatorKeyFor('daily_sleep_hours')).toBe('sleep');
+    expect(indicatorKeyFor('mood_index')).toBe('mood');
+    expect(indicatorKeyFor('systolic_bp')).toBe('sbp');
+    expect(indicatorKeyFor('core_temp')).toBe('temp');
     expect(indicatorKeyFor('sbp')).toBe('sbp');
     expect(indicatorKeyFor('onsd')).toBeNull();
   });

@@ -36,19 +36,29 @@ ARGUS supports 5 canonical mission location / habitat presets grounded in NASA H
 
 ### Crisis Scenarios (`ScenarioId`)
 - `'nominal'` — **Nominal Deep-Space Cruise**: All 6 zones within expected spaceflight norms.
+- `'unexplained_fatigue'` — **Cdr. Vance — Unexplained Fatigue**: Subtle multi-system drift during `0g_transit` — early Optic Nerve Sheath Diameter swelling (`5.8 mm`, yellow), elevated Node 2 cabin $\text{ppCO}_2$ (`4.4 mmHg`), HRV drop (`36 ms`), fasting blood glucose drift (`118 mg/dL`), and slower PVT reaction latency (`4` lapses).
 - `'sans_alert'` — **SANS Optic Disc Edema Alert**: Elevated Optic Nerve Sheath Diameter (ONSD `6.4 mm`) and intraocular pressure (`23 mmHg`) in `neuro`.
 - `'high_co2'` — **Habitat $\text{CO}_2$ Scrubber Degradation**: Elevated cabin $\text{ppCO}_2$ (`5.8 mmHg`) driving cerebral vasodilation (`neuro` yellow/red), tachycardia (`cardio` yellow), and cognitive fatigue (`behavioral` yellow).
 - `'solar_storm'` — **SPE Radiation Storm Alert**: Acute solar particle event raising cumulative dose rate (`immune` red, lymphocyte drop `1.05 k/µL`, skin erythema risk) and stress response (`cardio` / `behavioral` yellow).
+- `'dehydration'` — **Dehydration & Fluid-Balance Deficit**: intake `1.5 L/day`, urine SG `1.032`, resting HR `88 bpm`, diastolic BP `58 mmHg`, body mass `-5.6 %` (`cardio` / `metabolic` red).
+- `'sleep_loss'` — **Circadian Disruption & Sleep Debt**: sleep `4.6 h` at `64 %` efficiency, `8` PVT lapses, reaction time `395 ms`, cortisol `24.8 µg/dL` (`behavioral` red).
+- `'deconditioning'` — **Musculoskeletal Deconditioning**: ARED load `9 kN·reps`, BMD `-1.6 %`, grip strength `26 kg`, VO₂max `31 mL/kg/min` (`musculo` / `cardio` red).
+
+Every scenario carries the same 31 metrics (`src/data/scenarioExtensions.ts` adds the 12 extended metrics to the four originals and derives the three extra scenarios from `nominal`). The original four keep their zone-level triage story; the extended metrics only add detail.
 
 ### Metric Identifiers (`MetricId`)
-The 19 canonical metric IDs tracked across the 6 zones (see §2 catalog):
+The 31 canonical metric IDs tracked across the 6 zones (see §2 catalog). The last 12 form the extended panel (§2 "Extended panel"):
 ```typescript
 export type MetricId =
   | 'onsd' | 'iop' | 'cabin_co2'
   | 'resting_hr' | 'hrv_rmssd' | 'spo2' | 'systolic_bp' | 'hydration_intake'
   | 'bmd_delta' | 'ared_load' | 'blood_glucose' | 'caloric_intake'
   | 'rad_dose' | 'wbc_lymph' | 'core_temp'
-  | 'sleep_eff' | 'pvt_lapses' | 'daily_sleep_hours' | 'mood_index';
+  | 'sleep_eff' | 'pvt_lapses' | 'daily_sleep_hours' | 'mood_index'
+  // extended panel
+  | 'diastolic_bp' | 'sleep_resp_rate' | 'vo2_max' | 'hemoglobin' | 'urine_sg'
+  | 'grip_strength' | 'body_mass_delta' | 'crp' | 'cortisol' | 'reaction_time'
+  | 'headache_severity' | 'hyperopic_shift' | 'vocal_jitter';
 ```
 `VitalSignReading.metricId` stays typed as `string` for backward compatibility; new code uses `MetricId`.
 
@@ -133,6 +143,25 @@ export interface ThresholdRange {
 | `behavioral` | `daily_sleep_hours` | Daily Sleep Duration | `hours` | `7.0–9.0` (`6.0–10.0`) | `7.0–9.0` (`6.0–10.0`) | `7.0–9.0` (`6.0–10.0`) | `7.0–9.0` (`6.0–10.0`) | `7.0–9.0` (`6.0–10.0`) |
 | `behavioral` | `mood_index` | Behavioral Mood Index | `/10` | `7.0–10.0` (`5.0–10.0`) | `7.0–10.0` (`5.0–10.0`) | `7.0–10.0` (`5.0–10.0`) | `7.0–10.0` (`5.0–10.0`) | `7.0–10.0` (`5.0–10.0`) |
 
+### Extended panel (12 more daily parameters)
+Thresholds are identical in every environment (`METRIC_THRESHOLDS_0G`). Readings per scenario: `src/data/scenarioExtensions.ts` (`EXTRA_METRICS`).
+
+| Zone | Metric ID | Label | Unit | Nominal (`yellow`) | Collected by |
+|---|---|---|---|---|---|
+| `neuro` | `headache_severity` | Headache Severity | `/10` | `0–2` (`0–4`) | watch tap-survey, daily |
+| `neuro` | `hyperopic_shift` | Near-Vision Hyperopic Shift | `D` | `-0.25–0.5` (`-0.5–1.0`) | digital near-vision check, weekly |
+| `cardio` | `diastolic_bp` | Diastolic Blood Pressure | `mmHg` | `60–85` (`55–90`) | watch spot readings (daily mean) |
+| `cardio` | `sleep_resp_rate` | Sleeping Respiration Rate | `br/min` | `12–18` (`10–22`) | watch, nightly |
+| `cardio` | `vo2_max` | Aerobic Capacity (VO₂max) | `mL/kg/min` | `38–60` (`32–70`) | cycle ergometer test, every 3 days |
+| `cardio` | `hemoglobin` | Hemoglobin | `g/dL` | `12.5–17.0` (`11.5–18.0`) | blood analyzer, every 3 days |
+| `cardio` | `urine_sg` | Urine Specific Gravity | `SG` | `1.005–1.025` (`1.002–1.030`) | urine refractometer, daily |
+| `musculo` | `grip_strength` | Grip Strength | `kg` | `35–60` (`28–68`) | hand dynamometer, every 3 days |
+| `metabolic` | `body_mass_delta` | Body Mass Change vs pre-flight | `%` | `-3.0–1.0` (`-5.0–2.0`) | mass device, daily |
+| `immune` | `crp` | C-Reactive Protein | `mg/L` | `0–3` (`0–10`) | blood analyzer, every 3 days |
+| `behavioral` | `cortisol` | Morning Cortisol | `µg/dL` | `6–18` (`3–23`) | salivary strip, every 3 days |
+| `behavioral` | `reaction_time` | Mean Reaction Time | `ms` | `200–300` (`180–360`) | watch PVT, daily |
+| `behavioral` | `vocal_jitter` | Vocal Pitch Jitter | `%` | `0.20–1.04` (`0.00–1.80`) | voice check-in / Console mic [SRC-109] |
+
 ### Passive Wearable Metrics (non-triage) and how each indicator is collected
 With the two-device kit (`specs/05-data-platform.md` §4) nothing needs typing:
 - **From the watch:** `systolic_bp` (cuff-calibrated every 28 days [SRC-075]), `daily_sleep_hours`, `core_temp`, `mood_index` and `pvt_lapses`. Body temperature is *estimated* from overnight wrist temperature against the personal baseline [SRC-074]; a watch does not measure true core temperature. Mood is one tap a day.
@@ -208,6 +237,7 @@ Calculated deterministically in `src/utils/triageEngine.ts`:
 - Base score: `98%`
 - Each metric in `'yellow'` status deducts `3%`
 - Each metric in `'red'` status deducts `8%`
+- When a panel has more than 19 readings, both deductions are scaled by `19 / n` so the 31-metric panel scores like the original 19-metric one.
 - Completed countermeasure checklist items in the active session add `+3%` each (capped at `100%`, minimum `15%`).
 
 ### Continuous Glucose Monitor (CGM) Crew Mock Stream (`src/data/cgmMockData.ts`)
@@ -337,8 +367,14 @@ export interface EarthTelemetryPacket {
   visualExamAttached?: VisualExamAnalysis | null;
   recentCheckIns?: CheckInEntry[]; // Up to the 5 most recent check-ins of the active crew member (§6)
   crewNotes: string;
+  urgency?: 'routine_downlink' | 'priority_packet' | 'immediate_emergency_packet'; // absent on old packets = routine
+  kind?: 'medical' | 'behavioral' | 'emergency' | 'digest';
+  behavioralHealth?: BehavioralHealthReport | null;  // spec 04 §4.4 (src/types/assistant.ts)
+  visualObservation?: VisualObservation | null;      // on-device camera summary, spec 04 §4.3; never images
 }
 ```
+
+`VisualObservation` (camera, last 30 s): `facePresent`, `presenceRatio`, `blinkRatePerMin`, `perclos`, `yawnsPerMin`, `emotion` (`label` of neutral/happy/sad/angry/fearful/surprised/disgusted, `confidence`, per-label `scores`), `affect`, `fatigue`, `posture`, `restlessness`, `pulseBpmEstimate` + `pulseConfidence` (estimate only, never stored as a vital), `notes`. `MentalStateAssessment`: cue strengths 0–3 (low mood, stress, anxiety, sleep trouble, isolation, conflict, low motivation, hopelessness, fatigue), `mood`, `stress`, `fatigue`, `concernLevel` (none/watch/concern/urgent, set in code), `score` 0–100, `trend`, `evidence[]`, `summary`.
 
 ---
 
@@ -479,34 +515,9 @@ export interface UserAccount {
 - Passwords: argon2id on the server, at least 10 characters. The first run creates the admin (`POST /api/auth/setup`, or `npm run db:seed`).
 - Archiving a crew member keeps their accounts and history; an admin purge deletes both.
 
-## 10. Emergency Protocols (`EmergencyProtocol`, `src/data/emergencyProtocols.ts`)
+## 10. Emergency Protocols (`src/data/emergencyProtocols.ts`)
 
-```typescript
-export interface EmergencyProtocol {
-  id: 'fire' | 'depress' | 'toxic' | 'medical' | 'radiation' | 'co2';
-  title: string;
-  icon: string;                // lucide icon name
-  trigger: string;             // when to use it, one line
-  steps: string[];
-}
-
-export interface EmergencyRun {
-  protocolId: EmergencyProtocol['id'];
-  crewId: string;
-  startedAtIso: string;
-  completed: Record<number, string>; // step index → ISO time
-}
-```
-Runs are kept in memory for the session and included in the Earth packet notes when the crew taps `Notify Earth`.
-
-
-- **Offline Brain First:** Deterministic pure rule engine (`src/utils/companionBrain.ts`) answering questions on crew readiness, zone statuses, vitals vs personal baseline, drift & forecast, NASA HRP metric links, cumulative radiation, and spaceflight countermeasures with 0 network dependencies.
-- **Live Clinical AI Second:** Streams replies via `streamCrewChat` (`POST /api/ai/chat`) grounded in the crew snapshot when the ARGUS backend / AI provider is reachable; seamlessly falls back to the offline brain on network error or timeout.
-- **Voice I/O:** Optional text-to-speech with natural English voice synthesis (`window.speechSynthesis`) and voice dictation via Web Speech API (`SpeechRecognition`).
-- **Red-Flag Safety Guardrail:** Critical emergency phrases (chest pain, acute dyspnea, loss of consciousness, self-harm/crisis) immediately return an emergency action protocol advising the astronaut to stop activity, alert crewmates, and downlink an emergency packet to the Flight Surgeon. The companion NEVER mutates triage status or lowers urgency.
-- **Persistence:** Local conversation history is preserved per crew member in `localStorage` under `argus_companion_chat_<crewId>`.
-
----
+The Emergency tab and the SOS shortcut were removed (PR #66). The protocol checklists remain and run inside the ARGUS console (spec 02 §2.4): `EmergencyProtocol { id: 'fire' | 'depress' | 'toxic' | 'medical' | 'radiation' | 'co2', title, icon, trigger, steps[] }`, defined in the data file. A running protocol is the console's `EmergencyRunState` (`src/context/AssistantContext.tsx`: protocol, start time, reason, step completion times), saved per crew member. Generic training aid based on public ISS practice, not mission flight rules.
 
 ## 11. Scheduled Mission Routine & Gamification Milestones (`REQ-08`, `REQ-09`)
 
@@ -548,3 +559,62 @@ export interface ReadinessMilestone {
 5. `'peak_readiness'` — **Peak Condition**: Maintained Crew Readiness Score $\ge 95\%$ (target: 95%).
 6. `'countermeasure_pro'` — **Countermeasure Specialist**: Completed $\ge 2$ active countermeasure checklist items (target: 2 steps).
 
+
+## 12. Cognition Games (`src/features/cognition/`)
+
+Daily gamified cognitive readiness check. Each game implements one test of NASA's **Cognition** battery [SRC-089]. Emotion Recognition comes from a separate team system and is not in this rotation.
+
+### 12.1 Game catalog (`catalog.ts`)
+
+| `CognitionGameId` | Game | NASA test | Domain | Primary metric (direction) |
+|---|---|---|---|---|
+| `pvt` | Reflex | Psychomotor Vigilance, brief 3-min (PVT-B) [SRC-090] | Vigilant attention | mean 1/RT, s⁻¹ (higher) |
+| `motor_praxis` | Target Lock | Motor Praxis [SRC-094] | Sensory-motor speed | hits/s (higher) |
+| `fractal_2back` | Echo | Fractal N-Back, played as 3-back | Working memory | hit rate − false-alarm rate (higher) |
+| `volt` | Cargo Memory | Visual Object Learning [SRC-094] | Spatial learning & memory | accuracy % (higher) |
+| `dsst` | Code Breaker | Digit Symbol Substitution [SRC-095] | Complex scanning & visual tracking | correct/min (higher) |
+| `bart` | Pressure Run | Balloon Analog Risk | Risk decision making | adjusted pumps (both directions) |
+| `line_orientation` | Docking Align | Line Orientation [SRC-094] | Spatial orientation | mean angle error ° (lower) |
+| `abstract_matching` | Pattern Sort | Abstract Matching | Abstraction | accuracy % (higher) |
+| `matrix_reasoning` | Grid Logic | Matrix Reasoning | Abstract reasoning | accuracy % (higher) |
+
+- PVT-B: 3 min, inter-stimulus interval 1–4 s, lapse ≥ 355 ms, false start < 100 ms [SRC-090]. The game also counts lapses ≥ 500 ms and writes them as a `pvt_lapses` check-in, because that is the definition the existing `pvt_lapses` vital uses (§2).
+- Stimuli are procedural SVG glyphs (shape × color × fill × count × rotation), not the original Cognition images.
+- **Hard level, 3 minutes each (ARGUS choice, no primary source):** every game runs for 180 s at a fixed hard level (`useTimeBox`); trials keep coming until time is up.
+  - Target Lock: targets shrink 48 → 14 px per wave of 20 and vanish after 1.1 s (time-out = miss).
+  - Echo: 3-back, one glyph every 1.5 s (120 glyphs).
+  - Cargo Memory: rounds of 12 learned (1.2 s each) and 24 tested; half of the new items are look-alikes (one detail changed).
+  - Code Breaker: the symbol key is reshuffled every 60 s.
+  - Pressure Run: burst point uniform 1–64 pumps.
+  - Docking Align: lines 40–80 px, 2° steps, 10 s per pair (auto-lock).
+  - Pattern Sort: 4 s per object; the target also copies one non-rule detail from the wrong pair (decoy).
+  - Grid Logic: a third rule (fill changes along diagonals), 5 options, 15 s per grid.
+  - Reflex (PVT-B) is unchanged: it is already the standard 3-minute test.
+- `points` (0–1000) are for the leaderboard only. Anomaly detection uses the primary metric.
+
+### 12.2 Daily schedule (`schedule.ts`)
+
+- One game per crew member per **calendar day**, chosen by a seeded shuffle bag: every game once per 9-day cycle, a new order each cycle, never the same game two days running. Deterministic from `crewId` + date.
+- The daily game appears in the Scheduled Routine banner (§11) and the Cognition tab. A **retest** after an alert is stored with `daily: false` and does not score on the leaderboard.
+
+### 12.3 Personal baseline & status (`scoring.ts`)
+
+- Baseline = the astronaut's last **5** sessions of the **same game**; at least **3** are needed, otherwise status is `calibrating`. A rolling window absorbs the practice effect of repeated testing [SRC-091].
+- Decline z = robust z (median, MAD with a per-game floor `madFloor`) [SRC-063], signed so negative = worse; for `both` games any large change counts.
+- Status: decline z ≤ **−3.5** → `red` [SRC-063]; ≤ **−2** → `yellow` (assumption, matches the 2σ drifting band [SRC-064]); otherwise `green`. Deterministic, never set by AI.
+- Leaderboard: daily-game points over the last 7 days, ties broken by streak.
+
+### 12.4 Care routing (`routing.ts`)
+
+The ISS Crew Medical Officer is usually not a physician and acts as an extender of the ground flight surgeons, treating with onboard supplies on their advice [SRC-092][SRC-093].
+
+| Condition | Route | Action |
+|---|---|---|
+| `green` / `calibrating` | none | — |
+| single `yellow`, previous game not in decline, neuro zone not red | **onboard** | CMO screen: sleep, SpO₂ + cabin ppCO₂, hydration/food, medication, rest 20 min and retest |
+| `red`, **or** previous game also declined, **or** neuro zone `red` | **earth** | Pause safety-critical tasks, onboard checks, Earth packet queued via `queueEarthPacket` with the decline details |
+| neuro zone `red` | earth + | Neuro red-flag check; start the crew medical emergency procedure |
+
+### 12.5 Storage (`store.ts`)
+
+`CognitionSession` records live in `localStorage` key `argus.cognition.sessions.v2` (v2 = hard 3-minute games; v1 scores are not comparable, so baselines start again), keyed by crew. No demo data is generated; the team loads mock sessions with `importCognitionSessions()`. Server persistence is a follow-up.

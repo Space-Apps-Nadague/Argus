@@ -19,7 +19,10 @@ function getContext(): AudioContext | null {
   return ctx;
 }
 
-/** Unlocks audio on the first user gesture. Returns a cleanup function. */
+/**
+ * Unlocks audio and speech on the first user gesture (browsers block both before one).
+ * Returns a cleanup function.
+ */
 export function primeAlarmAudio(): () => void {
   if (typeof window === 'undefined') return () => undefined;
   const unlock = () => {
@@ -27,6 +30,17 @@ export function primeAlarmAudio(): () => void {
       void getContext()?.resume();
     } catch {
       /* audio unavailable */
+    }
+    try {
+      // A silent utterance unlocks speech (Safari/iOS) and makes the browser load its voices.
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.getVoices();
+        const u = new SpeechSynthesisUtterance(' ');
+        u.volume = 0;
+        window.speechSynthesis.speak(u);
+      }
+    } catch {
+      /* speech unavailable */
     }
   };
   window.addEventListener('pointerdown', unlock, { once: true });
@@ -93,25 +107,59 @@ export function alertSpeech(threats: LifeThreat[], callsign?: string): string {
   return parts.join(' ');
 }
 
+/** Kept in a module variable: Chrome stops an utterance that gets garbage-collected while speaking. */
+let utterance: SpeechSynthesisUtterance | null = null;
+
+/** An English voice, preferring one installed on the device. */
+function englishVoice(synth: SpeechSynthesis): SpeechSynthesisVoice | null {
+  const voices = synth.getVoices();
+  return (
+    voices.find((v) => /^en[-_]US/i.test(v.lang) && v.localService) ??
+    voices.find((v) => /^en[-_]US/i.test(v.lang)) ??
+    voices.find((v) => /^en/i.test(v.lang)) ??
+    null
+  );
+}
+
 /** Speaks the message after the beep (≈1.6 s). Returns a function that cancels it. */
 export function speakAlert(text: string, delayMs = 1600): () => void {
   if (typeof window === 'undefined' || !('speechSynthesis' in window) || !text) return () => undefined;
-  const timer = window.setTimeout(() => {
-    try {
-      const u = new SpeechSynthesisUtterance(text);
-      u.lang = 'en-US';
-      u.rate = 0.95;
-      u.volume = 1;
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(u);
-    } catch {
-      /* speech unavailable: the beep and the on-screen alert still work */
-    }
-  }, delayMs);
+  const synth = window.speechSynthesis;
+  let cancelled = false;
+  const timers: number[] = [];
+  timers.push(
+    window.setTimeout(() => {
+      if (cancelled) return;
+      try {
+        if (synth.speaking || synth.pending) synth.cancel();
+        // Chrome drops a speak() issued right after cancel(), so wait a moment first.
+        timers.push(
+          window.setTimeout(() => {
+            if (cancelled) return;
+            const u = new SpeechSynthesisUtterance(text);
+            u.lang = 'en-US';
+            u.rate = 0.95;
+            u.volume = 1;
+            const voice = englishVoice(synth);
+            if (voice) u.voice = voice;
+            utterance = u;
+            u.onend = () => {
+              if (utterance === u) utterance = null;
+            };
+            synth.resume();
+            synth.speak(u);
+          }, 120)
+        );
+      } catch {
+        /* speech unavailable: the beep and the on-screen alert still work */
+      }
+    }, delayMs)
+  );
   return () => {
-    window.clearTimeout(timer);
+    cancelled = true;
+    timers.forEach((t) => window.clearTimeout(t));
     try {
-      window.speechSynthesis.cancel();
+      if (synth.speaking || synth.pending) synth.cancel();
     } catch {
       /* ignore */
     }

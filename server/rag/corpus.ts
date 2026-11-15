@@ -6,7 +6,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { EMERGENCY_DISCLAIMER, EMERGENCY_PROTOCOLS } from '../../src/data/emergencyProtocols';
+import { EMERGENCY_DISCLAIMER, EMERGENCY_PROTOCOLS } from './emergencyProtocols';
 import { METRIC_BY_ID } from '../db/catalog';
 import { COUNTERMEASURE_LIBRARY } from '../models/countermeasureLibrary';
 import type { RagDocKind, RagDocumentInput } from './types';
@@ -33,7 +33,7 @@ export function repoDocuments(): RagDocumentInput[] {
       sourceId: 'SRC-004',
       title: `Emergency: ${p.title}`,
       kind: 'emergency_checklist',
-      origin: 'src/data/emergencyProtocols.ts',
+      origin: 'server/rag/emergencyProtocols.ts',
       url: null,
       zoneIds: EMERGENCY_ZONE_METRIC[p.id] ? zoneOfMetric(EMERGENCY_ZONE_METRIC[p.id]) : [],
       body: `When: ${p.trigger}\n\nSteps:\n${steps}\n\n${EMERGENCY_DISCLAIMER}`,

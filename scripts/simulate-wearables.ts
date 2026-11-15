@@ -5,7 +5,7 @@
  *   npm run simulate -- --live                        # every 60 s, POST the last minute(s) to the ingest API as each device
  *   npm run simulate -- --live --crew crew-lindqvist --scenario solar_storm   # push a crisis now
  *
- * Options: --preflight-days <n> (Earth days before launch, default 14), --reset (delete earlier simulated data first), --crew <id> (repeatable), --scenario <id>, --seed <n>, --full (1-min secondary streams),
+ * Options: --preflight-days <n> (Earth days before launch, default 30), --reset (delete earlier simulated data first), --crew <id> (repeatable), --scenario <id>, --seed <n>, --full (1-min secondary streams),
  *          --interval <s> (live), --api <url> (live, default http://127.0.0.1:8787)
  */
 
@@ -18,7 +18,7 @@ import { astronauts, devices, missions } from '../server/db/schema';
 import { loadEnv } from '../server/env';
 import { deviceToken } from '../server/ingest/deviceTokens';
 import { backfillSimulated } from '../server/ingest/backfill';
-import { simulate } from '../server/ingest/simulator';
+import { DEFAULT_SECONDARY_EVERY_MIN, simulate } from '../server/ingest/simulator';
 import type { ScenarioId } from '../src/types/argus';
 
 loadEnv();
@@ -66,7 +66,7 @@ async function backfill(days: number) {
     crewIds: crewFilter,
     scenarioOverride,
     reset: has('reset'),
-    secondaryEveryMin: has('full') ? 1 : 5,
+    secondaryEveryMin: has('full') ? 1 : DEFAULT_SECONDARY_EVERY_MIN,
     script: 'scripts/simulate-wearables.ts --backfill',
     log: (m) => console.log(`[simulate] ${m}`),
   });
