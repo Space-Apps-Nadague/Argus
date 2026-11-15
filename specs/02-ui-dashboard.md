@@ -96,6 +96,7 @@ A readable version of the prototype's "Thousand Eyes" ring plus the full data/co
   - Data: real HUD data only, no demo values. A HUD metric feeds the ring when its `metricId` is an indicator key or is mapped in `adapter.ts` (`resting_hr`→`rhr`, `hrv_rmssd`→`hrv`, `spo2`→`spo2`). Indicators without readings stay grey.
 - **Data table:** zone, metric, value + unit, status, personal baseline (mean ± SD), drift σ, nominal range, caution range, +3 day forecast.
 - **Configuration:** signed-in user + role, crew profile (baselines, notes), mission location (gravity, comm delay), scenario, threshold environment, AI provider chain.
+  - **Your data** (server mode only, specs/05 §6): a **Cloud AI** switch (`role="switch"`, sets `ai_consent` via `PATCH /api/astronauts/:id`; off = every AI answer for this astronaut is the offline deterministic one) and a **Download data** button (`GET /api/astronauts/:id/export`, saved as `argus-<id>-export.json`). Shown to the astronaut themself and to flight surgeons; admins see the switch only. Hidden in the offline demo.
 
 ### 2.4c Emergency (`EmergencyTab.tsx`)
 - Banner: comm delay for the current location ("Act first, report as you act").

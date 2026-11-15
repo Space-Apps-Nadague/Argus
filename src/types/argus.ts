@@ -136,6 +136,8 @@ export interface CrewMemberProfile {
   defaultScenarioId: ScenarioId;
   medicalNotes: string;
   isCustom?: boolean;
+  /** Server mode only (specs/05 §6): false = AI endpoints serve offline deterministic results. */
+  aiConsent?: boolean;
 }
 
 export interface ThresholdRange {

@@ -82,6 +82,7 @@ export interface CrewMemberProfile {
   defaultScenarioId: ScenarioId;
   medicalNotes: string;         // Individual spaceflight risk profile / notes
   isCustom?: boolean;
+  aiConsent?: boolean;          // Server mode only (specs/05 §6): false = AI endpoints serve offline deterministic results for this astronaut
 }
 ```
 

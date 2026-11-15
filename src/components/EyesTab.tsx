@@ -5,7 +5,7 @@
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { Eye, LineChart, Settings2, Table2 } from 'lucide-react';
+import { Download, Eye, LineChart, Settings2, Table2 } from 'lucide-react';
 import { useMission } from '../context/MissionContext';
 import { useAuth } from '../context/AuthContext';
 import type { BodyZoneId, VitalSignReading } from '../types/argus';
@@ -15,6 +15,7 @@ import { formatCommDelay } from '../data/spaceLocations';
 import { computeDrift, forecastMetric, formatSigma } from '../utils/driftAnalytics';
 import { ENVIRONMENT_META, evaluateMetricStatus, getMetricThreshold, STATUS_COLORS } from '../utils/triageEngine';
 import { fetchAiStatus } from '../services/argusApi';
+import { crewApi } from '../services/dataApi';
 import { formatValue } from '../utils/forecastSummary';
 import { Card } from './ui/Card';
 import { ThousandEyes } from '../features/thousandEyes/ThousandEyes';
@@ -39,6 +40,8 @@ export const EyesTab: React.FC = () => {
     setSelectedMetricId,
     setSelectedZone,
     setActiveTab,
+    serverBacked,
+    setCrewAiConsent,
   } = useMission();
   const { currentUser } = useAuth();
   const [ai, setAi] = useState<AiProviderStatus | null>(null);
@@ -141,6 +144,13 @@ export const EyesTab: React.FC = () => {
                       : 'None configured — offline protocols only'
               }
             />
+            {serverBacked && <YourData
+              crewId={activeCrewMember.id}
+              callsign={activeCrewMember.callsign}
+              aiConsent={activeCrewMember.aiConsent ?? true}
+              canExport={currentUser?.role === 'flight_surgeon' || currentUser?.crewId === activeCrewMember.id}
+              setAiConsent={setCrewAiConsent}
+            />}
           </dl>
         </Card>
       </div>
@@ -207,6 +217,96 @@ const Section: React.FC<{ label: string }> = ({ label }) => (
     {label}
   </div>
 );
+
+/**
+ * Data rights (specs/05 §6, specs/02 §2.4b): the Cloud AI switch (`ai_consent`) and the JSON export.
+ * Server mode only; the server re-checks every permission.
+ */
+const YourData: React.FC<{
+  crewId: string;
+  callsign: string;
+  aiConsent: boolean;
+  canExport: boolean;
+  setAiConsent: (crewId: string, consent: boolean) => Promise<void>;
+}> = ({ crewId, callsign, aiConsent, canExport, setAiConsent }) => {
+  const [busy, setBusy] = useState<'consent' | 'export' | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => setError(null), [crewId]);
+
+  const toggle = async () => {
+    setBusy('consent');
+    setError(null);
+    try {
+      await setAiConsent(crewId, !aiConsent);
+    } catch (err) {
+      setError((err as Error).message || 'Could not change the setting.');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const download = async () => {
+    setBusy('export');
+    setError(null);
+    try {
+      const data = await crewApi.exportData(crewId);
+      const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `argus-${crewId}-export.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError((err as Error).message || 'Download failed.');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <>
+      <Section label="Your data" />
+      <dt className="self-center text-hud-muted">Cloud AI</dt>
+      <dd className="flex min-w-0 items-center gap-2 text-hud-text">
+        <button
+          type="button"
+          role="switch"
+          aria-checked={aiConsent}
+          aria-label={`Cloud AI for ${callsign}`}
+          disabled={busy !== null}
+          onClick={toggle}
+          className={`hud-focus relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border transition-colors disabled:cursor-wait disabled:opacity-60 ${
+            aiConsent ? 'border-hud-accent bg-hud-accent/30' : 'border-hud-line bg-hud-panel'
+          }`}
+        >
+          <span
+            className={`inline-block h-4 w-4 transform rounded-full transition-transform ${
+              aiConsent ? 'translate-x-5 bg-hud-accent' : 'translate-x-1 bg-hud-muted'
+            }`}
+          />
+        </button>
+        <span className="text-xs">{aiConsent ? 'On' : 'Off · offline answers only'}</span>
+      </dd>
+      {canExport && (
+        <>
+          <dt className="self-center text-hud-muted">Export</dt>
+          <dd className="min-w-0">
+            <button type="button" className="hud-btn" disabled={busy !== null} onClick={download}>
+              <Download className="h-3.5 w-3.5" aria-hidden="true" />
+              {busy === 'export' ? 'Preparing…' : 'Download data'}
+            </button>
+          </dd>
+        </>
+      )}
+      {error && (
+        <p role="alert" className="col-span-2 text-xs text-red-300">
+          {error}
+        </p>
+      )}
+    </>
+  );
+};
 
 const Row: React.FC<{ k: string; v: string }> = ({ k, v }) => (
   <>

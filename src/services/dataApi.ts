@@ -77,6 +77,8 @@ export const crewApi = {
   update: (id: string, patch: { sex?: CrewMemberProfile['sex']; aiConsent?: boolean; medicalNotes?: string }) =>
     apiJson<{ crewMember: CrewMemberProfile }>(`/api/astronauts/${encodeURIComponent(id)}`, { method: 'PATCH', body: patch }),
   archive: (id: string) => apiJson<{ ok: true }>(`/api/astronauts/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  /** Data rights (specs/05 §6): everything stored about one astronaut, as JSON. */
+  exportData: (id: string) => apiJson<Record<string, unknown>>(`/api/astronauts/${encodeURIComponent(id)}/export`),
 };
 
 export const chatHistoryApi = {

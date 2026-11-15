@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { CrewMemberProfile } from '../../src/types/argus';
 import { createApp } from '../app';
 import { type DbHandle, openDb, setDbHandle } from '../db/client';
-import { auditLog, messages } from '../db/schema';
+import { astronauts, auditLog, messages } from '../db/schema';
 import { seedDatabase } from '../db/seed';
 
 const ADMIN_PW = 'admin-password-123';
@@ -181,5 +181,73 @@ describe('AI chat link', () => {
 
     const other = await login('pulse', DEMO_PW);
     expect((await req('/api/astronauts/crew-vance/conversations/latest', { cookie: other })).status).toBe(403);
+  });
+});
+
+describe('data rights (spec 05 §6)', () => {
+  it('astronauts switch their own cloud AI consent, not anyone else\'s', async () => {
+    const cookie = await login('valkyrie', DEMO_PW);
+    const off = await req('/api/astronauts/crew-vance', { method: 'PATCH', cookie, body: { aiConsent: false } });
+    expect(off.status).toBe(200);
+    expect(((await off.json()) as { crewMember: CrewMemberProfile }).crewMember.aiConsent).toBe(false);
+    const row = (await h.db.select().from(astronauts).where(eq(astronauts.id, 'crew-vance')))[0];
+    expect(row.aiConsent).toBe(false);
+    const { crew } = (await (await req('/api/astronauts', { cookie })).json()) as { crew: CrewMemberProfile[] };
+    expect(crew.find((c) => c.id === 'crew-vance')!.aiConsent).toBe(false);
+
+    expect((await req('/api/astronauts/crew-chen', { method: 'PATCH', cookie, body: { aiConsent: false } })).status).toBe(403);
+    // Consent is the only field an astronaut may change on their own profile.
+    expect((await req('/api/astronauts/crew-vance', { method: 'PATCH', cookie, body: { aiConsent: true, sex: 'male' } })).status).toBe(403);
+
+    expect((await req('/api/astronauts/crew-vance', { method: 'PATCH', cookie, body: { aiConsent: true } })).status).toBe(200);
+  });
+
+  it('exports an astronaut\'s data to themself and flight surgeons only, and audits it', async () => {
+    const self = await login('valkyrie', DEMO_PW);
+    const res = await req('/api/astronauts/crew-vance/export', { cookie: self });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-disposition')).toContain('argus-crew-vance-export.json');
+    const data = (await res.json()) as Record<string, unknown> & { profile: CrewMemberProfile };
+    expect(data.profile.id).toBe('crew-vance');
+    for (const key of ['dailyMetrics', 'baselines', 'anomalies', 'triageEvents', 'wellbeing', 'conversations', 'messages']) {
+      expect(Array.isArray(data[key])).toBe(true);
+    }
+
+    expect((await req('/api/astronauts/crew-chen/export', { cookie: self })).status).toBe(403);
+    expect((await req('/api/astronauts/crew-chen/export', { cookie: await login('surgeon', DEMO_PW) })).status).toBe(200);
+    expect((await req('/api/astronauts/crew-chen/export', { cookie: await login('admin', ADMIN_PW) })).status).toBe(403);
+    expect((await req('/api/astronauts/crew-vance/export')).status).toBe(401);
+
+    const audited = await h.db.select().from(auditLog).where(eq(auditLog.action, 'export'));
+    expect(audited.map((r) => r.targetId)).toEqual(expect.arrayContaining(['crew-vance', 'crew-chen']));
+  });
+
+  it('only admins purge an astronaut, and purging removes the profile for good', async () => {
+    const surgeon = await login('surgeon', DEMO_PW);
+    const created = await req('/api/astronauts', {
+      cookie: surgeon,
+      body: {
+        name: 'Test Purge',
+        callsign: 'purgeme',
+        role: 'Payload & Science Specialist',
+        sex: 'female',
+        age: 35,
+        bloodType: 'O+',
+        restingHrBaselineBpm: 60,
+        preFlightOnsdMm: 4.8,
+        countermeasureStreakSols: 0,
+        defaultScenarioId: 'nominal',
+        medicalNotes: 'none',
+      },
+    });
+    expect(created.status).toBe(201);
+    const { id } = ((await created.json()) as { crewMember: CrewMemberProfile }).crewMember;
+
+    expect((await req(`/api/astronauts/${id}?purge=1`, { method: 'DELETE', cookie: surgeon })).status).toBe(403);
+    const admin = await login('admin', ADMIN_PW);
+    expect((await req(`/api/astronauts/${id}?purge=1`, { method: 'DELETE', cookie: admin })).status).toBe(200);
+    expect(await h.db.select().from(astronauts).where(eq(astronauts.id, id))).toHaveLength(0);
+    const audited = await h.db.select().from(auditLog).where(eq(auditLog.action, 'astronaut_purge'));
+    expect(audited.map((r) => r.targetId)).toContain(id);
   });
 });
