@@ -226,3 +226,96 @@ export const WellbeingLlmSchema = z.object({
   supportiveMessage: text(1200),
   suggestedActions: z.array(text(200)).min(1).max(5),
 });
+
+// ── Unified assistant (specs/04-ai-backend.md §4.2) ──────────────────────────
+
+export const CommTierSchema = z.enum(['live', 'relay', 'autonomous']);
+const LevelSchema = z.enum(['low', 'moderate', 'high']);
+const ratio = () => z.number().min(0).max(1);
+
+export const VisualObservationSchema = z.object({
+  capturedAtIso: text(40),
+  windowSec: z.number().min(0).max(600),
+  facePresent: z.boolean(),
+  presenceRatio: ratio(),
+  blinkRatePerMin: z.number().min(0).max(120).nullable(),
+  perclos: ratio().nullable(),
+  yawnsPerMin: z.number().min(0).max(30).nullable(),
+  affect: z.enum(['neutral', 'positive', 'tense', 'flat', 'unknown']),
+  fatigue: LevelSchema.nullable(),
+  posture: z.enum(['upright', 'slumped', 'leaning', 'unknown']),
+  restlessness: LevelSchema.nullable(),
+  pulseBpmEstimate: z.number().min(30).max(220).nullable(),
+  pulseConfidence: ratio().nullable(),
+  notes: z.array(text(160)).max(8),
+});
+
+const cue = () => z.number().min(0).max(3);
+export const MentalStateCuesSchema = z.object({
+  lowMood: cue(),
+  stress: cue(),
+  anxiety: cue(),
+  sleepProblem: cue(),
+  isolation: cue(),
+  conflict: cue(),
+  lowMotivation: cue(),
+  hopelessness: cue(),
+  fatigue: cue(),
+});
+
+export const MentalStateAssessmentSchema = z.object({
+  assessedAtIso: text(40),
+  cues: MentalStateCuesSchema,
+  mood: z.enum(['good', 'ok', 'low', 'very_low']),
+  stress: LevelSchema,
+  fatigue: LevelSchema,
+  concernLevel: z.enum(['none', 'watch', 'concern', 'urgent']),
+  score: z.number().min(0).max(100),
+  trend: z.enum(['improving', 'stable', 'worsening']),
+  evidence: z.array(z.object({ source: z.enum(['conversation', 'camera', 'self_report', 'physiology']), text: text(400) })).max(12),
+  summary: text(600),
+});
+
+/** LLM output for the background cue extraction; every cue optional, coerced to 0–3. */
+export const MentalStateLlmSchema = z.object({
+  lowMood: cue().optional(),
+  stress: cue().optional(),
+  anxiety: cue().optional(),
+  sleepProblem: cue().optional(),
+  isolation: cue().optional(),
+  conflict: cue().optional(),
+  lowMotivation: cue().optional(),
+  hopelessness: cue().optional(),
+  fatigue: cue().optional(),
+  summary: text(600).optional(),
+});
+
+const ProtocolIdSchema = z.enum(['fire', 'depress', 'toxic', 'medical', 'radiation', 'co2']);
+
+export const ConverseRequestSchema = CrewContextSchema.extend({
+  messages: z
+    .array(z.object({ role: z.enum(['user', 'assistant', 'earth']), content: text(6000), timestampIso: text(40).optional() }))
+    .min(1)
+    .max(60),
+  modality: z.enum(['text', 'voice']),
+  tierOverride: CommTierSchema.optional(),
+  frame: z
+    .object({
+      base64Data: z.string().max(6_000_000),
+      mimeType: z.string().regex(/^image\/(jpeg|png|webp)$/i),
+    })
+    .optional(),
+  observation: VisualObservationSchema.optional(),
+  activeProtocol: z
+    .object({
+      protocolId: ProtocolIdSchema,
+      title: text(120),
+      steps: z.array(text(300)).max(20),
+      completedSteps: z.array(z.number().int().min(1).max(20)).max(20),
+    })
+    .optional(),
+  guidedSteps: z.array(text(300)).max(12).optional(),
+  checkIns: z.array(WellbeingCheckInSchema).max(60).optional(),
+  previousAssessment: MentalStateAssessmentSchema.optional(),
+  countermeasureLog: z.array(z.object({ id: text(80), title: text(160), helped: z.boolean().optional() })).max(30).optional(),
+});

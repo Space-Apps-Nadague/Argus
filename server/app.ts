@@ -11,6 +11,7 @@ import { adminRoutes } from './routes/admin';
 import { astronautRoutes } from './routes/astronauts';
 import { authRoutes } from './routes/auth';
 import { chatRoutes } from './routes/chat';
+import { converseRoutes } from './routes/converse';
 import { dataRoutes } from './routes/data';
 import { diagnosticsRoutes } from './routes/diagnostics';
 import { guidanceRoutes } from './routes/guidance';
@@ -45,6 +46,7 @@ export function createApp(): Hono<AppEnv> {
   ai.route('/', recommendationsRoutes);
   ai.route('/', wellbeingRoutes);
   ai.route('/', chatRoutes);
+  ai.route('/', converseRoutes);
   ai.route('/', voiceRoutes);
   app.route('/api/ai', ai);
 
