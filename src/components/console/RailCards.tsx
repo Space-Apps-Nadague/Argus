@@ -450,7 +450,7 @@ function reportState(r: EarthReport, now: number): string {
 
 export const EarthLinkCard: React.FC = () => {
   const { reports, sendReport, lastReportNotice, tier } = useAssistant();
-  const { serverBacked } = useMission();
+  const { serverBacked, queuedPackets } = useMission();
   const [note, setNote] = useState('');
   const [open, setOpen] = useState(false);
   const [now, setNow] = useState(Date.now());
@@ -519,7 +519,11 @@ export const EarthLinkCard: React.FC = () => {
           Report to Earth
         </button>
       )}
-      {!serverBacked && <p className="mt-2 text-[10px] text-hud-muted">Offline demo: reports are kept in this browser.</p>}
+      {!serverBacked && (
+        <p className="mt-2 text-[10px] text-hud-muted">
+          Offline demo: reports{queuedPackets.length > 0 ? ` & ${queuedPackets.length} queued blackout telemetry packets` : ''} kept in this browser.
+        </p>
+      )}
     </Card>
   );
 };

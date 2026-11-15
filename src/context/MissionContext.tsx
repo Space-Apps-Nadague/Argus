@@ -148,6 +148,59 @@ export function resolveLiveGuidance(
 }
 const TAB_STORAGE_KEY = 'argus_active_tab_v1';
 const HUD_TABS: HudTabId[] = ['biotwin', 'trends', 'forecast', 'eyes', 'console', 'cognition', 'crew', 'users', 'photobooth'];
+
+export const PACKETS_STORAGE_KEY = 'argus_packets_v1';
+export const COMPLETED_STEPS_STORAGE_KEY = 'argus_completed_steps_v1';
+
+export function sanitizePackets(raw: unknown): Record<string, EarthTelemetryPacket[]> {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const sanitized: Record<string, EarthTelemetryPacket[]> = {};
+  for (const [crewId, list] of Object.entries(raw as Record<string, unknown>)) {
+    if (!Array.isArray(list)) continue;
+    sanitized[crewId] = list.filter(
+      (p): p is EarthTelemetryPacket =>
+        Boolean(
+          p &&
+            typeof p === 'object' &&
+            typeof (p as any).packetId === 'string' &&
+            typeof (p as any).timestampIso === 'string'
+        )
+    );
+  }
+  return sanitized;
+}
+
+export function sanitizeCompletedSteps(raw: unknown): Record<string, string[]> {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const sanitized: Record<string, string[]> = {};
+  for (const [crewId, list] of Object.entries(raw as Record<string, unknown>)) {
+    if (!Array.isArray(list)) continue;
+    sanitized[crewId] = list.filter(
+      (s): s is string => typeof s === 'string' && s.length > 0
+    );
+  }
+  return sanitized;
+}
+
+export function loadInitialPackets(): Record<string, EarthTelemetryPacket[]> {
+  try {
+    const raw = localStorage.getItem(PACKETS_STORAGE_KEY);
+    if (raw) return sanitizePackets(JSON.parse(raw));
+  } catch {
+    // Ignore storage errors in restricted environments
+  }
+  return {};
+}
+
+export function loadInitialCompletedSteps(): Record<string, string[]> {
+  try {
+    const raw = localStorage.getItem(COMPLETED_STEPS_STORAGE_KEY);
+    if (raw) return sanitizeCompletedSteps(JSON.parse(raw));
+  } catch {
+    // Ignore storage errors in restricted environments
+  }
+  return {};
+}
 const LOCATIONS_STORAGE_KEY = 'argus_locations_v1';
 
 function loadInitialLocations(): Record<string, SpaceLocationId> {
@@ -231,7 +284,7 @@ function loadInitialCrewRoster(): CrewMemberProfile[] {
   return DEFAULT_CREW_ROSTER;
 }
 
-interface MissionState {
+export interface MissionState {
   crewRoster: CrewMemberProfile[];
   activeCrewId: string;
   isCrewModalOpen: boolean;
@@ -242,6 +295,7 @@ interface MissionState {
   anatomicalLayer: AnatomicalLayer;
   chartWindowDays: 14 | 30;
   completedStepIds: string[];
+  completedStepsByCrew: Record<string, string[]>;
   countermeasureStreakSols: number;
   guidance: FlightSurgeonGuidance;
   isSynthesizingAi: boolean;
@@ -249,6 +303,7 @@ interface MissionState {
   activePreviewImageUrl: string | null;
   isAnalyzingVisual: boolean;
   queuedPackets: EarthTelemetryPacket[];
+  queuedPacketsByCrew: Record<string, EarthTelemetryPacket[]>;
   runtimeApiKey: string;
   activeTab: HudTabId;
   checkIns: Record<string, CheckInEntry[]>;
@@ -256,7 +311,7 @@ interface MissionState {
   isCompanionOpen: boolean;
 }
 
-type MissionAction =
+export type MissionAction =
   | { type: 'SELECT_CREW_MEMBER'; payload: string }
   | { type: 'SET_ROSTER'; payload: { roster: CrewMemberProfile[]; selectId?: string } }
   | { type: 'ADD_CREW_MEMBER'; payload: CrewMemberProfile }
@@ -277,6 +332,8 @@ type MissionAction =
     }
   | { type: 'SET_ANALYZING_VISUAL'; payload: boolean }
   | { type: 'QUEUE_EARTH_PACKET'; payload: EarthTelemetryPacket }
+  | { type: 'CLEAR_QUEUED_PACKETS'; payload?: string }
+  | { type: 'CLEAR_COMPLETED_STEPS'; payload?: string }
   | { type: 'SET_RUNTIME_API_KEY'; payload: string }
   | { type: 'SET_ENVIRONMENT'; payload: GravityEnvironment }
   | { type: 'SET_ACTIVE_TAB'; payload: HudTabId }
@@ -292,7 +349,10 @@ const initialEnvironment: GravityEnvironment = loadInitialEnvironment();
 const initialZone: BodyZoneId =
   TELEMETRY_SCENARIOS[initialScenario].recommendedFocusZone;
 
-const initialState: MissionState = {
+const initialPacketsByCrew = loadInitialPackets();
+const initialStepsByCrew = loadInitialCompletedSteps();
+
+export const initialState: MissionState = {
   crewRoster: initialRoster,
   activeCrewId: initialCrew.id,
   isCrewModalOpen: false,
@@ -303,7 +363,8 @@ const initialState: MissionState = {
     TELEMETRY_SCENARIOS[initialScenario].zones[initialZone][0].metricId,
   anatomicalLayer: 'all',
   chartWindowDays: 14,
-  completedStepIds: [],
+  completedStepIds: initialStepsByCrew[initialCrew.id] || [],
+  completedStepsByCrew: initialStepsByCrew,
   countermeasureStreakSols: initialCrew.countermeasureStreakSols,
   guidance: getOfflineFlightSurgeonGuidance(
     initialScenario,
@@ -315,7 +376,8 @@ const initialState: MissionState = {
   visualExamAnalysis: null,
   activePreviewImageUrl: null,
   isAnalyzingVisual: false,
-  queuedPackets: [],
+  queuedPackets: initialPacketsByCrew[initialCrew.id] || [],
+  queuedPacketsByCrew: initialPacketsByCrew,
   runtimeApiKey: '',
   activeTab: loadInitialTab(),
   checkIns: loadInitialCheckIns(),
@@ -323,7 +385,7 @@ const initialState: MissionState = {
   isCompanionOpen: false,
 };
 
-function missionReducer(
+export function missionReducer(
   state: MissionState,
   action: MissionAction
 ): MissionState {
@@ -356,6 +418,8 @@ function missionReducer(
         state.environment,
         targetCrew
       );
+      const targetSteps = state.completedStepsByCrew[targetCrew.id] || [];
+      const targetPackets = state.queuedPacketsByCrew[targetCrew.id] || [];
       return {
         ...state,
         activeCrewId: targetCrew.id,
@@ -363,7 +427,8 @@ function missionReducer(
         selectedZone: nextZone,
         selectedMetricId: firstMetric,
         countermeasureStreakSols: targetCrew.countermeasureStreakSols,
-        completedStepIds: [],
+        completedStepIds: targetSteps,
+        queuedPackets: targetPackets,
         guidance: nextGuidance,
       };
     }
@@ -379,6 +444,8 @@ function missionReducer(
         state.environment,
         action.payload
       );
+      const targetSteps = state.completedStepsByCrew[action.payload.id] || [];
+      const targetPackets = state.queuedPacketsByCrew[action.payload.id] || [];
       return {
         ...state,
         crewRoster: nextRoster,
@@ -387,7 +454,8 @@ function missionReducer(
         selectedZone: nextZone,
         selectedMetricId: firstMetric,
         countermeasureStreakSols: action.payload.countermeasureStreakSols,
-        completedStepIds: [],
+        completedStepIds: targetSteps,
+        queuedPackets: targetPackets,
         guidance: nextGuidance,
       };
     }
@@ -409,21 +477,33 @@ function missionReducer(
         (c) => c.id === action.payload && c.isCustom
       );
       const nextCheckIns = { ...state.checkIns };
-      if (deletedIsCustom) delete nextCheckIns[action.payload];
+      const nextStepsByCrew = { ...state.completedStepsByCrew };
+      const nextPacketsByCrew = { ...state.queuedPacketsByCrew };
+      if (deletedIsCustom) {
+        delete nextCheckIns[action.payload];
+        delete nextStepsByCrew[action.payload];
+        delete nextPacketsByCrew[action.payload];
+      }
       const nextActiveCrew =
         state.activeCrewId === action.payload
           ? filtered[0]
           : getActiveCrew(filtered, state.activeCrewId);
       const nextScenario = nextActiveCrew.defaultScenarioId;
       const nextZone = TELEMETRY_SCENARIOS[nextScenario].recommendedFocusZone;
+      const targetSteps = nextStepsByCrew[nextActiveCrew.id] || [];
+      const targetPackets = nextPacketsByCrew[nextActiveCrew.id] || [];
       return {
         ...state,
         crewRoster: filtered,
         checkIns: nextCheckIns,
+        completedStepsByCrew: nextStepsByCrew,
+        queuedPacketsByCrew: nextPacketsByCrew,
         activeCrewId: nextActiveCrew.id,
         scenarioId: nextScenario,
         selectedZone: nextZone,
         countermeasureStreakSols: nextActiveCrew.countermeasureStreakSols,
+        completedStepIds: targetSteps,
+        queuedPackets: targetPackets,
         guidance: getOfflineFlightSurgeonGuidance(
           nextScenario,
           nextZone,
@@ -453,7 +533,6 @@ function missionReducer(
         scenarioId: action.payload,
         selectedZone: nextZone,
         selectedMetricId: firstMetric,
-        completedStepIds: [],
         guidance: nextGuidance,
       };
     }
@@ -495,9 +574,14 @@ function missionReducer(
       const updated = exists
         ? state.completedStepIds.filter((id) => id !== action.payload)
         : [...state.completedStepIds, action.payload];
+      const nextStepsByCrew = {
+        ...state.completedStepsByCrew,
+        [state.activeCrewId]: updated,
+      };
       return {
         ...state,
         completedStepIds: updated,
+        completedStepsByCrew: nextStepsByCrew,
       };
     }
     case 'SET_GUIDANCE':
@@ -521,11 +605,38 @@ function missionReducer(
         ...state,
         isAnalyzingVisual: action.payload,
       };
-    case 'QUEUE_EARTH_PACKET':
+    case 'QUEUE_EARTH_PACKET': {
+      const updated = [action.payload, ...state.queuedPackets];
+      const nextPacketsByCrew = {
+        ...state.queuedPacketsByCrew,
+        [state.activeCrewId]: updated,
+      };
       return {
         ...state,
-        queuedPackets: [action.payload, ...state.queuedPackets],
+        queuedPackets: updated,
+        queuedPacketsByCrew: nextPacketsByCrew,
       };
+    }
+    case 'CLEAR_QUEUED_PACKETS': {
+      const targetCrewId = action.payload ?? state.activeCrewId;
+      const nextPacketsByCrew = { ...state.queuedPacketsByCrew };
+      delete nextPacketsByCrew[targetCrewId];
+      return {
+        ...state,
+        queuedPacketsByCrew: nextPacketsByCrew,
+        queuedPackets: targetCrewId === state.activeCrewId ? [] : state.queuedPackets,
+      };
+    }
+    case 'CLEAR_COMPLETED_STEPS': {
+      const targetCrewId = action.payload ?? state.activeCrewId;
+      const nextStepsByCrew = { ...state.completedStepsByCrew };
+      delete nextStepsByCrew[targetCrewId];
+      return {
+        ...state,
+        completedStepsByCrew: nextStepsByCrew,
+        completedStepIds: targetCrewId === state.activeCrewId ? [] : state.completedStepIds,
+      };
+    }
     case 'SET_RUNTIME_API_KEY':
       return {
         ...state,
@@ -641,6 +752,8 @@ interface MissionContextValue extends MissionState {
   runUploadedVisualExam: (file: File) => Promise<void>;
   clearVisualExam: () => void;
   queueEarthPacket: (crewNotes?: string) => EarthTelemetryPacket;
+  clearQueuedPackets: (crewId?: string) => void;
+  clearCompletedSteps: (crewId?: string) => void;
   setRuntimeApiKey: (key: string) => void;
   logVitalReading: (zoneId: BodyZoneId, metricKey: string, value: number) => Promise<void>;
   setCompanionOpen: (open: boolean) => void;
@@ -729,6 +842,30 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
       // Ignore storage errors
     }
   }, [state.environment]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(PACKETS_STORAGE_KEY, JSON.stringify(state.queuedPacketsByCrew));
+    } catch {
+      // Ignore storage errors in restricted environments
+    }
+  }, [state.queuedPacketsByCrew]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(COMPLETED_STEPS_STORAGE_KEY, JSON.stringify(state.completedStepsByCrew));
+    } catch {
+      // Ignore storage errors in restricted environments
+    }
+  }, [state.completedStepsByCrew]);
+
+  const clearQueuedPackets = useCallback((crewId?: string) => {
+    dispatch({ type: 'CLEAR_QUEUED_PACKETS', payload: crewId });
+  }, []);
+
+  const clearCompletedSteps = useCallback((crewId?: string) => {
+    dispatch({ type: 'CLEAR_COMPLETED_STEPS', payload: crewId });
+  }, []);
 
   const activeCrewMember = useMemo(
     () =>
@@ -1347,6 +1484,8 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
       runUploadedVisualExam,
       clearVisualExam,
       queueEarthPacket,
+      clearQueuedPackets,
+      clearCompletedSteps,
       setRuntimeApiKey,
       logVitalReading,
       setCompanionOpen,
@@ -1401,6 +1540,8 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
       runUploadedVisualExam,
       clearVisualExam,
       queueEarthPacket,
+      clearQueuedPackets,
+      clearCompletedSteps,
       setRuntimeApiKey,
     ]
   );
