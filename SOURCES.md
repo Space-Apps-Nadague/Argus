@@ -95,3 +95,17 @@ Columns:
 | SRC-081 | [NASA-STD-3001 Vol 2 Rev D: Human Factors, Habitability, and Environmental Health](https://standards.nasa.gov/standard/NASA/NASA-STD-3001-VOL-2) (EER caloric equations, +200 kcal/hr EVA, 2.5 L/day baseline potable water) | standard | open | `specs/01-data-schema.md` §2, `src/utils/triageEngine.ts` (`caloric_intake`, `hydration_intake`), `server/db/catalog.ts` |
 | SRC-082 | [NASA HRP Risk of Inadequate Food and Nutrition](https://humanresearchroadmap.nasa.gov/Risks/risk.aspx?i=93) (spaceflight energy balance, flavor fatigue, hypohydration & renal stone risk) | web | open | `specs/01-data-schema.md` §2, `src/utils/triageEngine.ts`, `src/data/telemetryScenarios.ts` |
 
+
+## ARGUS assistant: comm tiers, voice and camera analysis
+
+| ID | Source | Type | Access | Used in |
+|---|---|---|---|---|
+| SRC-090 | [ITU-T G.114: One-way transmission time](https://www.itu.int/rec/T-REC-G.114) (≤ 400 ms one-way for interactive speech) | standard | open | `shared/commProfile.ts` (`live` tier cut-off) |
+| SRC-091 | [Dinges et al., PERCLOS: A Valid Psychophysiological Measure of Alertness (FHWA-MCRT-98-006, 1998)](https://rosap.ntl.bts.gov/view/dot/113) (share of time eyes ≥ 80 % closed) | paper | open | `src/services/vision/signals.ts` (PERCLOS, fatigue levels), `src/types/assistant.ts` |
+| SRC-092 | [vladmandic/face-api](https://github.com/vladmandic/face-api) (TinyFaceDetector, 68-point landmarks, 7-class facial expression model, in-browser TensorFlow.js) | software | open | `src/services/vision/observer.ts`, `src/services/vision/signals.ts` (emotion), `src/types/assistant.ts` |
+| SRC-093 | [Verkruysse, Svaasand & Nelson, Remote plethysmographic imaging using ambient light, Optics Express 16(26) 2008](https://pmc.ncbi.nlm.nih.gov/articles/PMC2717852) (green channel carries the pulse) | paper | open | `src/services/vision/signals.ts` (`estimatePulse`), `src/services/vision/observer.ts` |
+| SRC-094 | [NASA HRP: Risk of Adverse Cognitive or Behavioral Conditions and Psychiatric Disorders](https://www.nasa.gov/directorates/esdmd/hhp/risk-of-adverse-cognitive-or-behavioral-conditions-and-psychiatric-disorders) (isolation and confinement; behavioural-health countermeasures) | web | open | `shared/countermeasures.ts`, `shared/mentalState.ts`, `server/prompts.ts` (`ASSISTANT_PERSONA`) |
+| SRC-095 | [Speaches: OpenAI-compatible local speech server](https://speaches.ai/) (faster-whisper STT, Kokoro TTS) | software | open | `server/ai/localSpeech.ts`, `docker-compose.yml` |
+| SRC-096 | [Gemini API: Speech generation](https://aistudio.google.com/docs/speech-generation) (30 prebuilt voices and their styles, 24 kHz PCM output) | web | open | `server/ai/geminiVoices.ts`, `server/routes/voice.ts` (`/tts`, `/voices`) |
+| SRC-097 | [Soukupová & Čech, Real-Time Eye Blink Detection using Facial Landmarks (CVWW 2016)](https://vision.fe.uni-lj.si/cvww2016/proceedings/papers/05.pdf) (eye aspect ratio) | paper | open | `src/services/vision/signals.ts`, `src/services/vision/observer.ts` |
+| SRC-098 | [The distribution of blink rate among young adults: a cross-sectional study (2023)](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9899223/) (normal spontaneous blink rate 6–30/min) | paper | open | `src/services/vision/signals.ts` (`blinkRateHigh`) |

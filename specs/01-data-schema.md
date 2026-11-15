@@ -336,8 +336,14 @@ export interface EarthTelemetryPacket {
   visualExamAttached?: VisualExamAnalysis | null;
   recentCheckIns?: CheckInEntry[]; // Up to the 5 most recent check-ins of the active crew member (§6)
   crewNotes: string;
+  urgency?: 'routine_downlink' | 'priority_packet' | 'immediate_emergency_packet'; // absent on old packets = routine
+  kind?: 'medical' | 'behavioral' | 'emergency' | 'digest';
+  behavioralHealth?: BehavioralHealthReport | null;  // spec 04 §4.4 (src/types/assistant.ts)
+  visualObservation?: VisualObservation | null;      // on-device camera summary, spec 04 §4.3; never images
 }
 ```
+
+`VisualObservation` (camera, last 30 s): `facePresent`, `presenceRatio`, `blinkRatePerMin`, `perclos`, `yawnsPerMin`, `emotion` (`label` of neutral/happy/sad/angry/fearful/surprised/disgusted, `confidence`, per-label `scores`), `affect`, `fatigue`, `posture`, `restlessness`, `pulseBpmEstimate` + `pulseConfidence` (estimate only, never stored as a vital), `notes`. `MentalStateAssessment`: cue strengths 0–3 (low mood, stress, anxiety, sleep trouble, isolation, conflict, low motivation, hopelessness, fatigue), `mood`, `stress`, `fatigue`, `concernLevel` (none/watch/concern/urgent, set in code), `score` 0–100, `trend`, `evidence[]`, `summary`.
 
 ---
 

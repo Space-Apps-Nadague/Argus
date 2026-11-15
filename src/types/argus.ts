@@ -51,8 +51,7 @@ export type HudTabId =
   | 'trends'
   | 'forecast'
   | 'eyes'
-  | 'ai'
-  | 'emergency'
+  | 'console'
   | 'crew'
   | 'users';
 

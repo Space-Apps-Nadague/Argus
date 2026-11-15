@@ -6,6 +6,7 @@
 import OpenAI from 'openai';
 import { loadEnv } from '../server/env';
 import { buildProvider } from '../server/ai/providers';
+import { localSpeechConfig, localSynthesize, localTranscribe, probeLocalSpeech } from '../server/ai/localSpeech';
 
 loadEnv();
 
@@ -47,6 +48,28 @@ async function main() {
   });
   const text = res.choices[0]?.message?.content?.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
   console.log(`✓ Test reply in ${((Date.now() - started) / 1000).toFixed(1)}s: ${text}`);
+
+  await checkSpeech();
+}
+
+/** On-ship speech server (deep-space tier). Optional: warns instead of failing. */
+async function checkSpeech() {
+  const speech = localSpeechConfig(process.env);
+  if (!speech) {
+    console.log('· On-ship speech not configured (AI_LOCAL_SPEECH_BASE_URL unset): the browser voice is used off-Earth.');
+    return;
+  }
+  if (!(await probeLocalSpeech(speech))) {
+    console.warn(`! No speech server at ${speech.baseUrl}. Start it with \`docker compose up -d speaches\`.`);
+    return;
+  }
+  console.log(`✓ Speech server reachable at ${speech.baseUrl}`);
+  const tts = await localSynthesize(speech, 'ARGUS on-ship voice online.');
+  console.log(tts ? `✓ TTS works (${speech.ttsModel})` : `! TTS failed. Download it: uvx speaches-cli model download ${speech.ttsModel}`);
+  if (tts) {
+    const text = await localTranscribe(speech, tts.audioBase64, 'audio/wav');
+    console.log(text ? `✓ STT works (${speech.sttModel}): "${text}"` : `! STT failed. Download it: uvx speaches-cli model download ${speech.sttModel}`);
+  }
 }
 
 main().catch((err) => {

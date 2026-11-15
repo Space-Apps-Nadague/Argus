@@ -57,7 +57,7 @@ export const TopMissionBar: React.FC = () => {
     spaceLocation,
     spaceLocationId,
     setSpaceLocation,
-    setCompanionOpen,
+    setActiveTab,
   } = useMission();
   const { currentUser, isAdmin, seesAllCrew, canViewHealth, logout } = useAuth();
 
@@ -207,14 +207,14 @@ export const TopMissionBar: React.FC = () => {
 
           <button
             type="button"
-            onClick={() => setCompanionOpen(true)}
-            aria-label="Open ARGUS Companion chat drawer"
-            title="ARGUS Companion (offline brain + Clinical AI + voice)"
+            onClick={() => setActiveTab('console')}
+            aria-label="Open the ARGUS console"
+            title="Talk to ARGUS, your onboard doctor and therapist"
             className="hud-focus flex items-center gap-1.5 rounded-lg border border-hud-accent/60 bg-hud-accent/15 px-2.5 py-1.5 text-xs text-hud-text hover:bg-hud-accent/25 transition-colors"
           >
             <Bot className="h-4 w-4 text-hud-accent" aria-hidden="true" />
             <span className="font-display font-semibold tracking-wider">ARGUS</span>
-            <span className="hidden xl:inline text-[10px] text-hud-muted font-sans">Companion</span>
+            <span className="hidden xl:inline text-[10px] text-hud-muted font-sans">Talk</span>
           </button>
 
           <div className="flex items-center gap-1.5 rounded-lg border border-hud-line bg-hud-panel/80 py-1 pl-2.5 pr-1">

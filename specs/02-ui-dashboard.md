@@ -74,19 +74,12 @@ Readable 3-day outlook built only from deterministic models (`forecastMetric`, `
 - **What changes:** one row per metric, sorted worst-first: `Heart rate 76 → 82 bpm in 3 days`, status chips today → day 3 (`Caution → Alert`), a plain range sentence (`likely 79–85`), and a direction word (`Getting worse` / `Steady` / `Improving` relative to the nominal band). Filters: `Changing` (default) / `All`.
 - Footer: "Projection from the last 10 days. Not a diagnosis."
 
-### 2.4 ARGUS AI (`AiTab.tsx`) — all Flight Surgeon tools live here
-- Header: provider badge from `GET /api/health` (`Local · qwen3.6`, `OpenRouter free`, or `Offline`).
-- Sub-sections (segmented control): **Chat** (default; streaming companion via `POST /api/ai/chat`, history kept per crew member), **Flight Surgeon** (the former Flight Surgeon tab: situation + steps, visual self-exam, Earth packet — `FlightSurgeonPanel.tsx`), **Diagnostics** (`POST /api/ai/diagnostics`: ranked hypotheses with supporting metrics), **Plan** (`POST /api/ai/recommendations`), **Wellbeing** (1–5 mood check-in → `POST /api/ai/wellbeing`).
-- Every AI result shows its source (`live_ai` / offline) and the disclaimer. The AI never sets a triage status.
-- **Crew Symptom & Clinical Q&A (PR #27)** lives in the Flight Surgeon section (`FlightSurgeonPanel.tsx`):
-  - Free-text symptoms with one-click presets, answered by the AI or the offline `symptomFallback.ts`.
-  - Live webcam capture for the visual self-exam.
-- **Real-Time Voice & Video AI Flight Surgeon (`FlightSurgeonPanel.tsx`, `src/services/realtimeDoctor.ts`):**
-  - Hands-free and push-to-talk clinical voice/video interface supporting two transport modes (`specs/04-ai-backend.md` §4.1):
-    1. **Online Mode (`live-api`):** Connects directly to the Gemini Live API WebSocket via a server-minted ephemeral token (`POST /api/ai/live-token`) with bidirectional PCM audio, optional live webcam frame streaming (`image/jpeg`) for visual exams (SANS ocular checks, dermal lesions), **barge-in** interruption, and non-blocking tool execution (`get_crew_snapshot`, `log_checkin_reading`).
-    2. **Offline / Deep-Space Blackout Mode (`on-ship-pipeline`):** Presents as **"On-Ship Local Flight Surgeon (Autonomous Mode)"** with an `on-ship-local` badge (no cloud/Gemini branding) and a visible 3-stage pipeline progress bar (`Listening [STT]` → `Thinking [Local LLM]` → `Speaking [TTS]`). Uses Gemini behind the scenes when internet is reachable, or local Ollama / browser Web Speech fallback when truly disconnected.
-  - **Connectivity Auto-Detect + Simulated Comm Blackout Toggle:** Automatically probes `navigator.onLine` and `/api/health` + `/api/ai/live-token`, and exposes a manual **Simulated Comm Blackout / Offline Mode** switch (`role="switch"`) so judges and crew can compare `live-api` vs `on-ship-pipeline` on demand.
-  - **Clinical Framing & Guardrails:** Displays *"Decision support, not a medical diagnosis"* on the voice HUD. Deterministic triage (`triageEngine.ts`) and crisis escalation (`wellbeingModel.ts`) are never overridden or lowered by the voice model.
+### 2.4 ARGUS console (`console/ConsoleTab.tsx`, state in `context/AssistantContext.tsx`)
+The one place to talk to ARGUS, the crew's onboard doctor and therapist. It replaces the ARGUS AI tab (chat + flight surgeon), the Companion drawer and the Emergency tab. State lives above the tabs, so a tab switch loses nothing; the thread, open protocol and cards are saved per crew member (server thread restored on a new device).
+- **Header:** tier badge (Earth live / Earth relay / On-ship, live one-way delay, InfoTip with the stack in use and any fallback reason), comm override (auto, or further from Earth, e.g. "Blackout: on-ship only"), **Voice** popover (Earth voice, on-ship voice, browser voice: pick + play preview, speed, speak replies), section switch: Talk · Diagnostics · Plan · Check-in (· Earth inbox for flight surgeons).
+- **Talk, left:** one conversation thread. Bubbles for crew, ARGUS (source: Earth AI / On-ship AI / onboard protocols) and Earth doctor replies (violet); action chips under the ARGUS message that did them; crisis replies outlined red. Composer: text (Enter sends), **Talk to ARGUS** (hands-free conversation: live session at Earth/LEO, voice detection + STT elsewhere; talking over ARGUS stops it), **Voice message** (press to record, press to send), mute, stop, status (Listening / Transcribing / Thinking / Speaking), mic level, time to first word and first audio.
+- **Talk, right rail:** Emergency protocols (collapsed picker; a running protocol becomes a red checklist with step times, "say done", Close & report); **What ARGUS sees** (self-view, consent prompt, camera-on indicator, overlay chips: facial emotion with %, tired, slumped, restless, ~pulse; expression mix bar; close-up requests from ARGUS with Send close-up); steps ARGUS laid out; **Try this now** countermeasure cards with Did it help? Yes / No; **How you're doing** (mood, stress, fatigue, concern level, trend sparkline, what ARGUS noticed); **Doctors on Earth** (reports with urgency, kind and in-transit / delivered / read / replied state, round trip, Report to Earth with a note).
+- **SOS** in the tab rail opens the console with the protocol picker; red flags in conversation and life-threat alarms (§7) start the protocol automatically.
 
 ### 2.4b Eyes (`EyesTab.tsx`)
 A readable version of the prototype's "Thousand Eyes" ring plus the full data/configuration view:
@@ -96,12 +89,8 @@ A readable version of the prototype's "Thousand Eyes" ring plus the full data/co
 - **Data table:** zone, metric, value + unit, status, personal baseline (mean ± SD), drift σ, nominal range, caution range, +3 day forecast.
 - **Configuration:** signed-in user + role, crew profile (baselines, notes), mission location (gravity, comm delay), scenario, threshold environment, AI provider chain.
 
-### 2.4c Emergency (`EmergencyTab.tsx`)
-- Banner: comm delay for the current location ("Act first, report as you act").
-- Protocol cards (`EMERGENCY_PROTOCOLS`): fire/smoke, rapid depressurisation, toxic atmosphere, crew medical emergency, solar particle event, high CO₂. Each step is a checkbox; starting a protocol records start time and step completion times.
-- `Notify Earth` queues an `immediate_emergency_packet` Earth packet with the protocol log.
-- A red **SOS** shortcut at the bottom of the tab rail opens this tab from anywhere.
-- Footer: "Generic training aid based on public ISS practice — follow your mission's flight rules."
+### 2.4c Emergency
+Merged into the ARGUS console (§2.4). Protocol data: `src/data/emergencyProtocols.ts` (spec 01 §10).
 
 ### 2.5 Crew (`CrewTab.tsx`) — admin only
 - Grid of crew cards: callsign, name, role, sex icon, readiness (computed for that member's `defaultScenarioId`, or the active scenario for the active member), 5-dot zone status row, check-in streak, `Set active` button. Custom crew can be deleted.
@@ -125,14 +114,8 @@ A readable version of the prototype's "Thousand Eyes" ring plus the full data/co
   - **Screen-Constrained Popovers:** `TopMissionBar` popovers (Readiness Milestone Badges and Clinical AI key) use viewport-safe positioning (`fixed inset-x-3 top-16` on mobile `< sm`, `absolute right-0` with `max-w-[calc(100vw-1.5rem)]` on desktop) with keyboard Esc dismiss to eliminate horizontal scroll and viewport spillover.
   - The tab rail becomes a horizontal scroll bar below `md`; no page-level horizontal overflow. The Bio-Twin grid stacks on `< lg`, and Trends / Check-in grids stack on `< xl`.
 
-## 5. ARGUS Companion (AI chat) (`src/components/CompanionDrawer.tsx`, `src/utils/companionBrain.ts`)
-Port of the ARGOS prototype's chat companion (`jv()`, `send()`, `brain()`, `speak()`, `mic()` in `ARGOS_The_Thousand_Eyes.html`). Implemented in the ARGUS AI tab (§2.4) and as a global drawer (issue #7):
-- **Entry point:** `ARGUS Companion` button in the top mission bar (`TopMissionBar.tsx`) opens a right slide-over drawer, accessible across all tabs with keyboard shortcut and Esc dismiss.
-- **Offline brain first:** a deterministic intent engine in `src/utils/companionBrain.ts` (`red_flag`, `status`, `metric`, `symptom`, `forecast`, `why`, `radiation`, `help`) answers from triage, drift, forecast, links, and check-ins with 0 network calls.
-- **Live Clinical AI second:** when the backend / provider is available, replies stream via `streamCrewChat` (`POST /api/ai/chat`, `specs/04-ai-backend.md`) with a structured snapshot context, seamlessly falling back to the offline brain on network error or timeout.
-- **Voice I/O:** optional text-to-speech replies via `window.speechSynthesis` (British voice heuristic) and dictation via browser Web Speech API (`SpeechRecognition`).
-- **Red flags:** critical phrases (chest pain, shortness of breath, faint, self-harm/crisis in English and Hebrew) trigger an immediate urgent fixed protocol pointing to the Flight Surgeon / Earth emergency packet, vital checks, and crewmate notification.
-- **Guardrails:** never sets or overrides a triage status, never lowers urgency, invents no numbers, uses plain language, and conversation history is persisted per crew member in `localStorage`.
+## 5. ARGUS Companion
+Merged into the ARGUS console (§2.4); the top-bar ARGUS button opens it. `src/utils/companionBrain.ts` remains the HUD's last-resort offline brain when the ARGUS server cannot be reached.
 
 ## 6. HUD v2: Sign-in, Location & Clock
 - **Sign-in (`AuthGate.tsx`, `AuthContext.tsx`):** first run shows **Create admin account** (username + password ×2). Afterwards a **Sign in** screen (username + password). Session lasts until sign-out or the tab closes (`sessionStorage`).

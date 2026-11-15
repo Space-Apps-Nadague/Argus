@@ -118,6 +118,11 @@ export class SpeechOutput {
     this.end();
   }
 
+  /** Plays one already-synthesized clip (voice previews). */
+  playClip(audioBase64: string, mimeType: string): Promise<boolean> {
+    return this.player.enqueueEncoded(audioBase64, mimeType, this.settings.rate);
+  }
+
   /** Barge-in: stop now and drop everything queued. */
   cancel(): void {
     this.generation++;

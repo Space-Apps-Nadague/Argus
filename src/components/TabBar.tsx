@@ -8,6 +8,7 @@ import React, { useRef } from 'react';
 import { Activity, Bot, Eye, LineChart, Siren, Telescope, UserCog, Users } from 'lucide-react';
 import { HudTabId } from '../types/argus';
 import { useMission } from '../context/MissionContext';
+import { useAssistant } from '../context/AssistantContext';
 
 export interface HudTabDef {
   id: HudTabId;
@@ -28,8 +29,7 @@ export const HUD_TAB_DEFS: HudTabDef[] = [
   { id: 'trends', label: 'Trends', icon: <LineChart className="w-4 h-4" /> },
   { id: 'forecast', label: 'Forecast', icon: <Telescope className="w-4 h-4" /> },
   { id: 'eyes', label: 'Eyes', icon: <Eye className="w-4 h-4" /> },
-  { id: 'ai', label: 'ARGUS AI', icon: <Bot className="w-4 h-4" /> },
-  { id: 'emergency', label: 'Emergency', icon: <Siren className="w-4 h-4" /> },
+  { id: 'console', label: 'ARGUS', icon: <Bot className="w-4 h-4" /> },
   { id: 'crew', label: 'Crew', icon: <Users className="w-4 h-4" />, needs: 'roster' },
   { id: 'users', label: 'Users', icon: <UserCog className="w-4 h-4" />, needs: 'users' },
 ];
@@ -44,6 +44,7 @@ export const panelId = (id: HudTabId) => `hud-panel-${id}`;
 
 export const TabBar: React.FC<{ access: TabAccess; activeTab: HudTabId }> = ({ access, activeTab }) => {
   const { setActiveTab, zoneStatuses } = useMission();
+  const { setEmergencyPickerOpen, emergency } = useAssistant();
   const refs = useRef<Record<string, HTMLButtonElement | null>>({});
   const tabs = visibleTabs(access);
   const redCount = Object.values(zoneStatuses).filter((s) => s === 'red').length;
@@ -111,9 +112,12 @@ export const TabBar: React.FC<{ access: TabAccess; activeTab: HudTabId }> = ({ a
         <div className="flex items-center px-2 py-1.5 md:px-2 md:pb-4">
           <button
             type="button"
-            onClick={() => setActiveTab('emergency')}
+            onClick={() => {
+              setEmergencyPickerOpen(true);
+              setActiveTab('console');
+            }}
             className="hud-focus flex items-center justify-center gap-2 rounded-lg border border-red-500/60 bg-red-600/20 px-3 py-2 font-display text-xs font-bold tracking-widest text-red-200 transition-colors hover:bg-red-600/40 md:w-full"
-            aria-label="SOS: open emergency protocols"
+            aria-label={emergency ? `SOS: emergency running, ${emergency.title}` : 'SOS: open emergency protocols'}
           >
             <Siren className="h-4 w-4" aria-hidden="true" />
             SOS

@@ -147,7 +147,7 @@ export function resolveLiveGuidance(
   return escalateStaleGuidance(guidance, liveStatus);
 }
 const TAB_STORAGE_KEY = 'argus_active_tab_v1';
-const HUD_TABS: HudTabId[] = ['biotwin', 'trends', 'forecast', 'eyes', 'ai', 'emergency', 'crew', 'users'];
+const HUD_TABS: HudTabId[] = ['biotwin', 'trends', 'forecast', 'eyes', 'console', 'crew', 'users'];
 const LOCATIONS_STORAGE_KEY = 'argus_locations_v1';
 
 function loadInitialLocations(): Record<string, SpaceLocationId> {
@@ -186,8 +186,10 @@ function loadInitialEnvironment(): GravityEnvironment {
 
 function loadInitialTab(): HudTabId {
   try {
-    const raw = localStorage.getItem(TAB_STORAGE_KEY) as HudTabId | null;
-    if (raw && HUD_TABS.includes(raw)) return raw;
+    const raw = localStorage.getItem(TAB_STORAGE_KEY);
+    // The old ARGUS AI and Emergency tabs are now the one ARGUS console.
+    if (raw === 'ai' || raw === 'emergency') return 'console';
+    if (raw && HUD_TABS.includes(raw as HudTabId)) return raw as HudTabId;
   } catch {
     // Ignore storage errors in restricted environments
   }

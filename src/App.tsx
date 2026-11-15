@@ -4,7 +4,8 @@
  *
  * - Sign-in: `AuthGate.tsx` (first-run admin setup, then username + password)
  * - Top bar: `TopMissionBar.tsx` (brand, location, comm delay, clock, readiness, user menu, admin crew strip)
- * - Left tab rail: `TabBar.tsx` (Bio-Twin · Trends · Forecast · Eyes · ARGUS AI · Emergency · Crew/Users for admins)
+ * - Left tab rail: `TabBar.tsx` (Bio-Twin · Trends · Forecast · Eyes · ARGUS · Crew/Users for admins)
+ * - ARGUS console: `console/ConsoleTab.tsx`, state in `AssistantContext` (kept across tab switches)
  * - Panels: one panel per tab; only the active panel is mounted
  */
 
@@ -20,12 +21,11 @@ import { BioTwinTab } from './components/BioTwinTab';
 import { TrendsTab } from './components/TrendsTab';
 import { ForecastTab } from './components/ForecastTab';
 import { EyesTab } from './components/EyesTab';
-import { AiTab } from './components/AiTab';
-import { EmergencyTab } from './components/EmergencyTab';
+import { ConsoleTab } from './components/console/ConsoleTab';
+import { AssistantProvider } from './context/AssistantContext';
 import { CrewTab } from './components/CrewTab';
 import { UsersTab } from './components/UsersTab';
 import { CrewManagerModal } from './components/CrewManagerModal';
-import { CompanionDrawer } from './components/CompanionDrawer';
 import { LifeThreatAlert } from './components/LifeThreatAlert';
 
 const PANELS: Record<HudTabId, React.FC> = {
@@ -33,8 +33,7 @@ const PANELS: Record<HudTabId, React.FC> = {
   trends: TrendsTab,
   forecast: ForecastTab,
   eyes: EyesTab,
-  ai: AiTab,
-  emergency: EmergencyTab,
+  console: ConsoleTab,
   crew: CrewTab,
   users: UsersTab,
 };
@@ -51,7 +50,6 @@ const Hud: React.FC = () => {
     <div className="min-h-screen bg-hud-bg text-hud-text hud-grid-bg">
       <TopMissionBar />
       {canManageRoster && <CrewManagerModal />}
-      <CompanionDrawer />
       {canViewHealth && <LifeThreatAlert />}
       {mode === 'local' && (
         <div role="status" className="border-b border-yellow-500/40 bg-yellow-500/10 px-4 py-1 text-center text-[11px] text-yellow-200">
@@ -154,7 +152,9 @@ const SignedInApp: React.FC = () => {
         serverBacked={mode === 'server'}
         onCrewDeleted={removeAccountsForCrew}
       >
-        <Hud />
+        <AssistantProvider>
+          <Hud />
+        </AssistantProvider>
       </MissionProvider>
     </HudErrorBoundary>
   );
