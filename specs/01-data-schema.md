@@ -58,7 +58,7 @@ export type MetricId =
   // extended panel
   | 'diastolic_bp' | 'sleep_resp_rate' | 'vo2_max' | 'hemoglobin' | 'urine_sg'
   | 'grip_strength' | 'body_mass_delta' | 'crp' | 'cortisol' | 'reaction_time'
-  | 'headache_severity' | 'hyperopic_shift';
+  | 'headache_severity' | 'hyperopic_shift' | 'vocal_jitter';
 ```
 `VitalSignReading.metricId` stays typed as `string` for backward compatibility; new code uses `MetricId`.
 
@@ -160,6 +160,7 @@ Thresholds are identical in every environment (`METRIC_THRESHOLDS_0G`). Readings
 | `immune` | `crp` | C-Reactive Protein | `mg/L` | `0–3` (`0–10`) | blood analyzer, every 3 days |
 | `behavioral` | `cortisol` | Morning Cortisol | `µg/dL` | `6–18` (`3–23`) | salivary strip, every 3 days |
 | `behavioral` | `reaction_time` | Mean Reaction Time | `ms` | `200–300` (`180–360`) | watch PVT, daily |
+| `behavioral` | `vocal_jitter` | Vocal Pitch Jitter | `%` | `0.20–1.04` (`0.00–1.80`) | voice check-in / Console mic [SRC-109] |
 
 ### Passive Wearable Metrics (non-triage) and how each indicator is collected
 With the two-device kit (`specs/05-data-platform.md` §4) nothing needs typing:

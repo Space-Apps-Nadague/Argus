@@ -86,6 +86,7 @@ export const TRIAGE_METRICS: MetricDef[] = [
   triage('reaction_time', 'Mean Reaction Time', 'ms', 'behavioral', 'self_report', 'SRC-009'),
   triage('headache_severity', 'Headache Severity (watch tap)', '/10', 'neuro', 'self_report', 'SRC-009'),
   triage('hyperopic_shift', 'Near-Vision Hyperopic Shift', 'D', 'neuro', 'clinical', 'SRC-009'),
+  triage('vocal_jitter', 'Vocal Pitch Jitter', '%', 'behavioral', 'derived', 'SRC-109'),
 ];
 
 /**
@@ -115,7 +116,7 @@ export const SENSOR_KIT: Array<{ kind: DeviceKind; model: string; streams: strin
   {
     kind: 'smartwatch',
     model: 'Smartwatch (optical HR/SpO₂, ECG, cuff-calibrated BP, skin temperature, accelerometer)',
-    streams: ['heart_rate', 'resp_rate', 'spo2', 'activity', 'sleep_state', 'sleep_eff', 'daily_sleep_hours', 'hrv_rmssd', 'resting_hr', 'wrist_temp', 'skin_temp', 'core_temp', 'sleep_resp_rate', 'systolic_bp', 'diastolic_bp', 'pvt_lapses', 'reaction_time', 'mood_index', 'headache_severity'],
+    streams: ['heart_rate', 'resp_rate', 'spo2', 'activity', 'sleep_state', 'sleep_eff', 'daily_sleep_hours', 'hrv_rmssd', 'resting_hr', 'wrist_temp', 'skin_temp', 'core_temp', 'sleep_resp_rate', 'systolic_bp', 'diastolic_bp', 'pvt_lapses', 'reaction_time', 'mood_index', 'headache_severity', 'vocal_jitter'],
     sourceId: 'SRC-027',
   },
   { kind: 'dosimeter', model: 'Personal active dosimeter (Crew Active Dosimeter-class)', streams: ['dose_rate'], sourceId: 'SRC-026' },

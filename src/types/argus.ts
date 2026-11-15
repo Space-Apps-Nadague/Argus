@@ -64,7 +64,8 @@ export type MetricId =
   | 'cortisol'
   | 'reaction_time'
   | 'headache_severity'
-  | 'hyperopic_shift';
+  | 'hyperopic_shift'
+  | 'vocal_jitter';
 
 export type HudTabId =
   | 'biotwin'
