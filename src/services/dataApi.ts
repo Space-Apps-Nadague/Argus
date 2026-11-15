@@ -118,3 +118,26 @@ export const wellbeingApi = {
     apiJson<{ id: string }>(`/api/astronauts/${encodeURIComponent(crewId)}/wellbeing`, { body: scales }),
 };
 
+/** Photobooth family email (server/routes/family.ts). */
+export interface FamilyMailStatus {
+  id: string;
+  status: 'scheduled' | 'sent' | 'failed';
+  sendAtIso: string;
+  mode?: 'smtp' | 'test';
+  previewUrl?: string;
+  error?: string;
+}
+
+export const familyApi = {
+  send: (body: {
+    id: string;
+    crewId: string;
+    callsign: string;
+    place: string;
+    to: { name: string; email: string }[];
+    message: string;
+    image: string;
+    delaySeconds: number;
+  }) => apiJson<FamilyMailStatus>('/api/family/mail', { body }),
+  status: (id: string) => apiJson<FamilyMailStatus>(`/api/family/mail/${encodeURIComponent(id)}`),
+};

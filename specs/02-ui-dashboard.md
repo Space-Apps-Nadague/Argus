@@ -104,6 +104,19 @@ A readable version of the prototype's "Thousand Eyes" ring plus the full data/co
 - A red **SOS** shortcut at the bottom of the tab rail opens this tab from anywhere.
 - Footer: "Generic training aid based on public ISS practice — follow your mission's flight rules."
 
+### 2.7 Photobooth (`PhotoboothTab.tsx`, `src/features/photobooth/`)
+A fun camera booth so the crew can send photos home. Camera frames are processed on the device only (MediaPipe Tasks, Apache-2.0, gesture recogniser only; the 8 MB gesture model is downloaded to `public/models/vision` and the WASM copied to `public/vision/wasm` by `scripts/copy-vision-assets.mjs` before `dev`/`build` (online fallback if the download is missing); loaded only when the tab opens).
+- **Hands-free shutter (`gesture.ts`):** show a **peace sign ✌️** (MediaPipe `Victory`, score ≥ 0.5, checked every 2nd frame, misses under 180 ms ignored) for 0.25 s → a big **3-2-1** countdown → the photo is taken (shutter sound and flash). A *Peace sign seen* badge shows when the hand is recognised. The countdown keeps going if the hand drops; the next photo needs the sign to drop first. The **Take photo (3 s)** button starts the same timer.
+- **Modes:** **Single photo** or **4-photo strip** (classic photobooth: 4 photos, 2 s countdown between them with *Photo n of 4*, stacked on a cream card with the "Greetings from …" caption, callsign, mission day and message; frames are hidden in strip mode).
+- **Effects (`effects.ts`, all drawn on a canvas, no image files):**
+  - No fake backgrounds: the photo keeps the real camera view.
+  - Overlays & stickers: a **mission-camera data stamp** (viewfinder corners and a monospace block: callsign, UTC date and time, mission day and sol, location and light time to Earth; on by default), an ARGUS mission patch with the callsign, zero-g floaties (stars, water bubbles, a planet, a bolt) and a "Hi from Mars!" banner.
+  - **Greetings from:** the place follows the top-bar mission location (Mars → "Greetings from Mars!", ISS → orbit) and can be changed in a select (Earth, orbit, lunar orbit, the Moon, deep space, Mars).
+  - Colour filters: Mars red, Lunar grey, Night vision (green, scan lines), Retro film (vignette).
+  - Frames: Postcard ("Greetings from Mars!", callsign, mission day, sol on Mars, date, message, stamp) and Polaroid (handwritten-style message).
+- **Photo strip:** each photo lands in a strip under the camera and the camera keeps running, so the crew can keep shooting (last 8 per session). Each photo has **Send**, **Download** and **Delete**, and opens larger on click (Esc or click to close). The Send box lists family members and can add a new one on the spot.
+- **Family mail (`familyMail.ts`):** the photo (JPEG, 800 px) goes into an Earth downlink queue and shows *On its way · arrives in 10m 58s*, using the live one-way light time (`commDelayAt`), then *Delivered*. Family contacts (name, relation, optional email) are kept per astronaut. With the ARGUS server, contacts with an email get the photo by real email at the moment it "arrives" (`POST /api/family/mail`, specs/05 §6); the photo shows *Emailed to …* or the error; without the server (offline demo) nothing is emailed: **Send** shows the light-time countdown under the photo and then *Delivered*, labelled *Demo: delivery simulated*; the last 12 postcards per astronaut are kept on this device. Download is always available.
+
 ### 2.5 Crew (`CrewTab.tsx`) — admin only
 - Grid of crew cards: callsign, name, role, sex icon, readiness (computed for that member's `defaultScenarioId`, or the active scenario for the active member), 6-dot zone status row, check-in streak, `Set active` button. Custom crew can be deleted.
 - `+ Add crew member` opens the existing creator form in `CrewManagerModal.tsx`. Crew details (baselines, blood type, age, medical notes) appear in an expandable section on each card.
