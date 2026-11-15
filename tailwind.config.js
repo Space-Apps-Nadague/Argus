@@ -28,6 +28,15 @@ export default {
           yellow: '#eab308',
           red: '#ef4444',
         },
+        // Cognition games: categorical stimulus palette (specs/02-ui-dashboard.md §2.8). Not status colors.
+        game: {
+          1: '#22d3ee',
+          2: '#f472b6',
+          3: '#a3e635',
+          4: '#fb923c',
+          5: '#a78bfa',
+          6: '#facc15',
+        },
         argus: {
           green: '#22c55e',
           yellow: '#eab308',
