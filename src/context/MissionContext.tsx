@@ -1156,38 +1156,37 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
 
   const runSampleVisualExam = useCallback(
     async (sample: VisualExamSample) => {
-      dispatch({ type: 'SET_ANALYZING_VISUAL', payload: true });
-      try {
-        const effectiveSample: VisualExamSample =
-          state.scenarioId === 'unexplained_fatigue' && sample.id === 'sans_ultrasound'
-            ? {
-                ...sample,
-                defaultFindingStatus: 'yellow',
-                clinicalSummary:
-                  'Optic Nerve Sheath Diameter (ONSD) measured 3 mm posterior to globe is 5.80 mm (early SANS caution threshold 5.5–6.0 mm) with mild posterior scleral flattening.',
-                plainCrewGuidance:
-                  'The ultrasound shows early fluid expansion inside the optic nerve sheath behind your eye (5.8 mm — early SANS), amplified by elevated Node 2 CO₂ (4.4 mmHg).',
-                recommendedAction:
-                  'Apply LBNP cuff (-25 mmHg), inspect Node 2 CO₂ scrubber & sleeping-rack airflow, and queue an Earth telemetry packet.',
-              }
-            : sample;
-        const result = await analyzeVisualSelfExam({
-          sample: effectiveSample,
-          environment: state.environment,
-          runtimeApiKey: state.runtimeApiKey,
-        });
-        dispatch({
-          type: 'SET_VISUAL_EXAM_RESULT',
-          payload: {
-            analysis: result,
-            previewUrl: effectiveSample.previewSvgDataUrl,
+      const effectiveSample: VisualExamSample =
+        state.scenarioId === 'unexplained_fatigue' && sample.id === 'sans_ultrasound'
+          ? {
+              ...sample,
+              defaultFindingStatus: 'yellow',
+              clinicalSummary:
+                'Optic Nerve Sheath Diameter (ONSD) measured 3 mm posterior to globe is 5.80 mm (early SANS caution threshold 5.5–6.0 mm) with mild posterior scleral flattening.',
+              plainCrewGuidance:
+                'The ultrasound shows early fluid expansion inside the optic nerve sheath behind your eye (5.8 mm — early SANS), amplified by elevated Node 2 CO₂ (4.4 mmHg).',
+              recommendedAction:
+                'Apply LBNP cuff (-25 mmHg), inspect Node 2 CO₂ scrubber & sleeping-rack airflow, and queue an Earth telemetry packet.',
+            }
+          : sample;
+      dispatch({
+        type: 'SET_VISUAL_EXAM_RESULT',
+        payload: {
+          analysis: {
+            sampleIdOrFileName: effectiveSample.id,
+            modality: effectiveSample.modality,
+            findingStatus: effectiveSample.defaultFindingStatus,
+            clinicalSummary: effectiveSample.clinicalSummary,
+            plainCrewGuidance: effectiveSample.plainCrewGuidance,
+            recommendedAction: effectiveSample.recommendedAction,
+            analyzedAtIso: new Date().toISOString(),
+            source: 'offline_verified_cache',
           },
-        });
-      } finally {
-        dispatch({ type: 'SET_ANALYZING_VISUAL', payload: false });
-      }
+          previewUrl: effectiveSample.previewSvgDataUrl,
+        },
+      });
     },
-    [state.environment, state.runtimeApiKey, state.scenarioId]
+    [state.scenarioId]
   );
 
   const runUploadedVisualExam = useCallback(
