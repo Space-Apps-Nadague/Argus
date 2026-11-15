@@ -31,7 +31,6 @@ import {
   type StickerId,
 } from '../features/photobooth/effects';
 import { detectPeaceSign, loadVision, type VisionModels } from '../features/photobooth/vision';
-import { sharePhoto } from '../features/photobooth/share';
 import { IDLE, startCountdown, stepShutter, type ShutterState } from '../features/photobooth/gesture';
 import {
   deliveryStatus,
@@ -53,6 +52,8 @@ interface Shot {
   id: string;
   image: string;
   sentTo?: string[];
+  /** Postcard created when this photo was sent. */
+  cardId?: string;
 }
 
 /** Photos kept in the strip for this session. */
@@ -149,9 +150,8 @@ const EmailState: React.FC<{ card: FamilyPostcard; delivered: boolean }> = ({ ca
   const e = card.email;
   if (!e) return null;
   if (e.status === 'no_server') return <p className="text-[11px] text-hud-muted">Email needs the ARGUS server (offline demo).</p>;
-  if (e.status === 'shared') return <p className="text-[11px] text-emerald-300">Shared from this device (Mail, WhatsApp…)</p>;
-  if (e.status === 'mail_app')
-    return <p className="text-[11px] text-emerald-300">Email opened for {e.recipients.join(', ')}. The photo was downloaded: attach it and send.</p>;
+  if (e.status === 'simulated')
+    return <p className="text-[11px] text-hud-muted">Demo: delivery simulated (no mail server running)</p>;
   if (e.status === 'failed') return <p className="text-[11px] text-red-300">{e.error ?? 'Email failed.'}</p>;
   if (e.status === 'scheduled') return <p className="text-[11px] text-hud-muted">{delivered ? 'Emailing…' : `Email goes out on arrival to ${e.recipients.join(', ')}`}</p>;
   if (e.mode === 'test')
@@ -166,6 +166,29 @@ const EmailState: React.FC<{ card: FamilyPostcard; delivered: boolean }> = ({ ca
       </p>
     );
   return <p className="text-[11px] text-emerald-300">Emailed to {e.recipients.join(', ')}</p>;
+};
+
+/** Under a sent photo: live countdown until it reaches the family, then Delivered. */
+const ShotDelivery: React.FC<{ card?: FamilyPostcard; now: Date }> = ({ card, now }) => {
+  if (!card)
+    return (
+      <span className="flex items-center gap-1 text-[11px] text-emerald-300">
+        <Check className="h-3.5 w-3.5" aria-hidden="true" />
+        Sent
+      </span>
+    );
+  const st = deliveryStatus(card, now);
+  return st.delivered ? (
+    <span className="flex items-center gap-1 text-[11px] text-emerald-300">
+      <Check className="h-3.5 w-3.5" aria-hidden="true" />
+      Delivered
+    </span>
+  ) : (
+    <span className="flex items-center gap-1 font-mono text-[11px] text-amber-300" title={`On its way to ${card.to.join(', ')}`}>
+      <Send className="h-3.5 w-3.5" aria-hidden="true" />
+      {formatCountdown(st.secondsLeft)}
+    </span>
+  );
 };
 
 export const PhotoboothTab: React.FC = () => {
@@ -373,21 +396,13 @@ export const PhotoboothTab: React.FC = () => {
       card.email = { status: mode === 'server' ? 'scheduled' : 'no_server', recipients: recipients.map((r) => r.email!) };
     }
     if (mode !== 'server') {
-      // No ARGUS server (e.g. the demo): send the real photo now through the device share menu,
-      // or the mail app. Must run inside this click, before any await.
-      const names = sendTo.join(' & ');
-      const subject = `A photo from ${activeCrewMember.callsign} in ${capitalise(place)}`;
-      const text = [`Hi ${names},`, `${activeCrewMember.callsign} sent you a photo from ${capitalise(place)}.`, message.trim() ? `"${message.trim()}"` : '']
-        .filter(Boolean)
-        .join('\n');
-      const emails = recipients.map((r) => r.email!);
-      card.email = { status: 'shared', recipients: emails.length ? emails : sendTo };
-      void sharePhoto({ image: shot.image, fileName: `argus-${activeCrewMember.callsign.toLowerCase()}.jpg`, subject, text, emails }).then((res) =>
-        setPostcards(updatePostcard(crewId, card.id, { email: { status: res === 'cancelled' ? 'failed' : res, recipients: card.email!.recipients, error: res === 'cancelled' ? 'Sharing was cancelled.' : undefined } }))
-      );
+      // DEMO MODE — no ARGUS server, so no email is sent. The delivery (light-time countdown, then
+      // "Delivered") is simulated on screen and labelled "Demo" in the UI. Real email:
+      // server/family/mailer.ts, used when the server runs.
+      card.email = { status: 'simulated', recipients: sendTo };
     }
     setPostcards(savePostcard(card));
-    setShots((s) => s.map((x) => (x.id === shot.id ? { ...x, sentTo: sendTo } : x)));
+    setShots((s) => s.map((x) => (x.id === shot.id ? { ...x, sentTo: sendTo, cardId: card.id } : x)));
     setSending(null);
     if (recipients.length && mode === 'server') {
       familyApi
@@ -491,10 +506,7 @@ export const PhotoboothTab: React.FC = () => {
                     </button>
                     <div className="flex items-center justify-between gap-1 p-1.5">
                       {shot.sentTo ? (
-                        <span className="flex items-center gap-1 text-[11px] text-emerald-300">
-                          <Check className="h-3.5 w-3.5" aria-hidden="true" />
-                          Sent
-                        </span>
+                        <ShotDelivery card={postcards.find((p) => p.id === shot.cardId)} now={now} />
                       ) : (
                         <button type="button" onClick={() => openSend(shot.id)} className="hud-btn !px-2 !py-1 text-[11px]" aria-expanded={sending === shot.id}>
                           <Send className="h-3.5 w-3.5" aria-hidden="true" />
@@ -539,7 +551,9 @@ export const PhotoboothTab: React.FC = () => {
                               Arrives in <span className="font-mono text-amber-300">{lightTime}</span>
                             </>
                           ) : (
-                            <>Opens your share menu (Mail, WhatsApp…) with the photo. Light time to Earth: <span className="font-mono text-amber-300">{lightTime}</span></>
+                            <>
+                              Arrives in <span className="font-mono text-amber-300">{lightTime}</span> <span className="text-hud-muted">(demo: simulated)</span>
+                            </>
                           )}
                         </p>
                         <div className="flex gap-1.5">
@@ -653,7 +667,7 @@ export const PhotoboothTab: React.FC = () => {
                       <p className={st.delivered ? 'text-emerald-300' : 'text-amber-300'}>
                         {st.delivered
                           ? `Delivered ${new Date(p.arrivesAtIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-                          : `On its way · arrives in ${formatCountdown(st.secondsLeft)}`}
+                          : `On its way to Earth · arrives in ${formatCountdown(st.secondsLeft)}`}
                       </p>
                       <EmailState card={p} delivered={st.delivered} />
                     </div>

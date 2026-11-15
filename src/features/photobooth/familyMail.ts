@@ -16,8 +16,8 @@ export interface FamilyContact {
 
 /** Email delivery of a postcard (server mode). */
 export interface PostcardEmail {
-  /** shared: sent through the device share menu. mail_app: mail app opened, photo downloaded. */
-  status: 'scheduled' | 'sent' | 'failed' | 'no_server' | 'shared' | 'mail_app';
+  /** simulated: demo without the ARGUS server — nothing is sent, the delivery is shown on screen. */
+  status: 'scheduled' | 'sent' | 'failed' | 'no_server' | 'simulated';
   recipients: string[];
   /** smtp: really delivered. test: Ethereal test mailbox, see previewUrl. */
   mode?: 'smtp' | 'test';
