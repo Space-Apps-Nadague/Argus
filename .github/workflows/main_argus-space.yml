@@ -37,6 +37,20 @@ jobs:
           mkdir -p "${{ runner.temp }}/argus-deploy"
           cp -a package.json package-lock.json dist server shared src data SOURCES.md node_modules "${{ runner.temp }}/argus-deploy/"
 
+      # The server reads `.env` at start-up (server/env.ts); App Service settings still win over it.
+      # It sits outside `dist/`, the only folder served to browsers, so the key never reaches clients.
+      - name: Add AI key to the runtime package
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          if [ -z "$GEMINI_API_KEY" ]; then
+            echo "::warning::GEMINI_API_KEY secret is empty: production will run without an AI model."
+            exit 0
+          fi
+          umask 077
+          printf 'GEMINI_API_KEY=%s\nAI_PROVIDERS=gemini\n' "$GEMINI_API_KEY" > "${{ runner.temp }}/argus-deploy/.env"
+          echo "Wrote .env with GEMINI_API_KEY and AI_PROVIDERS=gemini"
+
       - name: Deploy to Azure Web App
         id: deploy-to-webapp
         uses: azure/webapps-deploy@v3

@@ -136,6 +136,7 @@ Guardrails enforced in code:
 - `npm run dev:local` — same, forcing `AI_PROVIDERS=local` (Ollama).
 - `npm run ai:local` — checks Ollama is up and `AI_LOCAL_MODEL` is pulled.
 - `npm run build && npm start` — production build (`dist/`) served by `tsx server/index.ts`.
+- **Production (Azure App Service `argus-space`):** the deploy workflow writes `GEMINI_API_KEY` (from the repo's Actions secret) and `AI_PROVIDERS=gemini` into the package's `.env`. App Service settings, when set, override it. The file is outside `dist/`, so it is never served to browsers. No local model runs in production.
 - `docker compose up ollama` — optional Ollama container for teammates without a local install.
 - `npm run rag:ingest` — (re)builds the AI knowledge base in `DATABASE_URL` with the `AI_EMBEDDINGS` model.
 - `npm run rag:search -- "<question>"` — runs hybrid keyword + vector retrieval from the CLI.
