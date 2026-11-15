@@ -55,6 +55,10 @@ export const authApi = {
   setup: (username: string, password: string) => apiJson<{ user: UserAccount }>('/api/auth/setup', { body: { username, password } }),
   login: (username: string, password: string) => apiJson<{ user: UserAccount }>('/api/auth/login', { body: { username, password } }),
   logout: () => apiJson<{ ok: true }>('/api/auth/logout', { body: {} }),
+  /** Face ID: issues a device sign-in token for the signed-in user (only its hash is stored). */
+  faceEnroll: () => apiJson<{ token: string }>('/api/auth/face/enroll', { body: {} }),
+  faceLogin: (token: string) => apiJson<{ user: UserAccount }>('/api/auth/face/login', { body: { token } }),
+  faceRemove: (token: string) => apiJson<{ ok: true }>('/api/auth/face/remove', { body: { token } }),
 };
 
 export const adminApi = {
