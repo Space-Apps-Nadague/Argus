@@ -248,6 +248,7 @@ export const Composer: React.FC = () => {
     interrupt,
     clearThread,
     messages,
+    deviceSpeechStatus: device,
   } = useAssistant();
   const [text, setText] = useState('');
   const busy = status === 'thinking' || status === 'speaking' || status === 'transcribing';
@@ -349,6 +350,12 @@ export const Composer: React.FC = () => {
           </span>
         )}
 
+        {(device.tts === 'loading' || device.stt === 'loading') && (
+          <span className="text-[11px] text-hud-accent" role="status">
+            Loading on-device {device.stt === 'loading' ? 'transcription' : 'voice'}
+            {device.progress !== null ? ` ${device.progress}%` : '…'} (first time only)
+          </span>
+        )}
         <span className="ml-auto flex items-center gap-3 text-[11px] text-hud-muted">
           {latency.firstTokenMs !== null && (
             <span title="Time to first word, and to first audio">

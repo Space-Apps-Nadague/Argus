@@ -2,7 +2,7 @@
   "name": "argus-crew-bio-twin",
   "private": true,
   "version": "1.0.0",
-  "description": "ARGUS \u2014 Astronaut Readiness Guidance & Unified Surveillance: Autonomous Crew Bio-Twin HUD",
+  "description": "ARGUS — Astronaut Readiness Guidance & Unified Surveillance: Autonomous Crew Bio-Twin HUD",
   "type": "module",
   "scripts": {
     "predev": "node scripts/copy-face-models.mjs && node scripts/copy-vision-assets.mjs",
@@ -34,6 +34,7 @@
   "dependencies": {
     "@electric-sql/pglite": "^0.5.16",
     "@hono/node-server": "^2.1.8",
+    "@huggingface/transformers": "^3.5.1",
     "@mediapipe/tasks-vision": "^1.2.3",
     "@node-rs/argon2": "^2.2.2",
     "@react-three/drei": "^9.121.4",
@@ -41,6 +42,7 @@
     "@vladmandic/face-api": "^1.7.15",
     "drizzle-orm": "^0.45.4",
     "hono": "^4.13.18",
+    "kokoro-js": "^1.2.1",
     "lucide-react": "^0.468.0",
     "nodemailer": "^10.5.0",
     "openai": "^7.57.0",

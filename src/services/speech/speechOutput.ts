@@ -29,6 +29,8 @@ export interface SpeechOutputDeps {
   onEngine?: (engine: VoiceEngineId) => void;
   /** Milliseconds from `begin()` to first audio, for the latency readout. */
   onFirstAudio?: (ms: number) => void;
+  /** Speech could not be produced at all (no server voice and no browser voice). */
+  onError?: (message: string) => void;
 }
 
 export interface SpeechSettings {
@@ -52,19 +54,46 @@ export function pickBrowserVoice(voices: SpeechSynthesisVoice[], preferred?: str
   );
 }
 
-function defaultBrowserSpeak(text: string, opts: { voiceName?: string; rate: number }): Promise<void> {
-  return new Promise((resolve) => {
-    if (typeof window === 'undefined' || !window.speechSynthesis) return resolve();
+/** Voices load asynchronously in Chrome; wait briefly for them. */
+async function browserVoices(): Promise<SpeechSynthesisVoice[]> {
+  const synth = window.speechSynthesis;
+  let voices = synth.getVoices();
+  for (let i = 0; i < 10 && !voices.length; i++) {
+    await new Promise((r) => setTimeout(r, 100));
+    voices = synth.getVoices();
+  }
+  return voices;
+}
+
+export class NoBrowserVoiceError extends Error {}
+
+async function defaultBrowserSpeak(text: string, opts: { voiceName?: string; rate: number }): Promise<void> {
+  if (typeof window === 'undefined' || !window.speechSynthesis) throw new NoBrowserVoiceError('This browser cannot speak.');
+  const voices = await browserVoices();
+  if (!voices.length) throw new NoBrowserVoiceError('No voice is installed in this browser.');
+  await new Promise<void>((resolve) => {
     const u = new SpeechSynthesisUtterance(text);
-    const voice = pickBrowserVoice(window.speechSynthesis.getVoices(), opts.voiceName);
+    const voice = pickBrowserVoice(voices, opts.voiceName);
     if (voice) {
       u.voice = voice;
       u.lang = voice.lang;
     }
     u.rate = opts.rate;
-    u.onend = () => resolve();
-    u.onerror = () => resolve();
-    window.speechSynthesis.speak(u);
+    // A long utterance can stall Chrome's engine; never hang the queue on it.
+    const guard = setTimeout(resolve, Math.max(4000, text.length * 120));
+    u.onend = () => {
+      clearTimeout(guard);
+      resolve();
+    };
+    u.onerror = () => {
+      clearTimeout(guard);
+      resolve();
+    };
+    // Chrome drops an utterance queued in the same tick as cancel(); give it a moment.
+    setTimeout(() => {
+      window.speechSynthesis.resume();
+      window.speechSynthesis.speak(u);
+    }, 60);
   });
 }
 
@@ -167,7 +196,17 @@ export class SpeechOutput {
         while (this.player.playing && generation === this.generation) await new Promise((r) => setTimeout(r, 60));
         if (generation !== this.generation) return;
         this.reportFirstAudio();
-        await (this.deps.browserSpeak ?? defaultBrowserSpeak)(sentence, { voiceName: this.settings.browserVoiceName, rate: this.settings.rate });
+        try {
+          await (this.deps.browserSpeak ?? defaultBrowserSpeak)(sentence, { voiceName: this.settings.browserVoiceName, rate: this.settings.rate });
+        } catch (err) {
+          if (generation === this.generation) {
+            this.deps.onError?.(
+              `ARGUS can't speak: ${(err as Error).message} Set GEMINI_API_KEY on the server for the Earth voice, or start the on-ship voice server.`
+            );
+            this.cancel();
+          }
+          return;
+        }
       }
       if (generation === this.generation) {
         this.pending = Math.max(0, this.pending - 1);

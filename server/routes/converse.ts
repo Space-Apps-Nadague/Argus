@@ -27,12 +27,13 @@ import type {
   MentalStateAssessment,
   VisualObservation,
 } from '../../src/types/assistant';
-import { SPACE_LOCATIONS, commDelayAt } from '../../src/data/spaceLocations';
+import { SPACE_LOCATIONS, commDelayAt, formatCommDelay } from '../../src/data/spaceLocations';
+import { determineCompanionIntent, generateOfflineCompanionReply } from '../../src/utils/companionBrain';
 import { BODY_ZONES } from '../../src/data/telemetryScenarios';
 import { STATUS_LABELS } from '../../src/utils/triageEngine';
 import { COMM_TIER_PROFILES, type CommTier, resolveCommTier, roundTripSeconds } from '../../shared/commProfile';
 import { pickCountermeasure } from '../../shared/countermeasures';
-import { combineAssessment, shouldAutoReport, urgencyForConcern } from '../../shared/mentalState';
+import { combineAssessment, CUE_IDS, extractCuesFromText, shouldAutoReport, urgencyForConcern } from '../../shared/mentalState';
 import { detectRedFlags } from '../../shared/redFlags';
 import { ASSISTANT_TOOLS, runAssistantTool, type ToolContext } from '../ai/assistantTools';
 import { logCitations } from '../rag/citations';
@@ -190,21 +191,51 @@ function toolContext(req: ConverseRequest, snapshot: CrewSnapshot): ToolContext 
 }
 
 /** Deterministic reply used when no model answers: supportive, grounded, and never just data. */
-export function offlineAssistantReply(snapshot: CrewSnapshot, lastUser: string, assessment: MentalStateAssessment, hasProtocol: boolean): string {
+export function offlineAssistantReply(snapshot: CrewSnapshot, lastUser: string, assessment: MentalStateAssessment, hasProtocol: boolean, cardTitle: string | null = null): string {
   const name = snapshot.crewMember?.callsign ?? 'there';
   if (hasProtocol) return `${name}, the checklist is on your screen. Work through it one step at a time and tell me "done" after each one. I am staying with you.`;
-  const strained = assessment.concernLevel !== 'none';
-  if (strained) {
-    const top = assessment.evidence.find((e) => e.source === 'conversation');
-    const worst = worstZoneStatus(snapshot.zoneStatuses);
+
+  const lead = `${name}, my AI model isn't reachable right now, so my answers are simpler than usual.`;
+
+  // 1. Feelings first: answer the person, not the data.
+  const feel = extractCuesFromText([lastUser]).cues;
+  const strongest = CUE_IDS.filter((id) => feel[id] > 0).sort((x, y) => feel[y] - feel[x])[0];
+  if (strongest || assessment.concernLevel !== 'none') {
+    const named: Record<string, string> = {
+      stress: 'Feeling stressed about it makes sense, especially with this much riding on you so far from home.',
+      anxiety: 'Feeling anxious about it is a normal reaction out here, and it does not mean something is wrong with you.',
+      lowMood: 'I am sorry you are feeling low. That is hard, and it is worth taking seriously.',
+      hopelessness: 'That sounds really heavy, and I am glad you told me.',
+      isolation: 'Missing people and feeling cut off is one of the hardest parts of being this far away.',
+      sleepProblem: 'Bad sleep makes everything else harder, so it is worth fixing first.',
+      fatigue: 'Being this tired wears you down, physically and mentally.',
+      conflict: 'Friction with crewmates is draining when there is nowhere to step away to.',
+      lowMotivation: 'Losing drive happens on long missions, and it usually comes back with rest and routine.',
+    };
     return [
-      `${name}, I hear you${top ? ', and what you said matters' : ''}. Out here, with the distance and the workload, feeling like this makes sense, and you do not have to carry it alone.`,
-      assessment.fatigue !== 'low' ? 'You also seem short on rest, which makes everything heavier than it is.' : '',
-      `I have put one thing on your screen to try right now. Do that first, then tell me how it went${worst !== 'green' ? ', and we will look at your readings together after' : ''}.`,
-      'I am running on the ship\'s onboard protocols at the moment, so my answers are simpler than usual, but I am here and I am listening. What is weighing on you most?',
+      `${name}, I hear you. ${named[strongest ?? 'stress'] ?? named.stress}`,
+      cardTitle ? `I have put something on your screen you can try right now: ${cardTitle}. Give it a go, then tell me how it went.` : '',
+      `What is weighing on you most about it? (${lead.replace(`${name}, `, '').replace(/^m/, 'M')})`,
     ].filter(Boolean).join(' ');
   }
-  return `${offlineReply(snapshot, lastUser).replace(/\s*\(Offline mode[^)]*\)\s*$/, '')} I am on the ship's onboard protocols right now, so tell me more about what you are noticing and we will work through it together.`;
+
+  // 2. A symptom, reading or clinical question: the onboard protocols.
+  const intent = determineCompanionIntent(lastUser);
+  if (snapshot.crewMember && ['symptom', 'metric', 'radiation', 'why', 'status'].includes(intent)) {
+    const brain = generateOfflineCompanionReply(lastUser, {
+      crewMember: snapshot.crewMember,
+      environment: snapshot.environment,
+      scenarioId: snapshot.scenarioId,
+      readinessScore: snapshot.readinessScore,
+      zoneStatuses: snapshot.zoneStatuses,
+      zones: snapshot.zones,
+      commDelay: snapshot.location ? formatCommDelay(snapshot.location) : undefined,
+    });
+    return `${lead} From the onboard protocols: ${brain.text}`;
+  }
+
+  // 3. Anything else: be honest and invite them in, no data dump.
+  return `${lead} I can still help with symptoms, readings, emergencies, or just talking through how you feel. What is going on?`;
 }
 
 function chunkText(text: string, size = 28): string[] {
@@ -223,8 +254,18 @@ function chunkText(text: string, size = 28): string[] {
  * so a conversation about feelings is not given (or shown) unrelated clinical references.
  * During an emergency the protocol itself is always looked up.
  */
+const CLINICAL_WORDS =
+  /\b(symptom|pain|ache|hurts?|headache|dizz|nause|vomit|fever|rash|swell|bleed|cough|breath|chest|heart|pulse|blood|pressure|oxygen|spo2|co2|carbon|eye|eyes|vision|blur|ear|bone|muscle|injur|wound|burn|cut|fracture|sprain|infection|sick|ill|radiation|dose|dosimeter|solar|medication|medicine|pill|tablet|drug|dose|ibuprofen|paracetamol|aspirin|antibiotic|treat|treatment|procedure|protocol|checklist|emergency|fire|smoke|leak|ammonia|toxic|depress|glucose|sugar|hydration|dehydrat|sleep(ing)? pill|melatonin|sans|onsd|intracranial)\w*/i;
+
+/** Only clinical or procedural messages get knowledge-base references. */
+export function isClinicalQuestion(text: string): boolean {
+  if (detectRedFlags(text).flagged) return true;
+  if (['symptom', 'metric', 'radiation', 'red_flag'].includes(determineCompanionIntent(text))) return true;
+  return CLINICAL_WORDS.test(text);
+}
+
 export async function retrieveForTurn(lastUser: string, protocolTitle: string | undefined, db: Parameters<typeof searchKnowledge>[0]['db']): Promise<RagHit[]> {
-  const queries = [protocolTitle, lastUser].filter((q): q is string => Boolean(q && q.trim().length >= 4));
+  const queries = [protocolTitle, isClinicalQuestion(lastUser) ? lastUser : undefined].filter((q): q is string => Boolean(q && q.trim().length >= 4));
   const seen = new Set<string>();
   const out: RagHit[] = [];
   for (const query of queries) {
@@ -276,14 +317,20 @@ converseRoutes.post('/converse', async (c) => {
 
   // Pick the "try this now" card before the reply so what ARGUS says and what appears match.
   const pendingCard = (req.countermeasureLog ?? []).some((cm) => cm.helped === undefined);
+  // A clear feeling in the latest message is enough for a card, even before the overall concern rises.
+  const latestCues = extractCuesFromText([lastUser]).cues;
+  const wantsCard = preAssessment.concernLevel !== 'none' || CUE_IDS.some((id) => latestCues[id] >= 2);
   const readyCard =
-    preAssessment.concernLevel !== 'none' && !req.activeProtocol && !pendingCard
-      ? pickCountermeasure(preAssessment.cues, (req.countermeasureLog ?? []).map((cm) => cm.id))
+    wantsCard && !req.activeProtocol && !pendingCard
+      ? pickCountermeasure(preAssessment.concernLevel !== 'none' ? preAssessment.cues : latestCues, (req.countermeasureLog ?? []).map((cm) => cm.id))
       : null;
   const startedProtocol = fast.find((a) => a.type === 'start_emergency_protocol');
 
   const db = c.get('db');
-  const ragHits = await retrieveForTurn(lastUser, req.activeProtocol?.title ?? (startedProtocol ? EMERGENCY_TITLES[startedProtocol.protocolId] : undefined), db);
+  // The running protocol is looked up only when the message is about it ("done", "what next"…).
+  const aboutProtocol = Boolean(req.activeProtocol) && (lastUser.trim().split(/\s+/).length <= 6 || STEP_DONE.test(lastUser) || /\b(step|next|now what|what now|checklist|protocol)\b/i.test(lastUser));
+  const protocolQuery = startedProtocol ? EMERGENCY_TITLES[startedProtocol.protocolId] : aboutProtocol ? req.activeProtocol!.title : undefined;
+  const ragHits = await retrieveForTurn(lastUser, protocolQuery, db);
 
   const useVision = Boolean(req.frame) && providerChainFor({ feature: 'chat', keyOverride, tier, vision: true }).length > 0;
   const toolsAvailable = providerChainFor({ feature: 'chat', keyOverride, tier, vision: useVision }).length > 0;
@@ -437,7 +484,7 @@ converseRoutes.post('/converse', async (c) => {
     if (!metaSent) {
       await sendMeta({ source: 'offline_verified_cache' });
       if (!flags.crisis) {
-        for (const piece of chunkText(offlineAssistantReply(snapshot, lastUser, assessment, Boolean(req.activeProtocol || startedProtocol)))) {
+        for (const piece of chunkText(offlineAssistantReply(snapshot, lastUser, assessment, Boolean(req.activeProtocol || startedProtocol), readyCard?.title ?? null))) {
           await send({ type: 'delta', text: piece });
         }
       }
@@ -445,7 +492,7 @@ converseRoutes.post('/converse', async (c) => {
     await send({ type: 'reply_end' });
 
     // A countermeasure card whenever there is real strain and the model did not offer one.
-    if (assessment.concernLevel !== 'none' && !emergency && !actions.some((a) => a.type === 'suggest_countermeasure')) {
+    if ((assessment.concernLevel !== 'none' || readyCard) && !emergency && !actions.some((a) => a.type === 'suggest_countermeasure')) {
       const already = req.countermeasureLog ?? [];
       const pending = already.some((cm) => cm.helped === undefined);
       const pick = readyCard ?? (pending ? null : pickCountermeasure(assessment.cues, already.map((cm) => cm.id)));

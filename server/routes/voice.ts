@@ -69,6 +69,7 @@ import {
 } from '../schemas';
 import { keyFromHeader, liveMeta, OFFLINE_META, parseBody } from './util';
 import { DEFAULT_GEMINI_VOICE, GEMINI_VOICES, isGeminiVoice } from '../ai/geminiVoices';
+import { onShipStrict } from '../ai/providers';
 import { LOCAL_VOICES, localSpeechConfig, localSynthesize, localTranscribe, probeLocalSpeech } from '../ai/localSpeech';
 import type { VoicesResponse } from '../../src/types/assistant';
 
@@ -648,15 +649,23 @@ voiceRoutes.post('/stt', async (c) => {
   const mode: VoiceTransportMode = req.mode ?? 'on-ship-pipeline';
   const nodeLabel: VoiceNodeLabel = mode === 'on-ship-pipeline' ? 'on-ship-local' : 'gemini-live';
   const headerKey = keyFromHeader(c) || c.req.header('X-Argus-Api-Key')?.trim();
-  // On-ship tier: audio never leaves the ship (specs/04-ai-backend.md §4.2).
-  const geminiKey = req.tier === 'autonomous' ? undefined : resolveGeminiApiKey(process.env, headerKey);
+  // On-ship tier: on-ship speech first; Earth speech stands in unless strict (spec 04 §4.2).
+  const geminiKey = req.tier === 'autonomous' && onShipStrict() ? undefined : resolveGeminiApiKey(process.env, headerKey);
   const localSpeech = currentPrivacy().offlineOnly ? null : localSpeechConfig();
 
   let transcript = '';
   let usedLiveStt = false;
   let usedLocalStt = false;
 
-  if (req.audioBase64 && geminiKey) {
+  if (req.tier === 'autonomous' && req.audioBase64 && localSpeech) {
+    const local = await localTranscribe(localSpeech, req.audioBase64, req.mimeType, req.languageCode);
+    if (local) {
+      transcript = local;
+      usedLocalStt = true;
+    }
+  }
+
+  if (!transcript && req.audioBase64 && geminiKey) {
     try {
       const mimeType = (req.mimeType || 'audio/webm').split(';')[0].trim();
       const sttModel = process.env.GEMINI_STT_MODEL?.trim() || 'gemini-3.8-flash';
@@ -714,7 +723,7 @@ voiceRoutes.post('/stt', async (c) => {
     }
   }
 
-  if (!transcript && req.audioBase64 && localSpeech) {
+  if (!transcript && !usedLocalStt && req.tier !== 'autonomous' && req.audioBase64 && localSpeech) {
     const local = await localTranscribe(localSpeech, req.audioBase64, req.mimeType, req.languageCode);
     if (local) {
       transcript = local;
@@ -766,8 +775,31 @@ voiceRoutes.post('/tts', async (c) => {
   const nodeLabel: VoiceNodeLabel = mode === 'on-ship-pipeline' ? 'on-ship-local' : 'gemini-live';
   const cleanText = req.text.replace(/[*#_`]/g, '').trim();
   const headerKey = keyFromHeader(c) || c.req.header('X-Argus-Api-Key')?.trim();
-  const geminiKey = req.tier === 'autonomous' ? undefined : resolveGeminiApiKey(process.env, headerKey);
+  const geminiKey = req.tier === 'autonomous' && onShipStrict() ? undefined : resolveGeminiApiKey(process.env, headerKey);
   const localSpeech = currentPrivacy().offlineOnly ? null : localSpeechConfig();
+  const localVoiceResponse = async () => {
+    if (!localSpeech || !cleanText) return null;
+    const local = await localSynthesize(localSpeech, cleanText, req.voice, req.speed);
+    if (!local) return null;
+    const envelope: AiEnvelope<VoiceTtsResponse> = {
+      result: {
+        audioBase64: local.audioBase64,
+        mimeType: local.mimeType,
+        mode,
+        nodeLabel: 'on-ship-local',
+        pipelineStage: 'tts',
+        useBrowserSpeechFallback: false,
+        durationEstimateMs: Math.max(1200, cleanText.split(/\s+/).length * 360),
+      },
+      meta: { source: 'live_ai', provider: 'local', model: localSpeech.ttsModel, latencyMs: Date.now() - started },
+    };
+    return envelope;
+  };
+  // On-ship tier: the on-ship voice speaks first.
+  if (req.tier === 'autonomous') {
+    const local = await localVoiceResponse();
+    if (local) return c.json(local);
+  }
   const ttsModel = process.env.GEMINI_TTS_MODEL?.trim() || DEFAULT_TTS_MODEL;
   const geminiVoice = isGeminiVoice(req.voice) ? req.voice : req.tier ? DEFAULT_GEMINI_VOICE : 'Kore';
 
@@ -848,23 +880,9 @@ voiceRoutes.post('/tts', async (c) => {
     }
   }
 
-  if (localSpeech && cleanText) {
-    const local = await localSynthesize(localSpeech, cleanText, req.voice, req.speed);
-    if (local) {
-      const envelope: AiEnvelope<VoiceTtsResponse> = {
-        result: {
-          audioBase64: local.audioBase64,
-          mimeType: local.mimeType,
-          mode,
-          nodeLabel: 'on-ship-local',
-          pipelineStage: 'tts',
-          useBrowserSpeechFallback: false,
-          durationEstimateMs: Math.max(1200, cleanText.split(/\s+/).length * 360),
-        },
-        meta: { source: 'live_ai', provider: 'local', model: localSpeech.ttsModel, latencyMs: Date.now() - started },
-      };
-      return c.json(envelope);
-    }
+  if (req.tier !== 'autonomous') {
+    const local = await localVoiceResponse();
+    if (local) return c.json(local);
   }
 
   const wavBase64 = synthesizeOfflineCueWavBase64(cleanText);

@@ -80,7 +80,7 @@ const TierBadge: React.FC = () => {
 };
 
 const VoiceSettings: React.FC = () => {
-  const { prefs, updatePrefs, voices, previewVoice, tier } = useAssistant();
+  const { prefs, updatePrefs, voices, previewVoice, tier, deviceSpeechStatus } = useAssistant();
   const [open, setOpen] = useState(false);
   const [browserVoices, setBrowserVoices] = useState<SpeechSynthesisVoice[]>([]);
   const ref = useRef<HTMLDivElement | null>(null);
@@ -154,8 +154,8 @@ const VoiceSettings: React.FC = () => {
           )}
           {row(
             'local',
-            'On-ship voice',
-            Boolean(voices?.engines.local.available),
+            voices?.engines.local.available ? 'On-ship voice' : 'On-ship voice (runs on this device)',
+            Boolean(voices?.engines.local.available) || deviceSpeechStatus.tts !== 'failed',
             engineList('local').map((v) => ({ id: v.id, label: `${v.label} · ${v.style} (${v.language})` })),
             voices?.defaults.local
           )}
