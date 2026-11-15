@@ -16,7 +16,8 @@ export interface FamilyContact {
 
 /** Email delivery of a postcard (server mode). */
 export interface PostcardEmail {
-  status: 'scheduled' | 'sent' | 'failed' | 'no_server';
+  /** shared: sent through the device share menu. mail_app: mail app opened, photo downloaded. */
+  status: 'scheduled' | 'sent' | 'failed' | 'no_server' | 'shared' | 'mail_app';
   recipients: string[];
   /** smtp: really delivered. test: Ethereal test mailbox, see previewUrl. */
   mode?: 'smtp' | 'test';

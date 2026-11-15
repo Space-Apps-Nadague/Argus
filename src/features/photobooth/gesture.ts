@@ -1,13 +1,13 @@
 /**
  * ARGUS — Photobooth hands-free shutter (specs/02-ui-dashboard.md §2.7)
- * Close your hand (a fist) for a moment → a 3-second countdown → the photo is taken.
- * Pure state machine so it is unit-tested; the camera loop feeds it `fist` every frame.
+ * Show a peace sign (✌️) for a quarter of a second → a 3-second countdown → the photo is taken.
+ * Pure state machine so it is unit-tested; the camera loop feeds it `sign` (peace sign seen) every frame.
  */
 
-/** A fist must be held this long before the countdown starts (ignores a passing hand). */
-export const FIST_ARM_MS = 400;
+/** The sign must be held this long before the countdown starts (ignores a passing hand). */
+export const SIGN_ARM_MS = 250;
 export const COUNTDOWN_MS = 3000;
-/** After a photo, wait this long and for the hand to open before a new fist counts. */
+/** After a photo, wait this long and for the sign to drop before a new one counts. */
 export const COOLDOWN_MS = 2000;
 
 export type ShutterPhase = 'idle' | 'arming' | 'countdown' | 'cooldown';
@@ -34,14 +34,14 @@ export function startCountdown(now: number, duration = COUNTDOWN_MS): ShutterSta
   return { phase: 'countdown', since: now, duration };
 }
 
-export function stepShutter(state: ShutterState, fist: boolean, now: number): ShutterStep {
+export function stepShutter(state: ShutterState, sign: boolean, now: number): ShutterStep {
   const elapsed = now - state.since;
   switch (state.phase) {
     case 'idle':
-      return { state: fist ? { phase: 'arming', since: now } : state, capture: false, secondsLeft: null };
+      return { state: sign ? { phase: 'arming', since: now } : state, capture: false, secondsLeft: null };
     case 'arming':
-      if (!fist) return { state: IDLE, capture: false, secondsLeft: null };
-      if (elapsed >= FIST_ARM_MS) return { state: startCountdown(now), capture: false, secondsLeft: 3 };
+      if (!sign) return { state: IDLE, capture: false, secondsLeft: null };
+      if (elapsed >= SIGN_ARM_MS) return { state: startCountdown(now), capture: false, secondsLeft: 3 };
       return { state, capture: false, secondsLeft: null };
     case 'countdown': {
       const duration = state.duration ?? COUNTDOWN_MS;
@@ -49,7 +49,7 @@ export function stepShutter(state: ShutterState, fist: boolean, now: number): Sh
       return { state, capture: false, secondsLeft: Math.ceil((duration - elapsed) / 1000) };
     }
     case 'cooldown':
-      if (!fist && elapsed >= COOLDOWN_MS) return { state: IDLE, capture: false, secondsLeft: null };
+      if (!sign && elapsed >= COOLDOWN_MS) return { state: IDLE, capture: false, secondsLeft: null };
       return { state, capture: false, secondsLeft: null };
   }
 }

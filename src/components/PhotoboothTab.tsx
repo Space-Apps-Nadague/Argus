@@ -2,14 +2,14 @@
  * ARGUS — Photobooth tab (specs/02-ui-dashboard.md §2.7)
  * A camera booth for the crew: a mission-camera data stamp, zero-g stickers, colour filters,
  * postcard frames and a classic 4-photo strip. The real background stays (no fake scenery).
- * Close your hand (fist) → 3-second timer → photo. Photos land
+ * Show a peace sign (✌️) → 3-second timer → photo. Photos land
  * in a strip under the camera (the camera keeps running) and go home through the Earth downlink
  * queue, arriving after the live light time; with the ARGUS server they are also emailed to the
  * family at that moment. Camera frames are processed on this device only.
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Camera, Check, Download, ExternalLink, Grab, Heart, Mail, MapPin, Send, Trash2, UserPlus, X } from 'lucide-react';
+import { Camera, Check, Download, ExternalLink, Hand, Heart, Mail, MapPin, Send, Trash2, UserPlus, X } from 'lucide-react';
 import { useMission } from '../context/MissionContext';
 import { useAuth } from '../context/AuthContext';
 import { familyApi } from '../services/dataApi';
@@ -30,7 +30,8 @@ import {
   type BoothOptions,
   type StickerId,
 } from '../features/photobooth/effects';
-import { detectFist, loadVision, type VisionModels } from '../features/photobooth/vision';
+import { detectPeaceSign, loadVision, type VisionModels } from '../features/photobooth/vision';
+import { sharePhoto } from '../features/photobooth/share';
 import { IDLE, startCountdown, stepShutter, type ShutterState } from '../features/photobooth/gesture';
 import {
   deliveryStatus,
@@ -59,6 +60,8 @@ const MAX_SHOTS = 8;
 /** Photos in a strip, and the countdown between them. */
 const STRIP_COUNT = 4;
 const STRIP_GAP_MS = 2000;
+/** A peace sign missed for less than this still counts as held. */
+const SIGN_HOLD_GAP_MS = 180;
 /** Places for "Greetings from …" (the default follows the top-bar location). */
 const PLACES = ['Earth', 'orbit', 'lunar orbit', 'the Moon', 'deep space', 'Mars'];
 
@@ -146,6 +149,9 @@ const EmailState: React.FC<{ card: FamilyPostcard; delivered: boolean }> = ({ ca
   const e = card.email;
   if (!e) return null;
   if (e.status === 'no_server') return <p className="text-[11px] text-hud-muted">Email needs the ARGUS server (offline demo).</p>;
+  if (e.status === 'shared') return <p className="text-[11px] text-emerald-300">Shared from this device (Mail, WhatsApp…)</p>;
+  if (e.status === 'mail_app')
+    return <p className="text-[11px] text-emerald-300">Email opened for {e.recipients.join(', ')}. The photo was downloaded: attach it and send.</p>;
   if (e.status === 'failed') return <p className="text-[11px] text-red-300">{e.error ?? 'Email failed.'}</p>;
   if (e.status === 'scheduled') return <p className="text-[11px] text-hud-muted">{delivered ? 'Emailing…' : `Email goes out on arrival to ${e.recipients.join(', ')}`}</p>;
   if (e.mode === 'test')
@@ -176,6 +182,7 @@ export const PhotoboothTab: React.FC = () => {
   const [modelsError, setModelsError] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [flash, setFlash] = useState(false);
+  const [signSeen, setSignSeen] = useState(false);
 
   const [opts, setOpts] = useState<BoothOptions>({ filter: 'none', frame: 'none', stickers: ['stamp', 'patch'] });
   const [boothMode, setBoothMode] = useState<'single' | 'strip'>('single');
@@ -292,7 +299,9 @@ export const PhotoboothTab: React.FC = () => {
     const renderer = new BoothRenderer();
     let raf = 0;
     let frame = 0;
-    let fist = false;
+    let sign = false;
+    // Smooth over single frames the model misses, so holding the sign is steady.
+    let lastSeen = -Infinity;
     let lastTs = 0;
     const loop = (t: number) => {
       raf = requestAnimationFrame(loop);
@@ -304,16 +313,18 @@ export const PhotoboothTab: React.FC = () => {
       if (models) {
         const ts = Math.max(lastTs + 1, Math.round(t));
         lastTs = ts;
-        if (frame % 3 === 0) {
+        if (frame % 2 === 0) {
           try {
-            fist = detectFist(models, v, ts);
+            if (detectPeaceSign(models, v, ts)) lastSeen = t;
           } catch {
             /* skip this frame */
           }
         }
+        sign = t - lastSeen < SIGN_HOLD_GAP_MS;
+        setSignSeen((prev) => (prev === sign ? prev : sign));
       }
       renderer.render(c.getContext('2d')!, v, o, inf, t);
-      const step = stepShutter(shutter.current, fist, t);
+      const step = stepShutter(shutter.current, sign, t);
       shutter.current = step.state;
       setCountdown((prev) => (prev === step.secondsLeft ? prev : step.secondsLeft));
       if (step.capture) takePhoto.current();
@@ -360,6 +371,20 @@ export const PhotoboothTab: React.FC = () => {
     const card = newPostcard({ crewId, to: sendTo, message, image: shot.image, delaySeconds: delay });
     if (recipients.length) {
       card.email = { status: mode === 'server' ? 'scheduled' : 'no_server', recipients: recipients.map((r) => r.email!) };
+    }
+    if (mode !== 'server') {
+      // No ARGUS server (e.g. the demo): send the real photo now through the device share menu,
+      // or the mail app. Must run inside this click, before any await.
+      const names = sendTo.join(' & ');
+      const subject = `A photo from ${activeCrewMember.callsign} in ${capitalise(place)}`;
+      const text = [`Hi ${names},`, `${activeCrewMember.callsign} sent you a photo from ${capitalise(place)}.`, message.trim() ? `"${message.trim()}"` : '']
+        .filter(Boolean)
+        .join('\n');
+      const emails = recipients.map((r) => r.email!);
+      card.email = { status: 'shared', recipients: emails.length ? emails : sendTo };
+      void sharePhoto({ image: shot.image, fileName: `argus-${activeCrewMember.callsign.toLowerCase()}.jpg`, subject, text, emails }).then((res) =>
+        setPostcards(updatePostcard(crewId, card.id, { email: { status: res === 'cancelled' ? 'failed' : res, recipients: card.email!.recipients, error: res === 'cancelled' ? 'Sharing was cancelled.' : undefined } }))
+      );
     }
     setPostcards(savePostcard(card));
     setShots((s) => s.map((x) => (x.id === shot.id ? { ...x, sentTo: sendTo } : x)));
@@ -424,6 +449,11 @@ export const PhotoboothTab: React.FC = () => {
                 )}
               </div>
             )}
+            {signSeen && countdown === null && (
+              <div className="pointer-events-none absolute left-3 top-3 rounded-full bg-emerald-500/85 px-3 py-1 text-sm font-semibold text-white" aria-live="polite">
+                ✌️ Peace sign seen
+              </div>
+            )}
             {flash && <div className="pointer-events-none absolute inset-0 bg-white" />}
           </div>
           <p className="mt-2 flex items-center gap-1.5 text-xs text-hud-muted">
@@ -436,9 +466,9 @@ export const PhotoboothTab: React.FC = () => {
               {boothMode === 'strip' ? 'Take 4-photo strip' : 'Take photo (3 s)'}
             </button>
             <p className="flex items-center gap-1.5 text-xs text-hud-muted">
-              <Grab className="h-4 w-4 text-hud-accent" aria-hidden="true" />
+              <Hand className="h-4 w-4 text-hud-accent" aria-hidden="true" />
               {models
-                ? 'Or close your hand into a fist: the 3-second timer starts by itself.'
+                ? 'Or show a peace sign ✌️ to the camera: the 3-second timer starts by itself.'
                 : modelsError
                   ? 'Effects could not load; the plain camera still works.'
                   : 'Loading hand-gesture detection…'}
@@ -504,7 +534,13 @@ export const PhotoboothTab: React.FC = () => {
                         )}
                         <AddContactForm onAdd={(n, r, e) => addContact(n, r, e, true)} />
                         <p className="text-[11px] text-hud-muted">
-                          Arrives in <span className="font-mono text-amber-300">{lightTime}</span>
+                          {mode === 'server' ? (
+                            <>
+                              Arrives in <span className="font-mono text-amber-300">{lightTime}</span>
+                            </>
+                          ) : (
+                            <>Opens your share menu (Mail, WhatsApp…) with the photo. Light time to Earth: <span className="font-mono text-amber-300">{lightTime}</span></>
+                          )}
                         </p>
                         <div className="flex gap-1.5">
                           <button type="button" onClick={() => send(shot)} disabled={!sendTo.length} className="hud-btn-primary flex-1 !py-1 text-xs">

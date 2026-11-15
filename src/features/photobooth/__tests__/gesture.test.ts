@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { COOLDOWN_MS, COUNTDOWN_MS, FIST_ARM_MS, IDLE, startCountdown, stepShutter, type ShutterState } from '../gesture';
+import { COOLDOWN_MS, COUNTDOWN_MS, SIGN_ARM_MS, IDLE, startCountdown, stepShutter, type ShutterState } from '../gesture';
 
-/** Feeds a fist on/off timeline (ms, fist) and returns the frames with captures and the countdown seen. */
+/** Feeds a peace-sign on/off timeline (ms, fist) and returns the frames with captures and the countdown seen. */
 function run(timeline: [number, boolean][], start: ShutterState = IDLE) {
   let state = start;
   const captures: number[] = [];
@@ -21,12 +21,12 @@ const frames = (from: number, to: number, fist: boolean, every = 50): [number, b
   return out;
 };
 
-describe('fist shutter', () => {
-  it('takes the photo 3 s after a held fist, counting 3-2-1', () => {
+describe('peace-sign shutter', () => {
+  it('takes the photo 3 s after a held peace sign, counting 3-2-1', () => {
     const { captures, shown } = run([...frames(0, 600, true), ...frames(650, 4000, false)]);
     expect(captures).toHaveLength(1);
-    expect(captures[0]).toBeGreaterThanOrEqual(FIST_ARM_MS + COUNTDOWN_MS);
-    expect(captures[0]).toBeLessThan(FIST_ARM_MS + COUNTDOWN_MS + 100);
+    expect(captures[0]).toBeGreaterThanOrEqual(SIGN_ARM_MS + COUNTDOWN_MS);
+    expect(captures[0]).toBeLessThan(SIGN_ARM_MS + COUNTDOWN_MS + 100);
     expect([...shown].sort()).toEqual([1, 2, 3]);
   });
 

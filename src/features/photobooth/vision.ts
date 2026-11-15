@@ -1,7 +1,7 @@
 /**
  * ARGUS — On-device vision for the Photobooth (specs/02-ui-dashboard.md §2.7)
- * MediaPipe Tasks (Apache-2.0) gesture recogniser, running in the browser: a closed fist starts
- * the 3-second timer. No frame leaves the device. WASM is copied to /vision/wasm and the 8 MB
+ * MediaPipe Tasks (Apache-2.0) gesture recogniser, running in the browser: a peace sign (✌️,
+ * MediaPipe "Victory") starts the 3-second timer. No frame leaves the device. WASM is copied to /vision/wasm and the 8 MB
  * model is downloaded to public/models/vision by scripts/copy-vision-assets.mjs (if it is missing,
  * the online copy is used). Everything loads only when the tab is opened.
  */
@@ -58,8 +58,11 @@ export function loadVision(): Promise<VisionModels> {
   return loading;
 }
 
-/** True when a hand in the current frame is a closed fist. */
-export function detectFist(m: VisionModels, video: HTMLVideoElement, now: number): boolean {
+/** Peace-sign confidence needed in one frame (the camera loop also smooths over short misses). */
+export const PEACE_MIN_SCORE = 0.5;
+
+/** True when a hand in the current frame shows a peace sign. */
+export function detectPeaceSign(m: VisionModels, video: HTMLVideoElement, now: number): boolean {
   const g = m.gestures.recognizeForVideo(video, now);
-  return g.gestures.some((hand) => hand[0]?.categoryName === 'Closed_Fist' && hand[0].score > 0.6);
+  return g.gestures.some((hand) => hand.some((c) => c.categoryName === 'Victory' && c.score >= PEACE_MIN_SCORE));
 }
