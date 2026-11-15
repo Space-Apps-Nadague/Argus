@@ -28,7 +28,16 @@ export const LOCATION_KEY: Record<SpaceLocationId, LocationKey> = {
 export const METRIC_TO_INDICATOR: Readonly<Record<string, string>> = {
   resting_hr: 'rhr',
   hrv_rmssd: 'hrv',
+  systolic_bp: 'sbp',
+  diastolic_bp: 'dbp',
   spo2: 'spo2',
+  sleep_resp_rate: 'resp',
+  daily_sleep_hours: 'sleep',
+  core_temp: 'temp',
+  caloric_intake: 'kcal',
+  hydration_intake: 'fluid',
+  grip_strength: 'grip',
+  rad_dose: 'dose',
 };
 
 export function indicatorKeyFor(metricId: string): string | null {
