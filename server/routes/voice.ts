@@ -103,7 +103,7 @@ export const VOICE_TOOL_DECLARATIONS: VoiceToolDeclaration[] = [
         metricId: {
           type: 'STRING',
           description:
-            'Canonical metric ID (onsd, iop, cabin_co2, resting_hr, hrv_rmssd, spo2, systolic_bp, bmd_delta, ared_load, blood_glucose, rad_dose, wbc_lymph, core_temp, sleep_eff, pvt_lapses, daily_sleep_hours, mood_index).',
+            'Canonical metric ID (onsd, iop, cabin_co2, resting_hr, hrv_rmssd, spo2, systolic_bp, hydration_intake, bmd_delta, ared_load, blood_glucose, caloric_intake, rad_dose, wbc_lymph, core_temp, sleep_eff, pvt_lapses, daily_sleep_hours, mood_index).',
         },
         value: {
           type: 'NUMBER',
@@ -372,6 +372,8 @@ const SPOKEN_METRIC_ALIASES: Array<{ pattern: RegExp; metricId: MetricId; zoneId
   { pattern: /\b(?:sleep\s+efficiency)\b/i, metricId: 'sleep_eff', zoneId: 'behavioral' },
   { pattern: /\b(?:sleep\s+hours|hours\s+of\s+sleep)\b/i, metricId: 'daily_sleep_hours', zoneId: 'behavioral' },
   { pattern: /\b(?:blood\s+glucose|glucose|blood\s+sugar)\b/i, metricId: 'blood_glucose', zoneId: 'musculo' },
+  { pattern: /\b(?:caloric\s+intake|calories|calorie\s+intake)\b/i, metricId: 'caloric_intake', zoneId: 'musculo' },
+  { pattern: /\b(?:hydration\s+intake|hydration|water\s+intake|fluid\s+intake)\b/i, metricId: 'hydration_intake', zoneId: 'cardio' },
 ];
 
 /**
