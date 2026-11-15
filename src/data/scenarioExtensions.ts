@@ -92,6 +92,12 @@ export const EXTRA_METRICS: ExtraMetric[] = [
     plainDescription: 'Mean response time on the 3-minute watch Psychomotor Vigilance Test. Slows with fatigue, high CO₂ and stress.',
     tracks: { nominal: [255, 262], unexplained_fatigue: [255, 312], sans_alert: [255, 290], high_co2: [255, 335], solar_storm: [255, 318], dehydration: [255, 310], sleep_loss: [255, 395], deconditioning: [255, 275] },
   },
+  {
+    // Source: SRC-109 (local vocal pitch jitter < 1.04% normal clinical cutoff)
+    metricId: 'vocal_jitter', zone: 'behavioral', label: 'Vocal Pitch Jitter', unit: '%', precision: 2, wave: 0.05,
+    plainDescription: 'Cycle-to-cycle fundamental frequency (F0) perturbation during speech check-ins. Rises with autonomic strain, fatigue and cognitive load.',
+    tracks: { nominal: [0.55, 0.58], unexplained_fatigue: [0.55, 1.48], sans_alert: [0.55, 1.15], high_co2: [0.55, 1.38], solar_storm: [0.55, 1.28], dehydration: [0.55, 1.22], sleep_loss: [0.55, 1.62], deconditioning: [0.55, 0.85] },
+  },
 ];
 
 const sign = (v: number) => (v >= 0 ? '+' : '');
