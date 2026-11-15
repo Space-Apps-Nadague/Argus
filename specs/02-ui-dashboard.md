@@ -117,6 +117,13 @@ A fun camera booth so the crew can send photos home. Camera frames are processed
 - **Photo strip:** each photo lands in a strip under the camera and the camera keeps running, so the crew can keep shooting (last 8 per session). Each photo has **Send**, **Download** and **Delete**, and opens larger on click (Esc or click to close). The Send box lists family members and can add a new one on the spot.
 - **Family mail (`familyMail.ts`):** the photo (JPEG, 800 px) goes into an Earth downlink queue and shows *On its way · arrives in 10m 58s*, using the live one-way light time (`commDelayAt`), then *Delivered*. Family contacts (name, relation, optional email) are kept per astronaut. With the ARGUS server, contacts with an email get the photo by real email at the moment it "arrives" (`POST /api/family/mail`, specs/05 §6); the photo shows *Emailed to …* or the error; without the server (offline demo) nothing is emailed: **Send** shows the light-time countdown under the photo and then *Delivered*, labelled *Demo: delivery simulated*; the last 12 postcards per astronaut are kept on this device. Download is always available.
 
+### 2.8 Cognition (`CognitionTab.tsx`, `src/features/cognition/`)
+- **Today's game** card: the game of the day (§12.2 of spec 01), Play button, or today's points when done. After a game: points, *Personal best* badge, status pill (or *Calibrating n/3*), primary metric.
+- **Game frame** (`GameShell.tsx`): intro (one-line how-to) → 3-2-1 countdown → play with live points, combo and progress bar. Keyboard alternatives for every game; sounds can be muted.
+- **Crew leaderboard** (7 days) with streaks; **Your recent games** table with status per session.
+- **Alert** (`CognitionAlert.tsx`, `role="alertdialog"`): yellow (caution) or red (alert) header, then *1 Assess the urgency · 2 Follow the instructions (checklist) · 3 Stay informed (Earth packet ID and comm delay, or "within CMO scope") · 4 Be prepared (retest, open medical protocol)*.
+- Stimulus colors use the categorical `game-1…6` tokens, never status colors. Animations respect `prefers-reduced-motion`.
+
 ### 2.5 Crew (`CrewTab.tsx`) — admin only
 - Grid of crew cards: callsign, name, role, sex icon, readiness (computed for that member's `defaultScenarioId`, or the active scenario for the active member), 6-dot zone status row, check-in streak, `Set active` button. Custom crew can be deleted.
 - `+ Add crew member` opens the existing creator form in `CrewManagerModal.tsx`. Crew details (baselines, blood type, age, medical notes) appear in an expandable section on each card.
