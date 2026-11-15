@@ -1,16 +1,20 @@
 /**
- * Grid Logic — Matrix Reasoning: find the piece that completes a 3×3 grid.
+ * Grid Logic — Matrix Reasoning, hard 3-minute version: find the piece that completes a 3×3 grid.
+ * Three rules at once (the fill pattern also changes diagonally), 5 options that each differ from the
+ * answer by one detail, 15 s per grid; grids keep coming until the 3 minutes are up.
  * Source: SRC-089 (MRT: abstract reasoning)
  * Grids are generated from rules: one attribute is constant per row, one changes across columns.
+ * Third rule, options, per-grid limit and time box are the ARGUS hard level (spec §12.1).
  */
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Glyph, GlyphSpec, SHAPES, FILLS, sameGlyph } from '../Glyph';
 import { mulberry32, randInt, shuffle } from '../rng';
 import { sfx } from '../sfx';
-import { GameProps, clamp } from './common';
+import { GameProps, clamp, useTimeBox } from './common';
 
-const TRIALS = 12;
-const OPTIONS = 4;
+export const MR_OPTIONS = 5;
+const OPTIONS = MR_OPTIONS;
+const TRIAL_LIMIT_MS = 15_000;
 
 export interface MrTrial {
   cells: GlyphSpec[]; // 9, last is the answer
@@ -21,11 +25,12 @@ export interface MrTrial {
 export function makeMrTrial(rand: () => number): MrTrial {
   const shapes = shuffle(SHAPES, rand).slice(0, 3);
   const colors = shuffle([0, 1, 2, 3, 4, 5], rand).slice(0, 3);
-  const fill = FILLS[randInt(rand, 0, 2)];
+  const fills = shuffle(FILLS, rand);
   const mode = randInt(rand, 0, 2); // which attribute varies across columns
   const cells: GlyphSpec[] = [];
   for (let r = 0; r < 3; r++)
     for (let c = 0; c < 3; c++) {
+      const fill = fills[(r + 2 * c) % 3]; // third rule: fill changes along the diagonals
       if (mode === 0) cells.push({ shape: shapes[r], color: colors[r], fill, count: c + 1 });
       else if (mode === 1) cells.push({ shape: shapes[r], color: colors[c], fill, count: r + 1 });
       else cells.push({ shape: shapes[c], color: colors[r], fill, count: ((r + c) % 3) + 1 });
@@ -47,44 +52,65 @@ export function makeMrTrial(rand: () => number): MrTrial {
   return { cells, options, answerIdx: options.findIndex((o) => sameGlyph(o, answer)) };
 }
 
-export const MatrixReasoning: React.FC<GameProps> = ({ seed, onProgress, onDone }) => {
-  const trials = useRef(Array.from({ length: TRIALS }, ((r) => () => makeMrTrial(r))(mulberry32(seed)))).current;
+export const MatrixReasoning: React.FC<GameProps> = ({ seed, durationSec, onProgress, onDone }) => {
+  const rand = useRef(mulberry32(seed));
+  const [t, setT] = useState<MrTrial>(() => makeMrTrial(rand.current));
   const [i, setI] = useState(0);
   const [picked, setPicked] = useState<number | null>(null);
   const correct = useRef(0);
+  const answered = useRef(0);
+  const timeouts = useRef(0);
   const combo = useRef(0);
   const points = useRef(0);
-  const t = trials[i];
+  const done = useRef(false);
+
+  useTimeBox(
+    durationSec,
+    (p) => onProgress({ points: clamp(Math.round(points.current), 0, 1000), progress: p, combo: combo.current }),
+    () => {
+      done.current = true;
+      const acc = answered.current ? correct.current / answered.current : 0;
+      onDone({
+        points: clamp(Math.round(points.current), 0, 1000),
+        metric: Math.round(acc * 100),
+        accuracy: acc,
+        extra: { answered: answered.current, timeouts: timeouts.current },
+      });
+    }
+  );
 
   const choose = (k: number) => {
-    if (picked !== null) return;
+    if (picked !== null || done.current) return;
+    answered.current++;
+    if (k < 0) timeouts.current++;
     const ok = k === t.answerIdx;
     if (ok) {
       correct.current++;
       combo.current++;
-      points.current += 70 + Math.min(combo.current, 6) * 2;
+      points.current += 40 + Math.min(combo.current, 6) * 2;
       sfx.hit();
     } else {
       combo.current = 0;
       sfx.miss();
     }
     setPicked(k);
-    const n = i + 1;
-    onProgress({ points: clamp(Math.round(points.current), 0, 1000), progress: n / TRIALS, combo: combo.current });
-    if (n >= TRIALS) {
-      const acc = correct.current / TRIALS;
-      onDone({ points: clamp(Math.round(points.current), 0, 1000), metric: Math.round(acc * 100), accuracy: acc });
-      return;
-    }
     setTimeout(() => {
       setPicked(null);
-      setI(n);
+      setT(makeMrTrial(rand.current));
+      setI((n) => n + 1);
     }, 600);
   };
 
+  // 15 s per grid; no answer counts as wrong.
+  useEffect(() => {
+    const id = window.setTimeout(() => choose(-1), TRIAL_LIMIT_MS);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [i]);
+
   return (
     <div className="flex flex-col items-center gap-4">
-      <p className="font-display text-sm tracking-widest text-hud-muted">GRID {i + 1}/{TRIALS}</p>
+      <p className="font-display text-sm tracking-widest text-hud-muted">GRID {i + 1} · 15 s each</p>
       <div key={i} className="game-pop grid grid-cols-3 gap-1 rounded-xl border border-hud-line bg-hud-bg/60 p-2">
         {t.cells.map((g, k) => (
           <div key={k} className="flex h-16 w-16 items-center justify-center rounded-md bg-hud-panel/60">
@@ -92,7 +118,7 @@ export const MatrixReasoning: React.FC<GameProps> = ({ seed, onProgress, onDone 
           </div>
         ))}
       </div>
-      <div className="flex gap-2" role="group" aria-label="Answer options">
+      <div className="flex flex-wrap justify-center gap-2" role="group" aria-label="Answer options">
         {t.options.map((g, k) => (
           <button
             key={k}

@@ -1,6 +1,6 @@
 /**
  * ARGUS — Cognition game catalog (specs/01-data-schema.md §12.1).
- * Each game implements one test of NASA's Cognition battery.
+ * Each game implements one test of NASA's Cognition battery, at a fixed hard level for 3 minutes.
  * Source: SRC-089 (Cognition battery: 10 tests, domains, typical durations)
  * Emotion Recognition is supplied by a separate team system and is not part of this rotation.
  */
@@ -24,8 +24,8 @@ export const COGNITION_GAMES: CognitionGameDef[] = [
     title: 'Target Lock',
     nasaTest: 'Motor Praxis',
     domain: 'Sensory-motor speed',
-    howTo: 'Hit each target as fast as you can. They keep shrinking.',
-    seconds: 30,
+    howTo: 'Hit each target before it vanishes (1.1 s). They keep shrinking.',
+    seconds: 180, // ARGUS hard level: every game is 3 minutes (spec §12.1)
     primaryMetricLabel: 'Hit speed',
     primaryMetricUnit: 'hits/s',
     direction: 'higher',
@@ -34,10 +34,10 @@ export const COGNITION_GAMES: CognitionGameDef[] = [
   {
     id: 'fractal_2back',
     title: 'Echo',
-    nasaTest: 'Fractal 2-Back',
+    nasaTest: 'Fractal N-Back (3-back)',
     domain: 'Working memory',
-    howTo: 'Hit MATCH when the shape is the same as two shapes ago.',
-    seconds: 90,
+    howTo: 'Hit MATCH when the shape is the same as THREE shapes ago.',
+    seconds: 180, // ARGUS hard level: every game is 3 minutes (spec §12.1)
     primaryMetricLabel: 'Hits minus false alarms',
     primaryMetricUnit: '',
     direction: 'higher',
@@ -48,8 +48,8 @@ export const COGNITION_GAMES: CognitionGameDef[] = [
     title: 'Cargo Memory',
     nasaTest: 'Visual Object Learning',
     domain: 'Spatial learning and memory',
-    howTo: 'Memorise 10 objects, then pick out the ones you saw.',
-    seconds: 100,
+    howTo: 'Memorise 12 objects, then pick out the exact ones you saw. Some new ones differ by one detail.',
+    seconds: 180, // ARGUS hard level: every game is 3 minutes (spec §12.1)
     primaryMetricLabel: 'Accuracy',
     primaryMetricUnit: '%',
     direction: 'higher',
@@ -60,8 +60,8 @@ export const COGNITION_GAMES: CognitionGameDef[] = [
     title: 'Code Breaker',
     nasaTest: 'Digit Symbol Substitution',
     domain: 'Complex scanning and visual tracking',
-    howTo: 'Use the key to match each symbol to its digit. Go fast.',
-    seconds: 90,
+    howTo: 'Use the key to match each symbol to its digit. Go fast: the key changes every minute.',
+    seconds: 180, // ARGUS hard level: every game is 3 minutes (spec §12.1)
     primaryMetricLabel: 'Correct per minute',
     primaryMetricUnit: '/min',
     direction: 'higher',
@@ -72,8 +72,8 @@ export const COGNITION_GAMES: CognitionGameDef[] = [
     title: 'Pressure Run',
     nasaTest: 'Balloon Analog Risk',
     domain: 'Risk decision making',
-    howTo: 'Pump to earn credits. Bank before it bursts.',
-    seconds: 120,
+    howTo: 'Pump to earn credits. Bank before it bursts (anywhere from 1 to 64 pumps).',
+    seconds: 180, // ARGUS hard level: every game is 3 minutes (spec §12.1)
     primaryMetricLabel: 'Risk propensity',
     primaryMetricUnit: 'pumps',
     direction: 'both',
@@ -84,8 +84,8 @@ export const COGNITION_GAMES: CognitionGameDef[] = [
     title: 'Docking Align',
     nasaTest: 'Line Orientation',
     domain: 'Spatial orientation',
-    howTo: 'Rotate the moving line until it is parallel to the fixed one.',
-    seconds: 70,
+    howTo: 'Rotate the moving line until it is parallel to the fixed one. 10 s per pair.',
+    seconds: 180, // ARGUS hard level: every game is 3 minutes (spec §12.1)
     primaryMetricLabel: 'Mean angle error',
     primaryMetricUnit: '°',
     direction: 'lower',
@@ -96,8 +96,8 @@ export const COGNITION_GAMES: CognitionGameDef[] = [
     title: 'Pattern Sort',
     nasaTest: 'Abstract Matching',
     domain: 'Abstraction, concept formation',
-    howTo: 'Send the object to the group it fits best.',
-    seconds: 100,
+    howTo: 'Send the object to the group it fits best. 4 s each, and watch for decoys.',
+    seconds: 180, // ARGUS hard level: every game is 3 minutes (spec §12.1)
     primaryMetricLabel: 'Accuracy',
     primaryMetricUnit: '%',
     direction: 'higher',
@@ -108,8 +108,8 @@ export const COGNITION_GAMES: CognitionGameDef[] = [
     title: 'Grid Logic',
     nasaTest: 'Matrix Reasoning',
     domain: 'Abstract reasoning',
-    howTo: 'Find the piece that completes the grid.',
-    seconds: 120,
+    howTo: 'Find the piece that completes the grid. Three rules, 15 s each.',
+    seconds: 180, // ARGUS hard level: every game is 3 minutes (spec §12.1)
     primaryMetricLabel: 'Accuracy',
     primaryMetricUnit: '%',
     direction: 'higher',

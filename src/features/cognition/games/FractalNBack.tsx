@@ -1,6 +1,8 @@
 /**
- * Echo — Fractal 2-Back (working memory): press MATCH when the glyph equals the one shown two steps back.
- * Source: SRC-089 (F2B: working memory), SRC-094 (task description)
+ * Echo — Fractal N-Back (working memory), hard 3-minute version: press MATCH when the glyph equals
+ * the one shown THREE steps back (3-back), one glyph every 1.5 s, 120 glyphs.
+ * Source: SRC-089 (F2B: working memory), SRC-094 (task description). 3-back, pace and length are
+ * the ARGUS hard level (spec §12.1).
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { Glyph, GlyphSpec, SHAPES, FILLS, sameGlyph } from '../Glyph';
@@ -8,8 +10,10 @@ import { mulberry32, randInt } from '../rng';
 import { sfx } from '../sfx';
 import { GameProps, clamp } from './common';
 
-const TRIALS = 48;
-const STEP_MS = 1700;
+/** How many steps back a match counts. */
+export const N_BACK = 3;
+const STEP_MS = 1500;
+const TRIALS = Math.round((180 * 1000) / STEP_MS); // fills the 3-minute game
 const TARGET_RATE = 0.3;
 
 function makeSequence(seed: number): { seq: GlyphSpec[]; isTarget: boolean[] } {
@@ -25,15 +29,15 @@ function makeSequence(seed: number): { seq: GlyphSpec[]; isTarget: boolean[] } {
   const seq: GlyphSpec[] = [];
   const isTarget: boolean[] = [];
   for (let i = 0; i < TRIALS; i++) {
-    if (i >= 2 && rand() < TARGET_RATE) {
-      seq.push(seq[i - 2]);
+    if (i >= N_BACK && rand() < TARGET_RATE) {
+      seq.push(seq[i - N_BACK]);
     } else {
       let g: GlyphSpec;
       do g = pool[randInt(rand, 0, pool.length - 1)];
-      while (i >= 2 && sameGlyph(g, seq[i - 2]));
+      while (i >= N_BACK && sameGlyph(g, seq[i - N_BACK]));
       seq.push(g);
     }
-    isTarget.push(i >= 2 && sameGlyph(seq[i], seq[i - 2]));
+    isTarget.push(i >= N_BACK && sameGlyph(seq[i], seq[i - N_BACK]));
   }
   return { seq, isTarget };
 }
@@ -58,7 +62,7 @@ export const FractalNBack: React.FC<GameProps> = ({ seed, onProgress, onDone }) 
         const targets = isTarget.filter(Boolean).length;
         const hits = isTarget.filter((t, k) => t && responded.current[k]).length;
         const fas = isTarget.filter((t, k) => !t && responded.current[k]).length;
-        const nonTargets = TRIALS - 2 - targets;
+        const nonTargets = TRIALS - N_BACK - targets;
         const hitRate = targets ? hits / targets : 0;
         const faRate = nonTargets ? fas / nonTargets : 0;
         onDone({
@@ -80,16 +84,16 @@ export const FractalNBack: React.FC<GameProps> = ({ seed, onProgress, onDone }) 
 
   const press = () => {
     const cur = iRef.current;
-    if (responded.current[cur] || cur < 2) return;
+    if (responded.current[cur] || cur < N_BACK) return;
     responded.current[cur] = true;
     if (isTarget[cur]) {
       combo.current++;
-      points.current += 40 + Math.min(combo.current, 8) * 5;
+      points.current += 22 + Math.min(combo.current, 8) * 2;
       sfx.hit();
       setFlash('hit');
     } else {
       combo.current = 0;
-      points.current = Math.max(0, points.current - 25);
+      points.current = Math.max(0, points.current - 15);
       sfx.miss();
       setFlash('miss');
     }
@@ -118,10 +122,10 @@ export const FractalNBack: React.FC<GameProps> = ({ seed, onProgress, onDone }) 
           <Glyph spec={seq[i]} size={150} title={`Shape ${i + 1}`} />
         </div>
       </div>
-      <button type="button" onClick={press} disabled={i < 2} className="hud-btn-primary w-48 py-3 text-base tracking-widest">
+      <button type="button" onClick={press} disabled={i < N_BACK} className="hud-btn-primary w-48 py-3 text-base tracking-widest">
         MATCH
       </button>
-      <p className="text-xs text-hud-muted">Same as 2 back? Press MATCH or Space.</p>
+      <p className="text-xs text-hud-muted">Same as 3 back? Press MATCH or Space.</p>
     </div>
   );
 };

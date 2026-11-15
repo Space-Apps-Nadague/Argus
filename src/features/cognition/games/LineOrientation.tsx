@@ -1,15 +1,18 @@
 /**
- * Docking Align — Line Orientation: rotate the moving line until it is parallel to the fixed one.
- * Source: SRC-089 (LOT: spatial orientation), SRC-094 (12 line pairs, rotate by clicking arrows)
+ * Docking Align — Line Orientation, hard 3-minute version: rotate the moving line until it is parallel to
+ * the fixed one. Shorter lines, 2° steps and 10 s per pair (it locks itself when time runs out);
+ * pairs keep coming until the 3 minutes are up.
+ * Source: SRC-089 (LOT: spatial orientation), SRC-094 (line pairs, rotate by clicking arrows)
+ * Line length, step, per-pair limit and time box are the ARGUS hard level (spec §12.1).
  */
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { RotateCcw, RotateCw } from 'lucide-react';
 import { mulberry32, randInt } from '../rng';
 import { sfx } from '../sfx';
-import { GameProps, clamp } from './common';
+import { GameProps, clamp, useTimeBox } from './common';
 
-const PAIRS = 12; // Source: SRC-094
-const STEP_DEG = 3;
+const STEP_DEG = 2;
+const PAIR_LIMIT_MS = 10_000;
 
 interface Pair {
   fixed: number;
@@ -21,14 +24,11 @@ interface Pair {
   len: number;
 }
 
-function makePairs(seed: number): Pair[] {
-  const rand = mulberry32(seed);
-  return Array.from({ length: PAIRS }, () => {
-    const fixed = randInt(rand, 0, 59) * 3;
-    let start = randInt(rand, 0, 59) * 3;
-    while (Math.abs(((start - fixed + 540) % 180) - 0) < 15) start = randInt(rand, 0, 59) * 3;
-    return { fixed, start, fx: randInt(rand, 70, 120), fy: randInt(rand, 60, 160), mx: randInt(rand, 200, 250), my: randInt(rand, 60, 160), len: randInt(rand, 60, 110) };
-  });
+export function makePair(rand: () => number): Pair {
+  const fixed = randInt(rand, 0, 89) * 2;
+  let start = randInt(rand, 0, 89) * 2;
+  while (lineAngleError(start, fixed) < 15) start = randInt(rand, 0, 89) * 2;
+  return { fixed, start, fx: randInt(rand, 60, 120), fy: randInt(rand, 50, 170), mx: randInt(rand, 200, 260), my: randInt(rand, 50, 170), len: randInt(rand, 40, 80) };
 }
 
 /** Smallest angle between two undirected lines, 0–90°. */
@@ -44,38 +44,58 @@ const Line = ({ x, y, deg, len, cls }: { x: number; y: number; deg: number; len:
   return <line x1={x - dx} y1={y - dy} x2={x + dx} y2={y + dy} strokeWidth={6} strokeLinecap="round" className={cls} />;
 };
 
-export const LineOrientation: React.FC<GameProps> = ({ seed, onProgress, onDone }) => {
-  const pairs = useRef(makePairs(seed)).current;
+export const LineOrientation: React.FC<GameProps> = ({ seed, durationSec, onProgress, onDone }) => {
+  const rand = useRef(mulberry32(seed));
+  const [p, setP] = useState<Pair>(() => makePair(rand.current));
   const [i, setI] = useState(0);
-  const [angle, setAngle] = useState(pairs[0].start);
+  const [angle, setAngle] = useState(p.start);
   const [last, setLast] = useState<number | null>(null);
   const errors = useRef<number[]>([]);
   const points = useRef(0);
-  const p = pairs[i];
+  const done = useRef(false);
+  const locked = useRef(false);
+  const angleRef = useRef(angle);
+  angleRef.current = angle;
 
-  const submit = () => {
-    const err = lineAngleError(angle, p.fixed);
-    errors.current.push(err);
-    points.current += clamp(Math.round(85 - err * 6), 0, 85);
-    err <= 3 ? sfx.hit() : sfx.miss();
-    setLast(err);
-    const n = i + 1;
-    onProgress({ points: clamp(points.current, 0, 1000), progress: n / PAIRS });
-    if (n >= PAIRS) {
-      const meanErr = errors.current.reduce((a, b) => a + b, 0) / PAIRS;
+  useTimeBox(
+    durationSec,
+    (prog) => onProgress({ points: clamp(points.current, 0, 1000), progress: prog }),
+    () => {
+      done.current = true;
+      const n = Math.max(1, errors.current.length);
       onDone({
         points: clamp(points.current, 0, 1000),
-        metric: Number(meanErr.toFixed(2)),
-        accuracy: errors.current.filter((e) => e <= 3).length / PAIRS,
+        metric: Number((errors.current.reduce((a, b) => a + b, 0) / n).toFixed(2)),
+        accuracy: errors.current.filter((e) => e <= 3).length / n,
+        extra: { pairs: errors.current.length },
       });
-      return;
     }
+  );
+
+  const submit = () => {
+    if (done.current || locked.current) return;
+    locked.current = true;
+    const err = lineAngleError(angleRef.current, p.fixed);
+    errors.current.push(err);
+    points.current += clamp(Math.round(30 - err * 3), 0, 30);
+    err <= 3 ? sfx.hit() : sfx.miss();
+    setLast(err);
     setTimeout(() => {
-      setI(n);
-      setAngle(pairs[n].start);
+      const np = makePair(rand.current);
+      setP(np);
+      setAngle(np.start);
+      setI((k) => k + 1);
       setLast(null);
-    }, 450);
+      locked.current = false;
+    }, 400);
   };
+
+  // Each pair locks itself after 10 s.
+  useEffect(() => {
+    const id = window.setTimeout(submit, PAIR_LIMIT_MS);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [i]);
 
   const rotate = (d: number) => setAngle((a) => (a + d + 360) % 360);
 
@@ -88,7 +108,7 @@ export const LineOrientation: React.FC<GameProps> = ({ seed, onProgress, onDone 
         if (e.key === 'Enter') submit();
       }}
     >
-      <p className="font-display text-sm tracking-widest text-hud-muted">ALIGN {i + 1}/{PAIRS}</p>
+      <p className="font-display text-sm tracking-widest text-hud-muted">ALIGN {i + 1} · 10 s each</p>
       <svg viewBox="0 0 320 220" className="w-full max-w-md rounded-xl border border-hud-line bg-hud-bg/60" role="img" aria-label="Two lines: make the cyan one parallel to the white one">
         <Line x={p.fx} y={p.fy} deg={p.fixed} len={p.len} cls="stroke-hud-text" />
         <Line x={p.mx} y={p.my} deg={angle} len={p.len} cls="stroke-hud-accent" />

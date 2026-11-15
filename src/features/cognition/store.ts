@@ -6,7 +6,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { CognitionSession } from './types';
 
-export const COGNITION_STORAGE_KEY = 'argus.cognition.sessions.v1';
+/** v2: hard 3-minute games; scores are not comparable with v1, so baselines start again. */
+export const COGNITION_STORAGE_KEY = 'argus.cognition.sessions.v2';
 
 type ByCrew = Record<string, CognitionSession[]>;
 

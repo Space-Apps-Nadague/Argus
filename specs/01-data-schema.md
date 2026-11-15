@@ -548,7 +548,7 @@ Daily gamified cognitive readiness check. Each game implements one test of NASA'
 |---|---|---|---|---|
 | `pvt` | Reflex | Psychomotor Vigilance, brief 3-min (PVT-B) [SRC-090] | Vigilant attention | mean 1/RT, s⁻¹ (higher) |
 | `motor_praxis` | Target Lock | Motor Praxis [SRC-094] | Sensory-motor speed | hits/s (higher) |
-| `fractal_2back` | Echo | Fractal 2-Back | Working memory | hit rate − false-alarm rate (higher) |
+| `fractal_2back` | Echo | Fractal N-Back, played as 3-back | Working memory | hit rate − false-alarm rate (higher) |
 | `volt` | Cargo Memory | Visual Object Learning [SRC-094] | Spatial learning & memory | accuracy % (higher) |
 | `dsst` | Code Breaker | Digit Symbol Substitution [SRC-095] | Complex scanning & visual tracking | correct/min (higher) |
 | `bart` | Pressure Run | Balloon Analog Risk | Risk decision making | adjusted pumps (both directions) |
@@ -558,7 +558,16 @@ Daily gamified cognitive readiness check. Each game implements one test of NASA'
 
 - PVT-B: 3 min, inter-stimulus interval 1–4 s, lapse ≥ 355 ms, false start < 100 ms [SRC-090]. The game also counts lapses ≥ 500 ms and writes them as a `pvt_lapses` check-in, because that is the definition the existing `pvt_lapses` vital uses (§2).
 - Stimuli are procedural SVG glyphs (shape × color × fill × count × rotation), not the original Cognition images.
-- **Assumptions (no primary source):** BART burst point uniform 1–32 pumps over 15 tanks; trial counts for F2B (48), AM (20), MRT (12) shortened for a daily 1–3 min game.
+- **Hard level, 3 minutes each (ARGUS choice, no primary source):** every game runs for 180 s at a fixed hard level (`useTimeBox`); trials keep coming until time is up.
+  - Target Lock: targets shrink 48 → 14 px per wave of 20 and vanish after 1.1 s (time-out = miss).
+  - Echo: 3-back, one glyph every 1.5 s (120 glyphs).
+  - Cargo Memory: rounds of 12 learned (1.2 s each) and 24 tested; half of the new items are look-alikes (one detail changed).
+  - Code Breaker: the symbol key is reshuffled every 60 s.
+  - Pressure Run: burst point uniform 1–64 pumps.
+  - Docking Align: lines 40–80 px, 2° steps, 10 s per pair (auto-lock).
+  - Pattern Sort: 4 s per object; the target also copies one non-rule detail from the wrong pair (decoy).
+  - Grid Logic: a third rule (fill changes along diagonals), 5 options, 15 s per grid.
+  - Reflex (PVT-B) is unchanged: it is already the standard 3-minute test.
 - `points` (0–1000) are for the leaderboard only. Anomaly detection uses the primary metric.
 
 ### 12.2 Daily schedule (`schedule.ts`)
@@ -586,4 +595,4 @@ The ISS Crew Medical Officer is usually not a physician and acts as an extender 
 
 ### 12.5 Storage (`store.ts`)
 
-`CognitionSession` records live in `localStorage` key `argus.cognition.sessions.v1`, keyed by crew. No demo data is generated; the team loads mock sessions with `importCognitionSessions()`. Server persistence is a follow-up.
+`CognitionSession` records live in `localStorage` key `argus.cognition.sessions.v2` (v2 = hard 3-minute games; v1 scores are not comparable, so baselines start again), keyed by crew. No demo data is generated; the team loads mock sessions with `importCognitionSessions()`. Server persistence is a follow-up.

@@ -1,15 +1,18 @@
 /**
- * Pattern Sort — Abstract Matching: send the target object to the pair it belongs with more, by an implicit rule.
+ * Pattern Sort — Abstract Matching, hard 3-minute version: send the target object to the pair it belongs
+ * with more, by an implicit rule. 4 s per object, and the target also shares a decoy detail with the
+ * wrong pair. Objects keep coming until the 3 minutes are up.
  * Source: SRC-089 (AM: abstraction, concept formation), SRC-094 (target classified to one of two pairs)
  * Rule generation: each pair shares one attribute value; the target shares the left pair's value only, or the right's.
+ * Decoy, per-object limit and time box are the ARGUS hard level (spec §12.1).
  */
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Glyph, GlyphSpec, SHAPES, FILLS } from '../Glyph';
 import { mulberry32, randInt } from '../rng';
 import { sfx } from '../sfx';
-import { GameProps, clamp } from './common';
+import { GameProps, clamp, useTimeBox } from './common';
 
-const TRIALS = 20;
+const TRIAL_LIMIT_MS = 4000;
 type Attr = 'shape' | 'color' | 'fill' | 'count';
 const ATTRS: Attr[] = ['shape', 'color', 'fill', 'count'];
 const RANGE: Record<Attr, number> = { shape: SHAPES.length, color: 6, fill: 3, count: 3 };
@@ -49,44 +52,70 @@ export function makeAmTrial(rand: () => number): AmTrial {
   const left: [GlyphSpec, GlyphSpec] = [member(aL, vL, aR, vR), member(aL, vL, aR, vR)];
   const right: [GlyphSpec, GlyphSpec] = [member(aR, vR, aL, vL), member(aR, vR, aL, vL)];
   const answer = rand() < 0.5 ? 'left' : 'right';
-  const target = answer === 'left' ? member(aL, vL, aR, vR) : member(aR, vR, aL, vL);
+  let target = answer === 'left' ? member(aL, vL, aR, vR) : member(aR, vR, aL, vL);
+  // Decoy: copy one non-rule detail from the wrong pair, so a quick look points the wrong way.
+  const free = ATTRS.filter((a) => a !== aL && a !== aR);
+  const decoyAttr = free[randInt(rand, 0, free.length - 1)];
+  const wrong = answer === 'left' ? right[0] : left[0];
+  target = setV(target, decoyAttr, getV(wrong, decoyAttr));
   return { left, right, target, answer };
 }
 
-export const AbstractMatching: React.FC<GameProps> = ({ seed, onProgress, onDone }) => {
-  const trials = useRef(Array.from({ length: TRIALS }, ((r) => () => makeAmTrial(r))(mulberry32(seed)))).current;
+export const AbstractMatching: React.FC<GameProps> = ({ seed, durationSec, onProgress, onDone }) => {
+  const rand = useRef(mulberry32(seed));
+  const [t, setT] = useState<AmTrial>(() => makeAmTrial(rand.current));
   const [i, setI] = useState(0);
   const [flash, setFlash] = useState<'hit' | 'miss' | null>(null);
   const correct = useRef(0);
+  const answered = useRef(0);
+  const timeouts = useRef(0);
   const combo = useRef(0);
   const points = useRef(0);
-  const t = trials[i];
+  const done = useRef(false);
 
-  const choose = (side: 'left' | 'right') => {
-    if (flash) return;
+  useTimeBox(
+    durationSec,
+    (p) => onProgress({ points: clamp(Math.round(points.current), 0, 1000), progress: p, combo: combo.current }),
+    () => {
+      done.current = true;
+      const acc = answered.current ? correct.current / answered.current : 0;
+      onDone({
+        points: clamp(Math.round(points.current), 0, 1000),
+        metric: Math.round(acc * 100),
+        accuracy: acc,
+        extra: { answered: answered.current, timeouts: timeouts.current },
+      });
+    }
+  );
+
+  const choose = (side: 'left' | 'right' | null) => {
+    if (flash || done.current) return;
+    answered.current++;
+    if (side === null) timeouts.current++;
     const ok = side === t.answer;
     if (ok) {
       correct.current++;
       combo.current++;
-      points.current += 40 + Math.min(combo.current, 8) * 1.25;
+      points.current += 12 + Math.min(combo.current, 8) * 0.5;
       sfx.hit();
     } else {
       combo.current = 0;
       sfx.miss();
     }
     setFlash(ok ? 'hit' : 'miss');
-    const n = i + 1;
-    onProgress({ points: clamp(Math.round(points.current), 0, 1000), progress: n / TRIALS, combo: combo.current });
-    if (n >= TRIALS) {
-      const acc = correct.current / TRIALS;
-      onDone({ points: clamp(Math.round(points.current), 0, 1000), metric: Math.round(acc * 100), accuracy: acc });
-      return;
-    }
     setTimeout(() => {
       setFlash(null);
-      setI(n);
-    }, 350);
+      setT(makeAmTrial(rand.current));
+      setI((k) => k + 1);
+    }, 300);
   };
+
+  // 4 s per object; no answer counts as wrong.
+  useEffect(() => {
+    const id = window.setTimeout(() => choose(null), TRIAL_LIMIT_MS);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [i]);
 
   const pairBox = (side: 'left' | 'right', pair: [GlyphSpec, GlyphSpec]) => (
     <button
@@ -102,7 +131,7 @@ export const AbstractMatching: React.FC<GameProps> = ({ seed, onProgress, onDone
 
   return (
     <div className="flex flex-col items-center gap-5" onKeyDown={(e) => (e.key === 'ArrowLeft' ? choose('left') : e.key === 'ArrowRight' ? choose('right') : null)}>
-      <p className="font-display text-sm tracking-widest text-hud-muted">SORT {i + 1}/{TRIALS}</p>
+      <p className="font-display text-sm tracking-widest text-hud-muted">SORT {i + 1} · 4 s each</p>
       <div className={`flex h-32 w-32 items-center justify-center rounded-2xl border-2 bg-hud-bg/60 ${flash === 'hit' ? 'border-status-green' : flash === 'miss' ? 'border-status-red game-shake' : 'border-hud-accent'}`}>
         <div key={i} className="game-pop"><Glyph spec={t.target} size={96} title="Object to sort" /></div>
       </div>

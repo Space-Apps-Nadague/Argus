@@ -1,47 +1,53 @@
 /**
- * Pressure Run — Balloon Analog Risk: pump a tank to earn credits; bank before it bursts.
+ * Pressure Run — Balloon Analog Risk, hard 3-minute version: pump a tank to earn credits; bank before it
+ * bursts. Tanks keep coming until the 3 minutes are up; the burst point is anywhere from 1 to 64 pumps.
  * Source: SRC-089 (BART: risk decision making). Outcome: adjusted pumps (mean pumps on tanks that did not burst).
- * Burst point uniform in 1–32 pumps is an ARGUS assumption for a short daily game (spec §12.1).
+ * Burst point uniform in 1–64 pumps and the time box are ARGUS choices (spec §12.1).
  */
 import React, { useRef, useState } from 'react';
 import { mulberry32, randInt } from '../rng';
 import { sfx } from '../sfx';
-import { GameProps, clamp } from './common';
+import { GameProps, clamp, useTimeBox } from './common';
 
-const TANKS = 15;
-const MAX_PUMPS = 32;
-const CREDIT_PER_PUMP = 5;
+const MAX_PUMPS = 64;
+const CREDIT_PER_PUMP = 1;
+const burstPoint = (seed: number, tank: number) => randInt(mulberry32(seed + tank * 7919), 1, MAX_PUMPS);
 
-export const Bart: React.FC<GameProps> = ({ seed, onProgress, onDone }) => {
-  const bursts = useRef(Array.from({ length: TANKS }, (_, k) => randInt(mulberry32(seed + k * 7919), 1, MAX_PUMPS))).current;
+export const Bart: React.FC<GameProps> = ({ seed, durationSec, onProgress, onDone }) => {
   const [tank, setTank] = useState(0);
   const [pumps, setPumps] = useState(0);
   const [bank, setBank] = useState(0);
   const [popped, setPopped] = useState(false);
   const banked = useRef<number[]>([]);
   const explosions = useRef(0);
+  const bankRef = useRef(0);
+  const done = useRef(false);
 
-  const next = (newBank: number) => {
-    const n = tank + 1;
-    onProgress({ points: clamp(Math.round(newBank / 2), 0, 1000), progress: n / TANKS });
-    if (n >= TANKS) {
+  useTimeBox(
+    durationSec,
+    (p) => onProgress({ points: clamp(Math.round(bankRef.current), 0, 1000), progress: p }),
+    () => {
+      done.current = true;
       const adj = banked.current.length ? banked.current.reduce((a, b) => a + b, 0) / banked.current.length : 0;
       onDone({
-        points: clamp(Math.round(newBank / 2), 0, 1000),
+        points: clamp(Math.round(bankRef.current), 0, 1000),
         metric: Number(adj.toFixed(2)),
-        extra: { explosions: explosions.current, credits: newBank },
+        extra: { explosions: explosions.current, credits: bankRef.current, tanks: tank + 1 },
       });
-      return;
     }
-    setTank(n);
+  );
+
+  const next = (newBank: number) => {
+    bankRef.current = newBank;
+    setTank(tank + 1);
     setPumps(0);
     setPopped(false);
   };
 
   const pump = () => {
-    if (popped) return;
+    if (popped || done.current) return;
     const p = pumps + 1;
-    if (p >= bursts[tank]) {
+    if (p >= burstPoint(seed, tank)) {
       explosions.current++;
       sfx.burst();
       setPopped(true);
@@ -54,7 +60,7 @@ export const Bart: React.FC<GameProps> = ({ seed, onProgress, onDone }) => {
   };
 
   const collect = () => {
-    if (popped || pumps === 0) return;
+    if (popped || pumps === 0 || done.current) return;
     const nb = bank + pumps * CREDIT_PER_PUMP;
     banked.current.push(pumps);
     sfx.bank();
@@ -66,7 +72,7 @@ export const Bart: React.FC<GameProps> = ({ seed, onProgress, onDone }) => {
   return (
     <div className="flex flex-col items-center gap-4">
       <div className="flex w-full max-w-sm justify-between font-mono text-sm">
-        <span className="text-hud-muted">Tank {tank + 1}/{TANKS}</span>
+        <span className="text-hud-muted">Tank {tank + 1}</span>
         <span className="text-hud-accent">Banked {bank} cr</span>
       </div>
       <div className="flex h-60 w-60 items-center justify-center">

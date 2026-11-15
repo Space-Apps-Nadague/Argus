@@ -1,32 +1,40 @@
 /**
  * Game frame: intro card → 3-2-1 countdown → play with a live HUD (points, combo, progress).
+ * With the camera health check on, a small mirrored preview runs during the game and the face
+ * measurements are summarised when the game ends (faceCapture.ts).
  * specs/02-ui-dashboard.md §2.8
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { Flame, Play, X } from 'lucide-react';
+import { Camera, Flame, Play, X } from 'lucide-react';
 import type { CognitionGameDef, GameResult } from './types';
 import { GAME_COMPONENTS } from './games';
 import type { GameProgress } from './games/common';
 import { sfx } from './sfx';
+import { useFaceCapture } from './faceCapture';
+import type { FaceVitalsSummary } from './faceVitals';
 
 interface Props {
   def: CognitionGameDef;
   seed: number;
   isRetest: boolean;
-  onFinish: (r: GameResult) => void;
+  /** Camera health check during the game. */
+  camera: boolean;
+  onFinish: (r: GameResult, face: FaceVitalsSummary | null) => void;
   onCancel: () => void;
 }
 
-export const GameShell: React.FC<Props> = ({ def, seed, isRetest, onFinish, onCancel }) => {
+export const GameShell: React.FC<Props> = ({ def, seed, isRetest, camera, onFinish, onCancel }) => {
   const [phase, setPhase] = useState<'intro' | 'count' | 'play'>('intro');
   const [count, setCount] = useState(3);
   const [hud, setHud] = useState<GameProgress>({ points: 0, progress: 0 });
   const Game = GAME_COMPONENTS[def.id];
+  const face = useFaceCapture(camera);
 
   useEffect(() => {
     if (phase !== 'count') return;
     if (count === 0) {
       sfx.go();
+      face.record();
       setPhase('play');
       return;
     }
@@ -36,6 +44,8 @@ export const GameShell: React.FC<Props> = ({ def, seed, isRetest, onFinish, onCa
   }, [phase, count]);
 
   const onProgress = useCallback((p: GameProgress) => setHud(p), []);
+  const { finish: finishFace } = face;
+  const onDone = useCallback((r: GameResult) => onFinish(r, camera ? finishFace() : null), [onFinish, camera, finishFace]);
 
   return (
     <div className="hud-card relative overflow-hidden p-4 sm:p-6" aria-live="polite">
@@ -89,7 +99,25 @@ export const GameShell: React.FC<Props> = ({ def, seed, isRetest, onFinish, onCa
         </div>
       )}
 
-      {phase === 'play' && <Game seed={seed} durationSec={def.seconds} onProgress={onProgress} onDone={onFinish} />}
+      {phase === 'play' && <Game seed={seed} durationSec={def.seconds} onProgress={onProgress} onDone={onDone} />}
+
+      {camera && (
+        <div className="pointer-events-none absolute bottom-3 right-3 flex items-end gap-2" aria-live="polite">
+          <span className="rounded bg-black/60 px-2 py-0.5 text-[10px] text-white">
+            {face.state === 'error'
+              ? 'Camera unavailable'
+              : face.state !== 'on'
+                ? 'Starting health check…'
+                : face.faceSeen
+                  ? 'Health check on · this device only'
+                  : 'Face not visible'}
+          </span>
+          <div className={`relative h-16 w-20 overflow-hidden rounded-md border-2 ${face.faceSeen ? 'border-status-green' : 'border-hud-line'}`}>
+            <video ref={face.videoRef} muted playsInline className="h-full w-full -scale-x-100 object-cover" />
+            {face.state !== 'on' && <Camera className="absolute inset-0 m-auto h-5 w-5 text-hud-muted" aria-hidden="true" />}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

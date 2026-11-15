@@ -2,9 +2,10 @@
  * ARGUS — Cognition games tab (specs/02-ui-dashboard.md §2.8, specs/01-data-schema.md §12).
  * One NASA Cognition–based game per astronaut per day, shuffled; scores vs personal baseline;
  * crew leaderboard; deterministic decline alerts routed on board or to the Flight Surgeon.
+ * Optional camera health check during the game (eyes, pallor, face fullness, pulse; on the device).
  */
 import React, { useMemo, useState } from 'react';
-import { Brain, CalendarCheck, Flame, Medal, RotateCcw, Trophy, Volume2, VolumeX, Play } from 'lucide-react';
+import { Brain, Camera, CameraOff, CalendarCheck, Flame, Medal, RotateCcw, Trophy, Volume2, VolumeX, Play } from 'lucide-react';
 import { useMission } from '../context/MissionContext';
 import { formatCommDelay } from '../data/spaceLocations';
 import { Card } from './ui/Card';
@@ -19,6 +20,8 @@ import { hashString } from '../features/cognition/rng';
 import { isGameMuted, setGameMuted } from '../features/cognition/sfx';
 import { GameShell } from '../features/cognition/GameShell';
 import { CognitionAlert } from '../features/cognition/CognitionAlert';
+import { FaceVitalsCard } from '../features/cognition/FaceVitalsCard';
+import { compareFace, loadFaceHistory, saveFaceSummary, type FaceFinding, type FaceVitalsSummary } from '../features/cognition/faceVitals';
 import type { CareDecision, CognitionEvaluation, CognitionGameId, CognitionSession, GameResult } from '../features/cognition/types';
 
 interface LastRun {
@@ -26,7 +29,17 @@ interface LastRun {
   evaluation: CognitionEvaluation;
   decision: CareDecision;
   newBest: boolean;
+  face?: { summary: FaceVitalsSummary; findings: FaceFinding[] };
 }
+
+const CAMERA_KEY = 'argus.cognition.camera';
+const loadCameraOn = () => {
+  try {
+    return localStorage.getItem(CAMERA_KEY) !== 'off';
+  } catch {
+    return true;
+  }
+};
 
 const statusLabel = (e: CognitionEvaluation) =>
   e.status === 'calibrating' ? `Calibrating ${e.baselineN}/3` : null;
@@ -39,6 +52,7 @@ export const CognitionTab: React.FC = () => {
   const [alertOpen, setAlertOpen] = useState(false);
   const [packet, setPacket] = useState<{ id: string; delay: string } | null>(null);
   const [muted, setMuted] = useState(isGameMuted());
+  const [cameraOn, setCameraOn] = useState(loadCameraOn);
 
   const todayKey = dateKeyOf(new Date());
   const crewId = activeCrewMember.id;
@@ -54,7 +68,7 @@ export const CognitionTab: React.FC = () => {
   );
   const nameOf = (id: string) => crewRoster.find((c) => c.id === id)?.callsign ?? id;
 
-  const finish = (gameId: CognitionGameId, retest: boolean, r: GameResult) => {
+  const finish = (gameId: CognitionGameId, retest: boolean, r: GameResult, faceSummary: FaceVitalsSummary | null) => {
     const nowIso = new Date().toISOString();
     const session: CognitionSession = {
       ...r,
@@ -98,7 +112,13 @@ export const CognitionTab: React.FC = () => {
       const pkt = queueEarthPacket(earthPacketNote(routingInput, decision));
       setPacket({ id: pkt.packetId, delay: formatCommDelay(spaceLocation) });
     }
-    setLast({ session, evaluation, decision, newBest: history.some((s) => s.gameId === gameId) && r.points > prevBest });
+    let face: LastRun['face'];
+    if (faceSummary) {
+      const findings = compareFace(faceSummary, loadFaceHistory(crewId));
+      if (faceSummary.faceSeenPct >= 50) saveFaceSummary({ ...faceSummary, crewId, sessionId: session.id, timestampIso: nowIso });
+      face = { summary: faceSummary, findings };
+    }
+    setLast({ session, evaluation, decision, newBest: history.some((s) => s.gameId === gameId) && r.points > prevBest, face });
     setAlertOpen(decision.route !== 'none');
     setPlaying(null);
   };
@@ -121,6 +141,24 @@ export const CognitionTab: React.FC = () => {
         </span>
         <button
           type="button"
+          className="hud-btn h-8 gap-1.5 px-2 text-xs"
+          onClick={() => {
+            const next = !cameraOn;
+            setCameraOn(next);
+            try {
+              localStorage.setItem(CAMERA_KEY, next ? 'on' : 'off');
+            } catch {
+              /* ignore */
+            }
+          }}
+          aria-pressed={cameraOn}
+          title="Measure eyes, skin colour, face fullness and pulse from the camera during the game (on this device only)"
+        >
+          {cameraOn ? <Camera className="h-4 w-4" aria-hidden="true" /> : <CameraOff className="h-4 w-4" aria-hidden="true" />}
+          Health check {cameraOn ? 'on' : 'off'}
+        </button>
+        <button
+          type="button"
           className="hud-btn h-8 w-8 p-0"
           onClick={() => {
             setGameMuted(!muted);
@@ -138,7 +176,8 @@ export const CognitionTab: React.FC = () => {
           def={GAME_BY_ID[playing.gameId]}
           seed={seedFor(playing.gameId, playing.retest)}
           isRetest={playing.retest}
-          onFinish={(r) => finish(playing.gameId, playing.retest, r)}
+          camera={cameraOn}
+          onFinish={(r, face) => finish(playing.gameId, playing.retest, r, face)}
           onCancel={() => setPlaying(null)}
         />
       ) : (
@@ -217,6 +256,12 @@ export const CognitionTab: React.FC = () => {
               </ol>
             )}
           </Card>
+
+          {last?.face && (
+            <div className="lg:col-span-3">
+              <FaceVitalsCard summary={last.face.summary} findings={last.face.findings} />
+            </div>
+          )}
 
           <Card title="Your recent games" className="lg:col-span-3">
             {recent.length === 0 ? (
