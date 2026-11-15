@@ -57,7 +57,7 @@ import {
 } from '../utils/checkIns';
 import { crewApi, dataApi } from '../services/dataApi';
 import { findMetricLinks } from '../utils/driftAnalytics';
-import { DEFAULT_SPACE_LOCATION, environmentForLocation, isSpaceLocationId, SPACE_LOCATIONS } from '../data/spaceLocations';
+import { DEFAULT_SPACE_LOCATION, environmentForLocation, formatCommDelay, isSpaceLocationId, SPACE_LOCATIONS } from '../data/spaceLocations';
 import {
   createQuickRoutineCheckIn,
   evaluateReadinessMilestones,
@@ -1203,7 +1203,7 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
         packetId: `PKT-${Math.floor(100000 + Math.random() * 900000)}`,
         timestampIso: new Date().toISOString(),
         missionDay: activeCrewMember.missionDaysLogged,
-        commDelayLabel: envMeta.commDelay,
+        commDelayLabel: `${formatCommDelay(spaceLocation)} ONE-WAY`,
         crewMember: {
           id: activeCrewMember.id,
           name: activeCrewMember.name,
@@ -1237,6 +1237,7 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
       shownCompletedStepIds,
       state.visualExamAnalysis,
       scenarioCheckIns,
+      spaceLocation,
     ]
   );
 

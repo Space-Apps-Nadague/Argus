@@ -4,15 +4,15 @@
 
 ### Operating Environment (`GravityEnvironment` / `MissionLocation`)
 ARGUS supports 5 canonical mission location / habitat presets grounded in NASA Human Research Program exploration operational concepts:
-- `'earth_1g'` — **Earth Surface Pre/Post-Flight Baseline & Rehabilitation** (`Earth (1.00g)`, Gravity: `1.00g`, Comm Delay: `On-Site`)
+- `'earth_1g'` — **Earth Surface Pre/Post-Flight Baseline & Rehabilitation** (`Earth (1.00g)`, Gravity: `1.00g`, Comm Delay: live, `0.000 s ONE-WAY`)
   - Primary NASA HRP / Grounding: NASA Lifetime Surveillance of Astronaut Health (LSAH) [SRC-006] and Spaceflight Standard Measures [SRC-009] terrestrial baseline testing and post-flight re-adaptation / rehabilitation protocols. Terrestrial 1.00g hydrostatic column, normal atmospheric composition, full geomagnetic/atmospheric radiation shielding, and direct on-site flight surgeon clinical consultation.
-- `'iss_leo'` — **International Space Station / Low Earth Orbit** (`ISS (LEO)`, Gravity: `0.00g`, Comm Delay: `Real-time ONE-WAY`)
+- `'iss_leo'` — **International Space Station / Low Earth Orbit** (`ISS (LEO)`, Gravity: `0.00g`, Comm Delay: live, LEO relay ≈ `240 ms ONE-WAY`)
   - Primary NASA HRP Hazards: Microgravity cephalad fluid shift, geomagnetic partial radiation shielding, closed-loop ECLSS $\text{CO}_2$ management.
-- `'lunar_base'` — **Artemis Lunar Surface Outpost** (`Lunar Base`, Gravity: `0.16g` / `1/6g`, Comm Delay: `1.3s ONE-WAY`)
+- `'lunar_base'` — **Artemis Lunar Surface Outpost** (`Lunar Base`, Gravity: `0.16g` / `1/6g`, Comm Delay: live Earth–Moon light time, e.g. `1.35 s ONE-WAY`)
   - Primary NASA HRP Hazards: Partial gravity musculoskeletal unloading, abrasive regolith/dust toxicity, secondary neutron radiation, lunar night circadian disruption.
-- `'0g_transit'` — **Deep-Space Microgravity Transit** (`0g Transit`, Gravity: `0.00g`, Comm Delay: `14m 22s ONE-WAY`)
+- `'0g_transit'` — **Deep-Space Microgravity Transit** (`0g Transit`, Gravity: `0.00g`, Comm Delay: live, `up to` the current Earth–Mars light time)
   - Primary NASA HRP Hazards: Unmitigated cephalad fluid shift, Spaceflight-Associated Neuro-ocular Syndrome (SANS), accelerated bone mineral density loss, unshielded SPE/GCR deep-space radiation, closed-loop $\text{CO}_2$ buildup.
-- `'mars_base'` — **Mars Surface Outpost** (`Mars Base`, Gravity: `0.38g` / `3/8g`, Comm Delay: `18m 10s ONE-WAY`)
+- `'mars_base'` — **Mars Surface Outpost** (`Mars Base`, Gravity: `0.38g` / `3/8g`, Comm Delay: live Earth–Mars light time, e.g. `10m 58s ONE-WAY`)
   - Primary NASA HRP Hazards: Hypogravity (3/8g), unshielded galactic cosmic rays (GCR), perchlorate dust toxicity, extreme isolation and communications latency (up to 24 min round-trip).
 
 ### Anatomical Bio-Twin Zones (`BodyZoneId`)

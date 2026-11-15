@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { commDelayForEnvironment } from '../../data/spaceLocations';
 import {
   calculateCrewReadinessScore,
   ENVIRONMENT_META,
@@ -248,35 +249,35 @@ describe('ARGUS Deterministic Triage Engine (specs/01-data-schema.md)', () => {
         label: 'ISS Low Earth Orbit',
         shortLabel: 'ISS (LEO)',
         gravityG: '0.00g',
-        commDelay: 'Real-time ONE-WAY',
+        commDelay: `${commDelayForEnvironment('iss_leo')} ONE-WAY`,
       });
 
       expect(ENVIRONMENT_META.lunar_base).toMatchObject({
         label: 'Artemis Lunar Base (1/6g)',
         shortLabel: 'Lunar Base',
         gravityG: '0.16g',
-        commDelay: '1.3s ONE-WAY',
+        commDelay: `${commDelayForEnvironment('lunar_base')} ONE-WAY`,
       });
 
       expect(ENVIRONMENT_META['0g_transit']).toMatchObject({
         label: '0g Deep-Space Transit',
         shortLabel: '0g Transit',
         gravityG: '0.00g',
-        commDelay: '14m 22s ONE-WAY',
+        commDelay: `${commDelayForEnvironment('0g_transit')} ONE-WAY`,
       });
 
       expect(ENVIRONMENT_META.mars_base).toMatchObject({
         label: 'Mars Surface Base (3/8g)',
         shortLabel: 'Mars Base',
         gravityG: '0.38g',
-        commDelay: '18m 10s ONE-WAY',
+        commDelay: `${commDelayForEnvironment('mars_base')} ONE-WAY`,
       });
 
       expect(ENVIRONMENT_META.earth_1g).toMatchObject({
         label: 'Earth Surface (1.00g)',
         shortLabel: 'Earth (1.00g)',
         gravityG: '1.00g',
-        commDelay: 'On-Site',
+        commDelay: `${commDelayForEnvironment('earth_1g')} ONE-WAY`,
       });
     });
 
@@ -360,16 +361,16 @@ describe('ARGUS Deterministic Triage Engine (specs/01-data-schema.md)', () => {
 
     it('tailors offline flight surgeon guidance hazard context to the active environment', () => {
       const g0g = getOfflineFlightSurgeonGuidance('nominal', 'neuro', '0g_transit');
-      expect(g0g.hazardContextSummary).toContain('14m 22s one-way Earth comm delay');
+      expect(g0g.hazardContextSummary).toContain(`${commDelayForEnvironment('0g_transit')} one-way Earth comm delay`);
 
       const gIss = getOfflineFlightSurgeonGuidance('nominal', 'neuro', 'iss_leo');
       expect(gIss.hazardContextSummary).toContain('real-time comm link to Mission Control');
 
       const gLunar = getOfflineFlightSurgeonGuidance('nominal', 'neuro', 'lunar_base');
-      expect(gLunar.hazardContextSummary).toContain('1.3s one-way Earth comm delay');
+      expect(gLunar.hazardContextSummary).toContain(`${commDelayForEnvironment('lunar_base')} one-way Earth comm delay`);
 
       const gMars = getOfflineFlightSurgeonGuidance('nominal', 'neuro', 'mars_base');
-      expect(gMars.hazardContextSummary).toContain('18m 10s one-way Earth comm delay');
+      expect(gMars.hazardContextSummary).toContain(`${commDelayForEnvironment('mars_base')} one-way Earth comm delay`);
 
       const gEarth = getOfflineFlightSurgeonGuidance('nominal', 'neuro', 'earth_1g');
       expect(gEarth.hazardContextSummary).toContain('1.00g terrestrial gravity');
