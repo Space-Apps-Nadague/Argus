@@ -33,6 +33,7 @@ export const METRIC_TO_INDICATOR: Readonly<Record<string, string>> = {
   spo2: 'spo2',
   sleep_resp_rate: 'resp',
   daily_sleep_hours: 'sleep',
+  mood_index: 'mood',
   core_temp: 'temp',
   caloric_intake: 'kcal',
   hydration_intake: 'fluid',
@@ -69,6 +70,8 @@ export function buildPerson({ locationId, metrics, now }: BuildPersonInput): Per
   metrics.forEach((m) => {
     const key = indicatorKeyFor(m.metricId);
     if (!key) return;
+    // HUD mood_index is /10 while Thousand Eyes `mood` is 1–5.
+    const scale = m.metricId === 'mood_index' ? 0.5 : 1;
     m.history.forEach((h) => {
       if (!Number.isFinite(h.value)) return;
       let c = byDay.get(h.missionDay);
@@ -76,7 +79,7 @@ export function buildPerson({ locationId, metrics, now }: BuildPersonInput): Per
         c = { t: launch + (h.missionDay - 0.5) * DAY, phase, env: back ? undefined : env, values: {} };
         byDay.set(h.missionDay, c);
       }
-      c.values[key] = h.value;
+      c.values[key] = h.value * scale;
     });
   });
 
