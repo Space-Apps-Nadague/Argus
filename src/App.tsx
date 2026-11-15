@@ -29,6 +29,7 @@ import { UsersTab } from './components/UsersTab';
 import { PhotoboothTab } from './components/PhotoboothTab';
 import { CrewManagerModal } from './components/CrewManagerModal';
 import { LifeThreatAlert } from './components/LifeThreatAlert';
+import { SpacecraftAlert } from './components/SpacecraftAlert';
 
 const PANELS: Record<HudTabId, React.FC> = {
   biotwin: BioTwinTab,
@@ -55,6 +56,7 @@ const Hud: React.FC = () => {
       <TopMissionBar />
       {canManageRoster && <CrewManagerModal />}
       {canViewHealth && <LifeThreatAlert />}
+      <SpacecraftAlert />
       {mode === 'local' && (
         <div role="status" className="border-b border-yellow-500/40 bg-yellow-500/10 px-4 py-1 text-center text-[11px] text-yellow-200">
           Offline demo · no ARGUS database connected, data stays in this browser

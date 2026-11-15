@@ -155,3 +155,11 @@ Merged into the ARGUS console (§2.4); the top-bar ARGUS button opens it. `src/u
 - **Dismissal:** only **OK** closes it. Acknowledgement is stored per crew member, metric and value for the browser session, so a new dangerous value raises a new alert.
 - **Test:** top bar **Settings** (gear) → **Test emergency alert** shows the same alert marked "Test · not a real reading" (38.5 °C fever, amber) with the alert sound and the spoken message. Nothing is logged or stored.
 - Shown only to users who can view health data.
+
+
+### 7b. Spacecraft link (`SpacecraftAlert.tsx`, `src/features/spacecraft/habitat.ts`) — demo
+ARGUS as the ship's voice assistant: it watches the cabin, changes the (simulated) spacecraft systems itself, and tells the crew out loud what it saw and what it did.
+- **Scenarios** (Settings → *Spacecraft · ARGUS takes action*): CO₂ spike (Lab, red), oxygen dropping, cabin too hot, humidity high, slow pressure leak (Node 3, red). Values, systems and recovery curves are illustrative, not flight data or flight rules.
+- **Action tiers:** *auto* (safe, reversible: scrubber rate, fans, cooling, O₂ generator boost, repressurisation) runs at once and can be undone; *confirm* (backup LiOH canister, O₂ from tanks, closing a hatch) waits for the crew; life-support shutdowns are never automated.
+- **Alarm card:** live reading recovering toward normal (progress bar), *What I changed* (from → to, Undo), pending actions with Confirm / Cancel, *What you should do*.
+- **Voice:** one ring + "ARGUS!", then e.g. "Cabin CO2 jumped to 7.8 millimeters of mercury in the Lab… I set the CO2 scrubber to maximum, turned the Lab fans to high and boosted the air flow between modules. VALKYRIE, please move to Node 1… Shall I start the backup lithium hydroxide canister? Say confirm or cancel." Then it listens (browser speech recognition, Chrome/Edge) for *confirm*, *cancel*, *undo*, *status* and answers out loud; buttons do the same without a microphone.
