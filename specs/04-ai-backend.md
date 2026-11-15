@@ -25,6 +25,8 @@ A small Node/TypeScript server (`server/`) hosts every AI feature so that:
 | `server/models/wellbeingModel.ts` | Behavioral-health risk score + crisis-language detector |
 | `server/models/crewSnapshot.ts` | Builds the crew/telemetry/triage context given to prompts |
 | `server/routes/voice.ts` | Real-Time Voice/Video Flight Surgeon (`live-token`, `stt`, `tts`, `voice-tool`, `voice-turn`) |
+| `server/rag/*.ts` | AI knowledge base: corpus, clinical-unit chunker, embeddings, ingest, hybrid retriever, `lookup_medical_protocol` tool (spec 05 §3.6) |
+| `server/routes/rag.ts` | `rag/search`, `rag/status` |
 | `server/routes/*.ts` | One file per endpoint |
 
 ## 3. Providers & Fallback Chain
@@ -61,8 +63,10 @@ All JSON endpoints return `AiEnvelope<T> = { result: T, meta: { source, provider
 | `POST /api/ai/live-token` | `LiveTokenRequest` | `LiveTokenResponse` | crew snapshot, deterministic urgency floor, tool schemas | short-lived Gemini Live API ephemeral token (`v1beta/auth_tokens`) |
 | `POST /api/ai/stt` | `VoiceSttRequest` | `VoiceSttResponse` | crisis language detection on transcript, offline fallback | speech-to-text transcription (Gemini multimodal / local Whisper) |
 | `POST /api/ai/tts` | `VoiceTtsRequest` | `VoiceTtsResponse` | deterministic WAV fallback + browser speech flag | speech synthesis (`gemini-3.8-flash-lite-tts` / local TTS) |
-| `POST /api/ai/voice-tool` | `VoiceToolCallRequest` | `VoiceToolCallResponse` | `get_crew_snapshot` & `log_checkin_reading` validation + triage | — |
-| `POST /api/ai/voice-turn` | `VoiceTurnRequest` | `VoiceTurnResponse` | crisis & red-flag escalation, urgency floor, DB chat/voice audit | concise spoken clinical guidance grounded in `CrewSnapshot` |
+| `POST /api/ai/voice-tool` | `VoiceToolCallRequest` | `VoiceToolCallResponse` | `get_crew_snapshot`, `log_checkin_reading` & `lookup_medical_protocol` execution + triage | — |
+| `POST /api/ai/voice-turn` | `VoiceTurnRequest` | `VoiceTurnResponse` | crisis & red-flag escalation, urgency floor, hybrid RAG protocol retrieval (`ragHits`), DB chat/voice + `rag_citations` audit | concise spoken clinical guidance grounded in `CrewSnapshot` and `REFERENCE` chunks |
+| `POST /api/ai/rag/search` | `RagSearchRequest` (`query`, optional `zoneId`, `limit` 1–10, `mode`, `crewMember.id`) | `RagSearchResponse` (`hits[]`, `retrieval`, `embeddingModel`) | hybrid keyword + vector retrieval, citation log | — |
+| `GET /api/ai/rag/status` | — | `RagStatus` | document/chunk counts, embedding model, `db` or `memory` | — |
 
 ### 4.1 Real-Time Voice & Video Flight Surgeon (`live-api` vs `on-ship-pipeline`)
 The Voice & Video Flight Surgeon (`server/routes/voice.ts`, `src/services/realtimeDoctor.ts`) supports two seamless transport modes:
@@ -72,11 +76,24 @@ The Voice & Video Flight Surgeon (`server/routes/voice.ts`, `src/services/realti
    - Supports **barge-in** (interrupting active playback on `serverContent.interrupted` or crew interruption) and non-blocking tool calls (`behavior: "NON_BLOCKING"`) executed against `POST /api/ai/voice-tool`:
      - `get_crew_snapshot`: returns deterministic 5-zone triage statuses, readiness score, personal baselines, and flagged drift trends.
      - `log_checkin_reading`: validates a vital reading against `METRIC_INPUT_RANGES`, evaluates deterministic Green/Yellow/Red triage, and logs the check-in.
+     - `lookup_medical_protocol`: queries the Medical & Spaceflight RAG knowledge base (`query`, optional `zoneId`), returns up to 3 clinical-unit protocol chunks with `SRC-xxx` citations (`ragHits`), and logs `rag_citations`.
 2. **Offline / Deep-Space Blackout Mode (`on-ship-pipeline`):**
-   - Runs a sequential **STT → Regular LLM → TTS** pipeline (`Listening [STT]` → `Thinking [Local LLM]` → `Speaking [TTS]`).
+   - Runs a sequential **STT → Regular LLM + RAG → TTS** pipeline (`Listening [STT]` → `Thinking [Local LLM]` → `Speaking [TTS]`).
    - **Simulated-Local Demo & True Offline Fallback:** Because the web demo runs on Earth rather than an isolated spacecraft, `/api/ai/stt`, `/api/ai/voice-turn`, and `/api/ai/tts` may use standard non-Live Gemini endpoints behind the scenes when internet is available while presenting and behaving in telemetry and HUD metadata as the **On-Ship Local Flight Surgeon** (`nodeLabel: 'on-ship-local'`, no cloud/Gemini branding). When `AI_PROVIDERS=local` (Ollama) is configured or the client is truly disconnected, the pipeline routes to Ollama / deterministic offline protocols and browser Web Speech / local WAV synthesis.
 3. **Audit & Persistence:**
-   - When `DATABASE_URL` is configured, `POST /api/ai/voice-turn` logs both the crew transcript and assistant spoken response to PostgreSQL (`conversations` and `messages` tables, `specs/05-data-platform.md` §3.5) with `contextSnapshot.voiceMode` (`'live-api'` or `'on-ship-pipeline'`) linked to the active `crewId`.
+   - When `DATABASE_URL` is configured, `POST /api/ai/voice-turn` logs both the crew transcript and assistant spoken response to PostgreSQL (`conversations` and `messages` tables, `specs/05-data-platform.md` §3.5) with `contextSnapshot.voiceMode` (`'live-api'` or `'on-ship-pipeline'`) and retrieved `rag_citations` (§3.6) linked to the active `crewId` and assistant `messageId`.
+
+### 4.2 Knowledge retrieval (RAG)
+Storage and retrieval are specified in spec 05 §3.6. How the AI uses them:
+- **3-Tier Latency-Aware Retrieval:**
+  1. *Tier 0 (Zero-latency session context):* `CrewSnapshot` (vitals, drift trends, flagged zones, allergies/medical notes when local, mission location/comm delay) is pre-loaded into the session instruction at 0 ms per-turn cost.
+  2. *Tier 1 (Sub-50 ms hybrid search):* Keyword (`ts_rank_cd` in Postgres / BM25 in memory) + vector cosine similarity fused with Reciprocal Rank Fusion (`k = 60`).
+  3. *Tier 2 (Mode-specific integration):*
+     - **Tool for tool-calling models (`live-api`, OpenAI-compatible):** `lookup_medical_protocol`, exported from `server/rag/tool.ts` as `LOOKUP_MEDICAL_PROTOCOL_TOOL` (Live API `functionDeclarations` shape, `behavior: "NON_BLOCKING"`) and `LOOKUP_MEDICAL_PROTOCOL_OPENAI_TOOL`, declared in `VOICE_TOOL_DECLARATIONS` (`live-token`) and executed by `POST /api/ai/voice-tool`. Parameters: `query` (string, required), `zoneId` (`BodyZoneId`, optional). Returns at most 3 chunks as `{ sourceId, title, heading, text }` plus `citations` and `ragHits`.
+     - **Prompt injection for sequential / non-tool turns (`on-ship-pipeline` `voice-turn`, `chat`):** `searchKnowledge` retrieves top chunks (`limit: 3`) and `formatKnowledgeForPrompt(hits)` renders them as a numbered `REFERENCE` block with `[SRC-xxx]` tags. The prompt instructs the model to use only that block for steps and doses and to cite the tag.
+- **Voice vs. HUD Citation Separation:** The AI speaks a concise 2–3 step plain-language summary for non-physician crew, while the HUD simultaneously renders the full cited protocol cards (`ragHits`: title, heading, `SRC-xxx` source badge, kind, and expandable clinical-unit checklist/steps) in `FlightSurgeonPanel.tsx`.
+- **Logging:** With a database, every retrieval for a turn is written to `rag_citations` (with `message_id` when known).
+- Retrieval never changes triage status or urgency. It only supplies reference text.
 
 Guardrails enforced in code:
 - LLM-returned metric ids are filtered to known `METRIC_THRESHOLDS` keys; LLM urgency can raise but never lower the deterministic urgency floor.
@@ -93,3 +110,5 @@ Guardrails enforced in code:
 - `npm run ai:local` — checks Ollama is up and `AI_LOCAL_MODEL` is pulled.
 - `npm run build && npm start` — production build (`dist/`) served by `tsx server/index.ts`.
 - `docker compose up ollama` — optional Ollama container for teammates without a local install.
+- `npm run rag:ingest` — (re)builds the AI knowledge base in `DATABASE_URL` with the `AI_EMBEDDINGS` model.
+- `npm run rag:search -- "<question>"` — runs hybrid keyword + vector retrieval from the CLI.

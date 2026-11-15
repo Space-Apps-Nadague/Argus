@@ -5,7 +5,7 @@
  * Port of the ARGOS prototype's pure deterministic companion brain (`brain()` in `ARGOS_The_Thousand_Eyes.html`).
  * Operates 100% offline with zero network dependencies, answering astronaut questions on:
  * - Red flag clinical emergencies & crisis language (English & Hebrew)
- * - Overall crew readiness & 5-zone status breakdown
+ * - Overall crew readiness & 6-zone status breakdown
  * - Specific vital signs vs personal baselines & normal flight ranges
  * - Spaceflight symptoms (SANS, hypercapnia, fatigue, back pain, vertigo)
  * - 72-hour forecast & personal baseline drift
@@ -51,6 +51,8 @@ export interface CompanionBrainContext {
   streakDays?: number;
   metricLinks?: MetricLink[];
   guidance?: FlightSurgeonGuidance;
+  /** Live one-way light time to Earth, e.g. `10m 58s`. Falls back to the environment default. */
+  commDelay?: string;
 }
 
 export interface CompanionReplyResult {
@@ -170,6 +172,22 @@ const METRIC_MATCH_DEFS: MetricMatchDef[] = [
     nasaMechanism:
       'Spaceflight induces insulin resistance and metabolic shift from lipid to carbohydrate oxidation due to muscle atrophy and circadian disruption.',
     clinicalAction: 'Review dietary log, timing of post-exercise carbohydrate intake, and scheduled fingerstick glucometry.',
+  },
+  {
+    metricId: 'caloric_intake',
+    regex: /\b(calor(?:ic|ies)|nutrition|food\s*intake|energy\s*intake|diet|meal)\b/i,
+    label: 'Daily Caloric Intake',
+    nasaMechanism:
+      'In-flight underconsumption driven by flavor fatigue, workload, or hypercapnia compromises lean muscle mass, bone remodeling, and ARED exercise recovery.',
+    clinicalAction: 'Target 2200–3200 kcal/day (2400–3400 kcal/day on Lunar/Mars EVA days) and supplement with high-protein meal bars if below nominal.',
+  },
+  {
+    metricId: 'hydration_intake',
+    regex: /\b(hydrat(?:ion|ed)|water\s*intake|fluid\s*intake|dehydrat(?:ion|ed)|thirst)\b/i,
+    label: 'Daily Hydration Intake',
+    nasaMechanism:
+      'Microgravity fluid shifts blunt thirst perception while elevated urinary calcium from bone unloading increases renal stone risk if daily water drops below 2.5 L/day.',
+    clinicalAction: 'Maintain ≥ 2.5 L/day potable water & rehydration fluids (≥ 2.7 L/day on Lunar/Mars EVA days) via scheduled galley dispenser boluses.',
   },
   {
     metricId: 'rad_dose',
@@ -392,6 +410,7 @@ export function generateOfflineCompanionReply(
   const name = context.crewMember?.name ?? callsign;
   const intent = determineCompanionIntent(text);
   const envMeta = ENVIRONMENT_META[context.environment];
+  const commDelay = context.commDelay ?? envMeta.commDelay.replace(' ONE-WAY', '');
   const isHebrew = HEB_REGEX.test(text);
   const hebNote = isHebrew
     ? '\n\n*(Recognized Hebrew terms; replies provided in English per mission flight protocol.)*'
@@ -410,7 +429,7 @@ export function generateOfflineCompanionReply(
       reply += `IMMEDIATE ACTION PROTOCOL:\n`;
       reply += `1. Inform the Crew Medical Officer or Flight Commander right now.\n`;
       reply += `2. A private high-priority tele-mental health packet has been flagged for ground support.\n`;
-      reply += `3. One-way signal delay to Earth is currently ${envMeta.commDelay.replace(' ONE-WAY', '')}. Stay with a crewmate while the channel establishes.\n`;
+      reply += `3. One-way signal delay to Earth is currently ${commDelay}. Stay with a crewmate while the channel establishes.\n`;
       reply += `4. I am staying online with you right here.`;
     } else {
       reply += `IMMEDIATE MEDICAL ACTION REQUIRED:\n`;
@@ -418,7 +437,7 @@ export function generateOfflineCompanionReply(
       reply += `2. **Alert your nearest crewmate or the Crew Medical Officer** right now.\n`;
       reply += `3. **Check primary vitals**: attach the pulse oximeter (SpO₂ & heart rate) and measure blood pressure.\n`;
       reply += `4. **Verify habitat atmosphere**: check cabin O₂ and CO₂ partial pressures.\n`;
-      reply += `5. **Dispatch Emergency Packet**: Ground comm delay is ${envMeta.commDelay.replace(' ONE-WAY', '')}. Queue an Emergency Telemetry Packet immediately so Earth Flight Surgeons receive complete waveforms.\n\n`;
+      reply += `5. **Dispatch Emergency Packet**: Ground comm delay is ${commDelay}. Queue an Emergency Telemetry Packet immediately so Earth Flight Surgeons receive complete waveforms.\n\n`;
       reply += `*ARGUS is an autonomous decision-support tool, not a physician. Do not delay notifying your crew.*`;
     }
 
@@ -626,13 +645,13 @@ export function generateOfflineCompanionReply(
     let reply = `Good sol, ${callsign}. Here is your readiness and biological status summary:\n\n`;
     reply += `• **Readiness Score**: **${score}%** (${score >= 85 ? 'NOMINAL' : score >= 70 ? 'CAUTION' : 'ALERT'})\n`;
     reply += `• **Location**: ${envMeta.label} (${envMeta.gravityG})\n`;
-    reply += `• **Earth Comm Delay**: ${envMeta.commDelay.replace(' ONE-WAY', '')} one-way\n`;
+    reply += `• **Earth Comm Delay**: ${commDelay} one-way\n`;
     if (context.streakDays !== undefined) {
       reply += `• **Check-in Streak**: ${context.streakDays} sol${context.streakDays === 1 ? '' : 's'}\n`;
     }
 
     reply += `\n**5-Zone Biological Triage**:\n`;
-    const zoneKeys: BodyZoneId[] = ['neuro', 'cardio', 'musculo', 'immune', 'behavioral'];
+    const zoneKeys: BodyZoneId[] = ['neuro', 'cardio', 'musculo', 'metabolic', 'immune', 'behavioral'];
     for (const z of zoneKeys) {
       const st = context.zoneStatuses[z] || 'green';
       const label = STATUS_LABELS[st];
@@ -670,7 +689,7 @@ export function generateOfflineCompanionReply(
     let reply = `**ARGUS Companion — Autonomous Crew Health Assistant**\n\n`;
     reply += `I operate directly onboard your vehicle with 100% offline capability, synthesizing your personal baselines, NASA Human Research Program (HRP) clinical protocols, and real-time telemetry.\n\n`;
     reply += `**Things you can ask me**:\n`;
-    reply += `• **"How am I?"** — Complete readiness score & 5-zone health breakdown\n`;
+    reply += `• **"How am I?"** — Complete readiness score & 6-zone health breakdown\n`;
     reply += `• **"What is my ONSD?"** (or HRV, SpO₂, CO₂, sleep) — Biomarker values vs your personal flight baseline\n`;
     reply += `• **"I have a headache"** (or dizziness, blurred vision, back pain) — Autonomous spaceflight symptom triage\n`;
     reply += `• **"Why is my HRV low?"** — Identifies confirmed multi-metric associations in your own data\n`;
@@ -690,7 +709,7 @@ export function generateOfflineCompanionReply(
   // 9. FALLBACK CATCH-ALL
   // ──────────────────────────────────────────────────────────────────────────
   let fallbackReply = `Understood, ${callsign}. I did not match that to a specific clinical protocol, but here is your current stance:\n\n`;
-  fallbackReply += `• Readiness stands at **${context.readinessScore}%** in ${envMeta.shortLabel} (${envMeta.commDelay.replace(' ONE-WAY', '')} to Earth).\n`;
+  fallbackReply += `• Readiness stands at **${context.readinessScore}%** in ${envMeta.shortLabel} (${commDelay} to Earth).\n`;
 
   const yellowOrRed = (Object.keys(context.zoneStatuses) as BodyZoneId[]).find(
     (z) => context.zoneStatuses[z] !== 'green'

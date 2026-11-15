@@ -8,7 +8,7 @@
  * - Panels: one panel per tab; only the active panel is mounted
  */
 
-import React from 'react';
+import React, { Component } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { MissionProvider, useMission } from './context/MissionContext';
 import { HudTabId } from './types/argus';
@@ -24,6 +24,7 @@ import { AiTab } from './components/AiTab';
 import { EmergencyTab } from './components/EmergencyTab';
 import { CrewTab } from './components/CrewTab';
 import { UsersTab } from './components/UsersTab';
+import { PhotoboothTab } from './components/PhotoboothTab';
 import { CrewManagerModal } from './components/CrewManagerModal';
 import { CompanionDrawer } from './components/CompanionDrawer';
 import { LifeThreatAlert } from './components/LifeThreatAlert';
@@ -37,6 +38,7 @@ const PANELS: Record<HudTabId, React.FC> = {
   emergency: EmergencyTab,
   crew: CrewTab,
   users: UsersTab,
+  photobooth: PhotoboothTab,
 };
 
 const Hud: React.FC = () => {
@@ -85,20 +87,78 @@ const Hud: React.FC = () => {
   );
 };
 
+interface HudErrorBoundaryProps {
+  children: React.ReactNode;
+  onSignOut: () => void;
+}
+
+interface HudErrorBoundaryState {
+  error: Error | null;
+  componentStack: string | null;
+}
+
+class HudErrorBoundary extends Component<HudErrorBoundaryProps, HudErrorBoundaryState> {
+  state: HudErrorBoundaryState = { error: null, componentStack: null };
+
+  static getDerivedStateFromError(error: Error): Partial<HudErrorBoundaryState> {
+    return { error };
+  }
+
+  componentDidCatch(_error: Error, info: React.ErrorInfo) {
+    this.setState({ componentStack: info.componentStack ?? null });
+  }
+
+  render() {
+    const { error, componentStack } = this.state;
+    if (!error) return this.props.children;
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-hud-bg p-4 text-hud-text hud-grid-bg">
+        <div role="alert" className="w-full max-w-lg rounded-xl border border-red-500/40 bg-hud-surface/90 p-5 shadow-xl">
+          <h1 className="font-display text-base font-semibold text-red-300">ARGUS HUD hit an unexpected error</h1>
+          <p className="mt-1.5 text-sm text-hud-muted">{error.message || 'Unknown render error'}</p>
+          {componentStack && (
+            <details className="mt-3 rounded-lg border border-hud-line bg-hud-bg/60 p-2.5 text-xs text-hud-muted">
+              <summary className="cursor-pointer font-medium text-hud-text">Component stack</summary>
+              <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap font-mono text-[11px]">{componentStack.trim()}</pre>
+            </details>
+          )}
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="hud-focus rounded-lg bg-hud-accent/20 px-3 py-1.5 text-xs font-medium text-hud-accent hover:bg-hud-accent/30"
+            >
+              Reload page
+            </button>
+            <button
+              type="button"
+              onClick={this.props.onSignOut}
+              className="hud-focus rounded-lg border border-hud-line px-3 py-1.5 text-xs font-medium text-hud-text hover:bg-hud-surface"
+            >
+              Sign out
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+}
+
 /** Remounts the mission state per signed-in user so crew users are locked to their own astronaut. */
 const SignedInApp: React.FC = () => {
-  const { currentUser, removeAccountsForCrew, lockedCrewId, canViewHealth, mode } = useAuth();
+  const { currentUser, removeAccountsForCrew, lockedCrewId, canViewHealth, mode, logout } = useAuth();
   if (!currentUser) return null;
   return (
-    <MissionProvider
-      key={currentUser.id}
-      lockedCrewId={lockedCrewId}
-      canViewHealth={canViewHealth}
-      serverBacked={mode === 'server'}
-      onCrewDeleted={removeAccountsForCrew}
-    >
-      <Hud />
-    </MissionProvider>
+    <HudErrorBoundary key={currentUser.id} onSignOut={logout}>
+      <MissionProvider
+        lockedCrewId={lockedCrewId}
+        canViewHealth={canViewHealth}
+        serverBacked={mode === 'server'}
+        onCrewDeleted={removeAccountsForCrew}
+      >
+        <Hud />
+      </MissionProvider>
+    </HudErrorBoundary>
   );
 };
 

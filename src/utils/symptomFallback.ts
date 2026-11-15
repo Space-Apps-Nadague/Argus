@@ -15,6 +15,7 @@ import {
   ScenarioId,
   TriageStatus,
 } from '../types/argus';
+import { commDelayForEnvironment } from '../data/spaceLocations';
 
 export interface SymptomMatchResult {
   category: 'red_flag' | 'sans_neuro' | 'hypercapnia' | 'cardiovascular' | 'musculoskeletal' | 'immune_radiation' | 'behavioral_sleep' | 'general_query';
@@ -181,7 +182,7 @@ export function matchOfflineSymptomGuidance(params: {
         scenarioId,
         triageStatus: 'red',
         headline: `CRITICAL MEDICAL EMERGENCY: Autonomous Red-Flag Protocol (${rf.toUpperCase()})`,
-        hazardContextSummary: `Spaceflight comm blackout (14m 22s one-way). Severe acute symptom "${rf}" detected during autonomous clinical monitoring.`,
+        hazardContextSummary: `Spaceflight comm blackout (${commDelayForEnvironment(environment)} one-way). Severe acute symptom "${rf}" detected during autonomous clinical monitoring.`,
         plainLanguageExplanation: `You have reported critical red-flag symptoms ("${raw}"). Immediate crew notification, life-support stabilization, and emergency ground telemetry queuing are mandatory.`,
         earthConsultUrgency: 'immediate_emergency_packet',
         guidedSteps: [
@@ -522,7 +523,7 @@ export function matchOfflineSymptomGuidance(params: {
     scenarioId,
     triageStatus: 'yellow',
     headline: `Autonomous Clinical Guidance: Crew Query Recorded (${raw.slice(0, 40)}${raw.length > 40 ? '…' : ''})`,
-    hazardContextSummary: `During deep-space 0g transit (comm delay 14m 22s), crew queries are evaluated against deterministic spaceflight protocols.`,
+    hazardContextSummary: `During this mission phase (one-way comm delay ${commDelayForEnvironment(environment)}), crew queries are evaluated against deterministic spaceflight protocols.`,
     plainLanguageExplanation: `You entered: "${raw}". The Autonomous Flight Surgeon has logged your question. Review the recommended self-exam steps below and append observations to the Earth telemetry packet.`,
     earthConsultUrgency: 'priority_packet',
     guidedSteps: [

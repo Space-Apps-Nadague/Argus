@@ -4,23 +4,24 @@
 
 ### Operating Environment (`GravityEnvironment` / `MissionLocation`)
 ARGUS supports 5 canonical mission location / habitat presets grounded in NASA Human Research Program exploration operational concepts:
-- `'earth_1g'` — **Earth Surface Pre/Post-Flight Baseline & Rehabilitation** (`Earth (1.00g)`, Gravity: `1.00g`, Comm Delay: `On-Site`)
+- `'earth_1g'` — **Earth Surface Pre/Post-Flight Baseline & Rehabilitation** (`Earth (1.00g)`, Gravity: `1.00g`, Comm Delay: live, `0.000 s ONE-WAY`)
   - Primary NASA HRP / Grounding: NASA Lifetime Surveillance of Astronaut Health (LSAH) [SRC-006] and Spaceflight Standard Measures [SRC-009] terrestrial baseline testing and post-flight re-adaptation / rehabilitation protocols. Terrestrial 1.00g hydrostatic column, normal atmospheric composition, full geomagnetic/atmospheric radiation shielding, and direct on-site flight surgeon clinical consultation.
-- `'iss_leo'` — **International Space Station / Low Earth Orbit** (`ISS (LEO)`, Gravity: `0.00g`, Comm Delay: `Real-time ONE-WAY`)
+- `'iss_leo'` — **International Space Station / Low Earth Orbit** (`ISS (LEO)`, Gravity: `0.00g`, Comm Delay: live, LEO relay ≈ `240 ms ONE-WAY`)
   - Primary NASA HRP Hazards: Microgravity cephalad fluid shift, geomagnetic partial radiation shielding, closed-loop ECLSS $\text{CO}_2$ management.
-- `'lunar_base'` — **Artemis Lunar Surface Outpost** (`Lunar Base`, Gravity: `0.16g` / `1/6g`, Comm Delay: `1.3s ONE-WAY`)
+- `'lunar_base'` — **Artemis Lunar Surface Outpost** (`Lunar Base`, Gravity: `0.16g` / `1/6g`, Comm Delay: live Earth–Moon light time, e.g. `1.35 s ONE-WAY`)
   - Primary NASA HRP Hazards: Partial gravity musculoskeletal unloading, abrasive regolith/dust toxicity, secondary neutron radiation, lunar night circadian disruption.
-- `'0g_transit'` — **Deep-Space Microgravity Transit** (`0g Transit`, Gravity: `0.00g`, Comm Delay: `14m 22s ONE-WAY`)
+- `'0g_transit'` — **Deep-Space Microgravity Transit** (`0g Transit`, Gravity: `0.00g`, Comm Delay: live, `up to` the current Earth–Mars light time)
   - Primary NASA HRP Hazards: Unmitigated cephalad fluid shift, Spaceflight-Associated Neuro-ocular Syndrome (SANS), accelerated bone mineral density loss, unshielded SPE/GCR deep-space radiation, closed-loop $\text{CO}_2$ buildup.
-- `'mars_base'` — **Mars Surface Outpost** (`Mars Base`, Gravity: `0.38g` / `3/8g`, Comm Delay: `18m 10s ONE-WAY`)
+- `'mars_base'` — **Mars Surface Outpost** (`Mars Base`, Gravity: `0.38g` / `3/8g`, Comm Delay: live Earth–Mars light time, e.g. `10m 58s ONE-WAY`)
   - Primary NASA HRP Hazards: Hypogravity (3/8g), unshielded galactic cosmic rays (GCR), perchlorate dust toxicity, extreme isolation and communications latency (up to 24 min round-trip).
 
 ### Anatomical Bio-Twin Zones (`BodyZoneId`)
 1. `'neuro'` — **Neuro-Ocular & CNS** (Brain, Optic Nerve Sheath, Cerebral Perfusion)
 2. `'cardio'` — **Cardiovascular & Pulmonary** (Heart, Thoracic Vessels, Gas Exchange)
 3. `'musculo'` — **Musculoskeletal & Spine** (Vertebral Column, Femoral Neck, Load-Bearing Muscle)
-4. `'immune'` — **Immune, Radiation & Dermal** (Lymphatic Core, Bone Marrow, Skin Barrier)
-5. `'behavioral'` — **Behavioral, Circadian & Cognitive** (Neural Halo, Sleep Architecture, Alertness)
+4. `'metabolic'` — **Metabolic & Nutrition** (Hepatic Core, Pancreatic Islets, Glycemic & Energy Balance)
+5. `'immune'` — **Immune, Radiation & Dermal** (Lymphatic Core, Bone Marrow, Skin Barrier)
+6. `'behavioral'` — **Behavioral, Circadian & Cognitive** (Neural Halo, Sleep Architecture, Alertness)
 
 ### Anatomical 3D Render Layers (`AnatomicalLayer`)
 - `'all'` — Full multi-layer holographic composite
@@ -34,18 +35,18 @@ ARGUS supports 5 canonical mission location / habitat presets grounded in NASA H
 - `'red'` — Critical threshold exceeded; immediate autonomous protocol & Earth packet queue required (`#ef4444`)
 
 ### Crisis Scenarios (`ScenarioId`)
-- `'nominal'` — **Nominal Deep-Space Cruise**: All 5 zones within expected spaceflight norms.
+- `'nominal'` — **Nominal Deep-Space Cruise**: All 6 zones within expected spaceflight norms.
 - `'sans_alert'` — **SANS Optic Disc Edema Alert**: Elevated Optic Nerve Sheath Diameter (ONSD `6.4 mm`) and intraocular pressure (`23 mmHg`) in `neuro`.
 - `'high_co2'` — **Habitat $\text{CO}_2$ Scrubber Degradation**: Elevated cabin $\text{ppCO}_2$ (`5.8 mmHg`) driving cerebral vasodilation (`neuro` yellow/red), tachycardia (`cardio` yellow), and cognitive fatigue (`behavioral` yellow).
 - `'solar_storm'` — **SPE Radiation Storm Alert**: Acute solar particle event raising cumulative dose rate (`immune` red, lymphocyte drop `1.05 k/µL`, skin erythema risk) and stress response (`cardio` / `behavioral` yellow).
 
 ### Metric Identifiers (`MetricId`)
-The 17 canonical metric IDs tracked across the 5 zones (see §2 catalog):
+The 19 canonical metric IDs tracked across the 6 zones (see §2 catalog):
 ```typescript
 export type MetricId =
   | 'onsd' | 'iop' | 'cabin_co2'
-  | 'resting_hr' | 'hrv_rmssd' | 'spo2' | 'systolic_bp'
-  | 'bmd_delta' | 'ared_load' | 'blood_glucose'
+  | 'resting_hr' | 'hrv_rmssd' | 'spo2' | 'systolic_bp' | 'hydration_intake'
+  | 'bmd_delta' | 'ared_load' | 'blood_glucose' | 'caloric_intake'
   | 'rad_dose' | 'wbc_lymph' | 'core_temp'
   | 'sleep_eff' | 'pvt_lapses' | 'daily_sleep_hours' | 'mood_index';
 ```
@@ -119,9 +120,11 @@ export interface ThresholdRange {
 | `cardio` | `hrv_rmssd` | Heart Rate Variability | `ms` | `42–85` (`30–95`) | `42–85` (`30–95`) | `42–85` (`30–95`) | `42–85` (`30–95`) | `42–85` (`30–95`) |
 | `cardio` | `spo2` | Arterial $\text{SpO}_2$ | `%` | `96–100` (`93–100`) | `96–100` (`93–100`) | `96–100` (`93–100`) | `96–100` (`93–100`) | `96–100` (`93–100`) |
 | `cardio` | `systolic_bp` | Systolic Blood Pressure | `mmHg` | `100–130` (`90–140`) | `100–130` (`90–140`) | `105–135` (`95–145`) | `110–135` (`95–145`) | `100–130` (`90–140`) |
+| `cardio` | `hydration_intake` | Daily Hydration Intake | `L/day` | `2.5–3.8` (`2.0–4.5`) | `2.5–3.8` (`2.0–4.5`) | `2.7–4.0` (`2.2–4.8`) | `2.7–4.0` (`2.2–4.8`) | `2.2–3.5` (`1.8–4.2`) |
 | `musculo` | `bmd_delta` | Femoral BMD Monthly $\Delta$ | `%` | `-0.8–0.2` (`-1.3–0.5`) | `-0.8–0.2` (`-1.3–0.5`) | `-0.6–0.2` (`-1.0–0.5`) | `-0.4–0.3` (`-0.8–0.6`) | `-0.2–0.2` (`-0.5–0.5`) |
 | `musculo` | `ared_load` | Daily ARED Resistance Load | `kN·reps` | `18–30` (`12–35`) | `18–30` (`12–35`) | `14–26` (`10–30`) | `12–24` (`8–28`) | `0–16` (`0–24`) |
-| `musculo` | `blood_glucose` | Blood Glucose | `mg/dL` | `70–110` (`60–140`) | `70–110` (`60–140`) | `70–110` (`60–140`) | `70–110` (`60–140`) | `70–110` (`60–140`) |
+| `musculo` | `caloric_intake` | Daily Caloric Intake | `kcal/day` | `2200–3200` (`1800–3600`) | `2200–3200` (`1800–3600`) | `2400–3400` (`2000–3800`) | `2400–3400` (`2000–3800`) | `2000–3000` (`1600–3400`) |
+| `metabolic` | `blood_glucose` | Blood Glucose | `mg/dL` | `70–110` (`60–140`) | `70–110` (`60–140`) | `70–110` (`60–140`) | `70–110` (`60–140`) | `70–110` (`60–140`) |
 | `immune` | `rad_dose` | 24h Radiation Dose Rate | `mSv/d` | `0.4–1.2` (`0.0–2.5`) | `0.2–0.6` (`0.0–1.2`) | `0.3–0.9` (`0.0–2.0`) | `0.3–0.8` (`0.0–1.8`) | `0.0–0.05` (`0.0–0.1`) |
 | `immune` | `wbc_lymph` | Lymphocyte Count | `k/µL` | `1.5–3.5` (`1.2–4.0`) | `1.5–3.5` (`1.2–4.0`) | `1.5–3.5` (`1.2–4.0`) | `1.5–3.5` (`1.2–4.0`) | `1.5–3.5` (`1.2–4.0`) |
 | `immune` | `core_temp` | Core Body Temperature | `°C` | `36.5–37.5` (`36.0–38.0`) | `36.5–37.5` (`36.0–38.0`) | `36.5–37.5` (`36.0–38.0`) | `36.5–37.5` (`36.0–38.0`) | `36.5–37.5` (`36.0–38.0`) |
@@ -133,7 +136,7 @@ export interface ThresholdRange {
 ### Passive Wearable Metrics (non-triage) and how each indicator is collected
 With the two-device kit (`specs/05-data-platform.md` §4) nothing needs typing:
 - **From the watch:** `systolic_bp` (cuff-calibrated every 28 days [SRC-075]), `daily_sleep_hours`, `core_temp`, `mood_index` and `pvt_lapses`. Body temperature is *estimated* from overnight wrist temperature against the personal baseline [SRC-074]; a watch does not measure true core temperature. Mood is one tap a day.
-- **From a weekly glucometer photo:** `blood_glucose` [SRC-077], since watches cannot measure glucose [SRC-076].
+- **From the CGM patch:** `blood_glucose` every 5 min [SRC-072, SRC-073], with a finger-prick glucometer photo (`manual`) as backup [SRC-077], since watches cannot measure glucose [SRC-076].
 - **Clinical reference for the team bands** (PR #20): AHA blood pressure categories [SRC-070, SRC-071]; ADA glucose ranges [SRC-072, SRC-073].
 - **Minute-level streams with no thresholds of their own:** `heart_rate` (bpm), `resp_rate` (breaths/min), `activity` (g), `sleep_state` (0/1), `wrist_temp` (°C), `diastolic_bp` (mmHg) and `dose_rate` (µGy/h). They feed the daily values of `resting_hr`, `spo2`, `sleep_eff`, `core_temp` and `rad_dose` (spec 05 §5.1) and the AI context.
 - **Time:** timestamps are real UTC `timestamptz`, and `missionDay` is derived from the mission start.
@@ -163,9 +166,11 @@ Both tables live in `src/utils/triageEngine.ts` next to `METRIC_THRESHOLDS`. Nei
 | `hrv_rmssd` | `6` | `1` | `300` | Overnight RMSSD from your wearable. |
 | `spo2` | `0.7` | `40` | `100` | Finger oximeter, warm hand, still for 30 s. |
 | `systolic_bp` | `4` | `40` | `300` | Automatic: watch spot readings, seated (watch cuff-calibrated every 28 days). |
+| `hydration_intake` | `0.25` | `0.3` | `8.0` | Cumulative potable water & rehydration fluid dispenser log (L/day) [SRC-081]. |
 | `bmd_delta` | `0.15` | `-10` | `5` | Monthly QCT/DXA-equivalent scan result vs previous scan (%). |
 | `ared_load` | `2.5` | `0` | `60` | Total from the ARED/resistance device log for today. |
-| `blood_glucose` | `5` | `10` | `2000` | Weekly fasting finger-prick, then a photo of the meter screen. |
+| `blood_glucose` | `5` | `10` | `2000` | Continuous Glucose Monitor (CGM) 5-min patch; finger-prick glucometer photo backup. |
+| `caloric_intake` | `180` | `500` | `6000` | Total daily food & beverage energy from the crew nutrition log (kcal/day) [SRC-081]. |
 | `rad_dose` | `0.15` | `0` | `20000` | Personal dosimeter: last 24 h reading. |
 | `wbc_lymph` | `0.2` | `0` | `100` | Point-of-care blood analyzer, finger-prick sample. |
 | `core_temp` | `0.15` | `20.0` | `46.5` | Automatic: estimated from overnight watch wrist temperature. |
@@ -204,6 +209,46 @@ Calculated deterministically in `src/utils/triageEngine.ts`:
 - Each metric in `'yellow'` status deducts `3%`
 - Each metric in `'red'` status deducts `8%`
 - Completed countermeasure checklist items in the active session add `+3%` each (capped at `100%`, minimum `15%`).
+
+### Continuous Glucose Monitor (CGM) Crew Mock Stream (`src/data/cgmMockData.ts`)
+Deterministic 5-minute interstitial glucose mock data (288 readings per 24h day) for each crew member in `DEFAULT_CREW_ROSTER`, grounded in ADA glycemic bands [SRC-072, SRC-073] (Issue #57):
+
+```typescript
+export type CgmTrendArrow =
+  | 'double_up'
+  | 'single_up'
+  | 'forty_five_up'
+  | 'flat'
+  | 'forty_five_down'
+  | 'single_down'
+  | 'double_down';
+
+export type CgmEventTag = 'sleep' | 'fasting' | 'post_meal' | 'ared_exercise' | 'eva_stress';
+
+export interface CgmReading {
+  timestampIso: string;
+  missionDay: number;
+  minuteOfDay: number;
+  glucoseMgDl: number;
+  trendArrow: CgmTrendArrow;
+  rateOfChangeMgDlPerMin: number;
+  eventTag?: CgmEventTag;
+}
+
+export interface CrewCgmMockDataset {
+  crewId: string;
+  callsign: string;
+  sensorModel: string;
+  sensorSerial: string;
+  sampleIntervalMinutes: 5;
+  meanGlucoseMgDl: number;
+  timeInRangePct: number; // % of readings within 70–140 mg/dL
+  lowPct: number;         // % of readings < 70 mg/dL
+  highPct: number;        // % of readings > 140 mg/dL
+  cvPct: number;          // coefficient of variation (%)
+  readings: CgmReading[];
+}
+```
 
 ---
 

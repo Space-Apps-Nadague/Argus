@@ -18,6 +18,7 @@ const zonesWith = (immune: VitalSignReading[], cardio: VitalSignReading[] = []):
   neuro: [],
   cardio,
   musculo: [],
+  metabolic: [],
   immune,
   behavioral: [],
 });

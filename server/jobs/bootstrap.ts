@@ -4,7 +4,8 @@
  * - on start: seed an empty database (sources, catalog, crew, kits, admin, demo logins); give every astronaut
  *   without simulated history 30 days of it (resumable after restarts); load NASA reference data if missing;
  * - every ARGUS_SIMULATE_TOPUP_MIN minutes (default 15, 0 = off): extend the simulated history to "now"
- *   so the demo never goes stale.
+ *   so the demo never goes stale;
+ * - on start: sync the AI knowledge base (spec 05 §3.6) with the deployed corpus; unchanged documents are skipped.
  * Enabled with ARGUS_BOOTSTRAP_ON_START=1. Passwords come only from app settings.
  */
 
@@ -41,6 +42,13 @@ export async function bootstrapIfEmpty(db: Db): Promise<void> {
     } catch (err) {
       log(`NASA reference load skipped: ${(err as Error).message}`);
     }
+  }
+  // Idempotent, so every deploy picks up new or edited corpus files.
+  try {
+    const { ingestKnowledge } = await import('../rag/ingest');
+    await ingestKnowledge(db, { script: 'server/jobs/bootstrap.ts', log });
+  } catch (err) {
+    log(`AI knowledge base sync failed: ${(err as Error).message}`);
   }
 }
 

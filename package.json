@@ -5,7 +5,7 @@
   "description": "ARGUS \u2014 Astronaut Readiness Guidance & Unified Surveillance: Autonomous Crew Bio-Twin HUD",
   "type": "module",
   "scripts": {
-    "predev": "node scripts/copy-face-models.mjs",
+    "predev": "node scripts/copy-face-models.mjs && node scripts/copy-vision-assets.mjs",
     "dev": "vite",
     "dev:server": "tsx watch server/index.ts",
     "dev:all": "concurrently -k -n web,api -c cyan,magenta \"npm:dev\" \"npm:dev:server\"",
@@ -13,7 +13,7 @@
     "start": "tsx server/index.ts",
     "start:server": "tsx server/index.ts",
     "ai:local": "tsx scripts/check-local-ai.ts",
-    "prebuild": "node scripts/copy-face-models.mjs",
+    "prebuild": "node scripts/copy-face-models.mjs && node scripts/copy-vision-assets.mjs",
     "build": "tsc -b && vite build",
     "typecheck:server": "tsc -p server/tsconfig.json",
     "preview": "vite preview",
@@ -27,11 +27,14 @@
     "db:sql": "tsx scripts/db-sql.ts",
     "simulate": "tsx scripts/simulate-wearables.ts",
     "data:nasa": "tsx scripts/ingest/nasa.ts",
-    "data:export": "tsx scripts/export-data.ts"
+    "data:export": "tsx scripts/export-data.ts",
+    "rag:ingest": "tsx scripts/rag-ingest.ts",
+    "rag:search": "tsx scripts/rag-search.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.16",
     "@hono/node-server": "^2.1.8",
+    "@mediapipe/tasks-vision": "^1.2.3",
     "@node-rs/argon2": "^2.2.2",
     "@react-three/drei": "^9.121.4",
     "@react-three/fiber": "^8.17.10",
@@ -39,6 +42,7 @@
     "drizzle-orm": "^0.45.4",
     "hono": "^4.13.18",
     "lucide-react": "^0.468.0",
+    "nodemailer": "^10.5.0",
     "openai": "^7.57.0",
     "postgres": "^4.1.1",
     "react": "^18.3.1",
@@ -51,6 +55,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
+    "@types/nodemailer": "^8.0.2",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@types/three": "^0.170.0",

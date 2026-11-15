@@ -56,7 +56,29 @@ function createMockApi(overrides: Partial<RealtimeDoctorApiAdapter> = {}): Realt
         behavior: 'NON_BLOCKING',
         parameters: { type: 'OBJECT', properties: {} },
       },
+      {
+        name: 'lookup_medical_protocol',
+        description: 'Look up verified medical protocol.',
+        behavior: 'NON_BLOCKING',
+        parameters: { type: 'OBJECT', properties: {} },
+      },
     ],
+  };
+
+  const sampleRagHit = {
+    chunkId: 'chunk-sans-1',
+    documentId: 'reference/sans-neuro-ocular',
+    sourceId: 'SRC-010',
+    title: 'Spaceflight-Associated Neuro-Ocular Syndrome (SANS) Protocol',
+    kind: 'clinical_reference' as const,
+    origin: 'NASA HRP Evidence Report: Risk of Spaceflight-Associated Neuro-Ocular Syndrome (SANS)',
+    zoneIds: ['neuro' as const],
+    heading: 'Guided In-Flight Ocular & ONSD Self-Exam',
+    content: '1. Perform binocular Amsler grid and near-acuity chart self-test.',
+    rank: 1,
+    score: 0.032,
+    keywordRank: 1,
+    vectorRank: 1,
   };
 
   return {
@@ -89,6 +111,7 @@ function createMockApi(overrides: Partial<RealtimeDoctorApiAdapter> = {}): Realt
           neuro: 'red',
           cardio: 'green',
           musculo: 'green',
+          metabolic: 'green',
           immune: 'green',
           behavioral: 'green',
         },
@@ -102,6 +125,7 @@ function createMockApi(overrides: Partial<RealtimeDoctorApiAdapter> = {}): Realt
                 status: 'green',
               }
             : undefined,
+        ragHits: req.toolName === 'lookup_medical_protocol' ? [sampleRagHit] : undefined,
       } satisfies VoiceToolCallResponse,
     })),
     voiceTurn: vi.fn().mockImplementation(async (req) => ({
@@ -119,11 +143,13 @@ function createMockApi(overrides: Partial<RealtimeDoctorApiAdapter> = {}): Realt
           neuro: 'red',
           cardio: 'green',
           musculo: 'green',
+          metabolic: 'green',
           immune: 'green',
           behavioral: 'green',
         },
         earthConsultUrgency: 'immediate_emergency_packet',
         toolCallsExecuted: [],
+        ragHits: [sampleRagHit],
         disclaimer: 'Decision support, not a medical diagnosis.',
       },
     })),
@@ -271,7 +297,7 @@ describe('realtimeDoctor utilities & session manager', () => {
       ])
     );
 
-    // Simulate incoming non-blocking tool call (`log_checkin_reading`) from Gemini 3.8 Live
+    // Simulate incoming non-blocking tool calls (`log_checkin_reading` + `lookup_medical_protocol`) from Gemini 3.8 Live
     await session.handleLiveServerMessage(
       JSON.stringify({
         interactionStatus: 'IN_PROGRESS',
@@ -282,6 +308,11 @@ describe('realtimeDoctor utilities & session manager', () => {
               name: 'log_checkin_reading',
               args: { zoneId: 'cardio', metricId: 'resting_hr', value: 68 },
             },
+            {
+              id: 'call-100',
+              name: 'lookup_medical_protocol',
+              args: { query: 'SANS ocular ONSD exam', zoneId: 'neuro' },
+            },
           ],
         },
       })
@@ -290,10 +321,14 @@ describe('realtimeDoctor utilities & session manager', () => {
     expect(loggedVitals).toEqual([
       expect.objectContaining({ metricId: 'resting_hr', value: 68 }),
     ]);
+    expect(session.getState().citedProtocols).toEqual([
+      expect.objectContaining({ sourceId: 'SRC-010', documentId: 'reference/sans-neuro-ocular' }),
+    ]);
     expect(wsInstance!.sentMessages[wsInstance!.sentMessages.length - 1]).toMatchObject({
       toolResponse: {
         functionResponses: [
           expect.objectContaining({ id: 'call-99', name: 'log_checkin_reading' }),
+          expect.objectContaining({ id: 'call-100', name: 'lookup_medical_protocol' }),
         ],
       },
     });
@@ -342,6 +377,8 @@ describe('realtimeDoctor utilities & session manager', () => {
     expect(turn.mode).toBe('on-ship-pipeline');
     expect(turn.nodeLabel).toBe('on-ship-local');
     expect(turn.triageStatus).toBe('red');
+    expect(turn.ragHits?.[0]?.sourceId).toBe('SRC-010');
+    expect(session.getState().citedProtocols[0]?.sourceId).toBe('SRC-010');
     expect(observedStages).toEqual(
       expect.arrayContaining(['listening_stt', 'thinking_llm', 'speaking_tts', 'idle'])
     );
@@ -355,5 +392,6 @@ describe('realtimeDoctor utilities & session manager', () => {
     expect(offlineTurn.triageStatus).toBe('red');
     expect(offlineTurn.earthConsultUrgency).toBe('immediate_emergency_packet');
     expect(offlineTurn.nodeLabel).toBe('on-ship-local');
+    expect(offlineTurn.ragHits?.length).toBeGreaterThan(0);
   });
 });

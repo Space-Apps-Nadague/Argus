@@ -44,6 +44,7 @@ import {
 } from '../utils/companionBrain';
 import { streamCrewChat } from '../services/argusApi';
 import { hasConfiguredAiKey } from '../services/flightSurgeonAi';
+import { formatCommDelay } from '../data/spaceLocations';
 
 const QUICK_PROMPTS = [
   'How am I doing?',
@@ -92,6 +93,7 @@ export const CompanionDrawer: React.FC = () => {
     metricLinks,
     guidance,
     runtimeApiKey,
+    spaceLocation,
   } = useMission();
 
   const [messages, setMessages] = useState<CompanionMessage[]>([]);
@@ -112,6 +114,7 @@ export const CompanionDrawer: React.FC = () => {
   const recognitionRef = useRef<any>(null);
 
   const envMeta = ENVIRONMENT_META[environment];
+  const commDelay = formatCommDelay(spaceLocation);
   const storageKey = `argus_companion_chat_${activeCrewMember.id}`;
 
   const speechRecognitionSupported = typeof window !== 'undefined' &&
@@ -130,6 +133,7 @@ export const CompanionDrawer: React.FC = () => {
       streakDays: checkInStreakDays,
       metricLinks,
       guidance,
+      commDelay,
     }),
     [
       activeCrewMember,
@@ -142,6 +146,7 @@ export const CompanionDrawer: React.FC = () => {
       checkInStreakDays,
       metricLinks,
       guidance,
+      commDelay,
     ]
   );
 
@@ -165,13 +170,13 @@ export const CompanionDrawer: React.FC = () => {
       id: `initial-${activeCrewMember.id}`,
       crewId: activeCrewMember.id,
       role: 'argus',
-      text: `Good sol, ${activeCrewMember.callsign}. ARGUS Companion is online with 100% autonomous capability in ${envMeta.label} (${envMeta.commDelay.replace(' ONE-WAY', '')} to Earth). I am reading your 5-zone biological telemetry against your pre-flight baselines. How are you feeling today?`,
+      text: `Good sol, ${activeCrewMember.callsign}. ARGUS Companion is online with 100% autonomous capability in ${envMeta.label} (${commDelay} to Earth). I am reading your 6-zone biological telemetry against your pre-flight baselines. How are you feeling today?`,
       timestampIso: new Date().toISOString(),
       intent: 'status',
       source: 'offline_brain',
     };
     setMessages([initialGreeting]);
-  }, [storageKey, activeCrewMember.id, activeCrewMember.callsign, envMeta.label, envMeta.commDelay]);
+  }, [storageKey, activeCrewMember.id, activeCrewMember.callsign, envMeta.label, commDelay]);
 
   // Persist conversation history
   useEffect(() => {
@@ -547,7 +552,7 @@ export const CompanionDrawer: React.FC = () => {
           <div className="flex items-center gap-2 font-mono">
             <Radio className="h-3 w-3 text-amber-400" aria-hidden="true" />
             <span>Comm Delay:</span>
-            <span className="text-amber-300">{envMeta.commDelay.replace(' ONE-WAY', '')} to Earth</span>
+            <span className="text-amber-300">{commDelay} to Earth</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="h-1.5 w-1.5 rounded-full bg-status-green animate-pulse" aria-hidden="true" />
