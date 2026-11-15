@@ -28,3 +28,6 @@ tools/whatsapp-bot/argus-wa-bot
 
 # Face ID models, copied from node_modules by scripts/copy-face-models.mjs
 public/models/face/
+# MediaPipe WASM, copied from node_modules by scripts/copy-vision-assets.mjs
+public/vision/
+public/models/vision/gesture_recognizer.task

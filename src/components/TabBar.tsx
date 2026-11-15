@@ -5,7 +5,7 @@
  */
 
 import React, { useRef } from 'react';
-import { Activity, Bot, Dumbbell, Eye, LineChart, Siren, Telescope, UserCog, Users } from 'lucide-react';
+import { Activity, Bot, Camera, Dumbbell, Eye, LineChart, Siren, Telescope, UserCog, Users } from 'lucide-react';
 import { HudTabId } from '../types/argus';
 import { useMission } from '../context/MissionContext';
 import { recommendTraining } from '../features/training/recommend';
@@ -34,6 +34,7 @@ export const HUD_TAB_DEFS: HudTabDef[] = [
   { id: 'training', label: 'Training', icon: <Dumbbell className="w-4 h-4" /> },
   { id: 'crew', label: 'Crew', icon: <Users className="w-4 h-4" />, needs: 'roster' },
   { id: 'users', label: 'Users', icon: <UserCog className="w-4 h-4" />, needs: 'users' },
+  { id: 'photobooth', label: 'Photobooth', icon: <Camera className="w-4 h-4" /> },
 ];
 
 export const visibleTabs = (a: TabAccess) =>

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { commDelayForEnvironment } from '../../data/spaceLocations';
 import {
   calculateCrewReadinessScore,
   ENVIRONMENT_META,
@@ -14,11 +15,13 @@ import {
   environmentForLocation,
 } from '../../data/spaceLocations';
 import {
+  BODY_ZONES,
   DEFAULT_CREW_ROSTER,
   getCrewAdjustedZones,
   getOfflineFlightSurgeonGuidance,
   TELEMETRY_SCENARIOS,
   VISUAL_EXAM_SAMPLES,
+  ZONE_ORDER,
 } from '../../data/telemetryScenarios';
 import {
   createSculptedHeadAndNeckGeometry,
@@ -33,7 +36,7 @@ describe('ARGUS Deterministic Triage Engine (specs/01-data-schema.md)', () => {
     expect(evaluateMetricStatus('onsd', 6.42, '0g_transit')).toBe('red');
   });
 
-  it('evaluates all 5 zones as green in the nominal scenario under 0g_transit', () => {
+  it('evaluates all 6 zones as green in the nominal scenario under 0g_transit', () => {
     const statuses = evaluateAllZones(
       TELEMETRY_SCENARIOS.nominal.zones,
       '0g_transit'
@@ -42,6 +45,7 @@ describe('ARGUS Deterministic Triage Engine (specs/01-data-schema.md)', () => {
       neuro: 'green',
       cardio: 'green',
       musculo: 'green',
+      metabolic: 'green',
       immune: 'green',
       behavioral: 'green',
     });
@@ -170,7 +174,7 @@ describe('ARGUS Deterministic Triage Engine (specs/01-data-schema.md)', () => {
       expect(evaluateMetricStatus('systolic_bp', 150, '0g_transit')).toBe('red');
     });
 
-    it('evaluates blood_glucose (musculo) thresholds deterministically', () => {
+    it('evaluates blood_glucose (metabolic) thresholds deterministically and places it in metabolic zone', () => {
       // Nominal: 70-110, Yellow: 60-140, Red: <60 or >140
       expect(evaluateMetricStatus('blood_glucose', 92, '0g_transit')).toBe('green');
       expect(evaluateMetricStatus('blood_glucose', 70, '0g_transit')).toBe('green');
@@ -179,6 +183,23 @@ describe('ARGUS Deterministic Triage Engine (specs/01-data-schema.md)', () => {
       expect(evaluateMetricStatus('blood_glucose', 65, '0g_transit')).toBe('yellow');
       expect(evaluateMetricStatus('blood_glucose', 55, '0g_transit')).toBe('red');
       expect(evaluateMetricStatus('blood_glucose', 155, '0g_transit')).toBe('red');
+
+      expect(ZONE_ORDER).toHaveLength(6);
+      expect(ZONE_ORDER).toContain('metabolic');
+      expect(BODY_ZONES.metabolic.name).toBe('Metabolic & Nutrition');
+
+      for (const scenario of Object.values(TELEMETRY_SCENARIOS)) {
+        expect(scenario.zones.metabolic.some((r) => r.metricId === 'blood_glucose')).toBe(true);
+        expect(scenario.zones.musculo.some((r) => r.metricId === 'blood_glucose')).toBe(false);
+      }
+
+      const statuses = evaluateAllZones(TELEMETRY_SCENARIOS.nominal.zones, '0g_transit');
+      expect(Object.keys(statuses).sort()).toEqual([...ZONE_ORDER].sort());
+      expect(statuses.metabolic).toBe('green');
+
+      const metabolicGuidance = getOfflineFlightSurgeonGuidance('nominal', 'metabolic', '0g_transit');
+      expect(metabolicGuidance.zoneId).toBe('metabolic');
+      expect(metabolicGuidance.guidedSteps.length).toBeGreaterThan(0);
     });
 
     it('evaluates core_temp (immune) thresholds deterministically', () => {
@@ -214,11 +235,11 @@ describe('ARGUS Deterministic Triage Engine (specs/01-data-schema.md)', () => {
       expect(evaluateMetricStatus('mood_index', 2.0, '0g_transit')).toBe('red');
     });
 
-    it('contains all 17 canonical metrics across scenarios with 30-day longitudinal series', () => {
+    it('contains all 19 canonical metrics across scenarios with 30-day longitudinal series', () => {
       const expectedMetrics = [
         'onsd', 'iop', 'cabin_co2',
-        'resting_hr', 'hrv_rmssd', 'spo2', 'systolic_bp',
-        'bmd_delta', 'ared_load', 'blood_glucose',
+        'resting_hr', 'hrv_rmssd', 'spo2', 'systolic_bp', 'hydration_intake',
+        'bmd_delta', 'ared_load', 'blood_glucose', 'caloric_intake',
         'rad_dose', 'wbc_lymph', 'core_temp',
         'sleep_eff', 'pvt_lapses', 'daily_sleep_hours', 'mood_index',
       ];
@@ -231,6 +252,64 @@ describe('ARGUS Deterministic Triage Engine (specs/01-data-schema.md)', () => {
           expect(scenarioMetricIds).toContain(expectedId);
         }
       }
+    });
+
+    it('evaluates caloric_intake (musculo) thresholds across environments (REQ-06)', () => {
+      // 0g_transit & iss_leo: Nominal 2200–3200, Yellow 1800–3600
+      expect(evaluateMetricStatus('caloric_intake', 2680, '0g_transit')).toBe('green');
+      expect(evaluateMetricStatus('caloric_intake', 2200, 'iss_leo')).toBe('green');
+      expect(evaluateMetricStatus('caloric_intake', 2050, '0g_transit')).toBe('yellow');
+      expect(evaluateMetricStatus('caloric_intake', 1750, '0g_transit')).toBe('red');
+      expect(evaluateMetricStatus('caloric_intake', 3700, '0g_transit')).toBe('red');
+
+      // lunar_base & mars_base (surface EVA +200 kcal/hr): Nominal 2400–3400, Yellow 2000–3800
+      expect(evaluateMetricStatus('caloric_intake', 2200, 'lunar_base')).toBe('yellow');
+      expect(evaluateMetricStatus('caloric_intake', 2600, 'mars_base')).toBe('green');
+      expect(evaluateMetricStatus('caloric_intake', 1950, 'mars_base')).toBe('red');
+
+      // earth_1g: Nominal 2000–3000, Yellow 1600–3400
+      expect(evaluateMetricStatus('caloric_intake', 2100, 'earth_1g')).toBe('green');
+      expect(evaluateMetricStatus('caloric_intake', 1750, 'earth_1g')).toBe('yellow');
+    });
+
+    it('evaluates hydration_intake (cardio) thresholds across environments (REQ-06)', () => {
+      // 0g_transit & iss_leo: Nominal 2.5–3.8, Yellow 2.0–4.5
+      expect(evaluateMetricStatus('hydration_intake', 2.9, '0g_transit')).toBe('green');
+      expect(evaluateMetricStatus('hydration_intake', 2.5, 'iss_leo')).toBe('green');
+      expect(evaluateMetricStatus('hydration_intake', 2.2, '0g_transit')).toBe('yellow');
+      expect(evaluateMetricStatus('hydration_intake', 1.8, '0g_transit')).toBe('red');
+      expect(evaluateMetricStatus('hydration_intake', 4.7, '0g_transit')).toBe('red');
+
+      // lunar_base & mars_base (surface EVA): Nominal 2.7–4.0, Yellow 2.2–4.8
+      expect(evaluateMetricStatus('hydration_intake', 2.5, 'lunar_base')).toBe('yellow');
+      expect(evaluateMetricStatus('hydration_intake', 3.1, 'mars_base')).toBe('green');
+      expect(evaluateMetricStatus('hydration_intake', 2.1, 'mars_base')).toBe('red');
+
+      // earth_1g: Nominal 2.2–3.5, Yellow 1.8–4.2
+      expect(evaluateMetricStatus('hydration_intake', 2.3, 'earth_1g')).toBe('green');
+      expect(evaluateMetricStatus('hydration_intake', 1.9, 'earth_1g')).toBe('yellow');
+    });
+
+    it('provides 30-day series and offline guidance steps for nutrition & hydration', () => {
+      const nominalCal = TELEMETRY_SCENARIOS.nominal.zones.musculo.find(
+        (r) => r.metricId === 'caloric_intake'
+      );
+      const nominalHyd = TELEMETRY_SCENARIOS.nominal.zones.cardio.find(
+        (r) => r.metricId === 'hydration_intake'
+      );
+      expect(nominalCal?.history).toHaveLength(30);
+      expect(nominalHyd?.history).toHaveLength(30);
+
+      const highCo2Cal = TELEMETRY_SCENARIOS.high_co2.zones.musculo.find(
+        (r) => r.metricId === 'caloric_intake'
+      );
+      expect(evaluateMetricStatus('caloric_intake', highCo2Cal!.currentValue, '0g_transit')).toBe('yellow');
+
+      const musculoGuidance = getOfflineFlightSurgeonGuidance('nominal', 'musculo', '0g_transit');
+      expect(musculoGuidance.guidedSteps.some((s) => /caloric/i.test(s.title))).toBe(true);
+
+      const cardioGuidance = getOfflineFlightSurgeonGuidance('nominal', 'cardio', '0g_transit');
+      expect(cardioGuidance.guidedSteps.some((s) => /hydration|water/i.test(s.title))).toBe(true);
     });
   });
 
@@ -248,35 +327,35 @@ describe('ARGUS Deterministic Triage Engine (specs/01-data-schema.md)', () => {
         label: 'ISS Low Earth Orbit',
         shortLabel: 'ISS (LEO)',
         gravityG: '0.00g',
-        commDelay: 'Real-time ONE-WAY',
+        commDelay: `${commDelayForEnvironment('iss_leo')} ONE-WAY`,
       });
 
       expect(ENVIRONMENT_META.lunar_base).toMatchObject({
         label: 'Artemis Lunar Base (1/6g)',
         shortLabel: 'Lunar Base',
         gravityG: '0.16g',
-        commDelay: '1.3s ONE-WAY',
+        commDelay: `${commDelayForEnvironment('lunar_base')} ONE-WAY`,
       });
 
       expect(ENVIRONMENT_META['0g_transit']).toMatchObject({
         label: '0g Deep-Space Transit',
         shortLabel: '0g Transit',
         gravityG: '0.00g',
-        commDelay: '14m 22s ONE-WAY',
+        commDelay: `${commDelayForEnvironment('0g_transit')} ONE-WAY`,
       });
 
       expect(ENVIRONMENT_META.mars_base).toMatchObject({
         label: 'Mars Surface Base (3/8g)',
         shortLabel: 'Mars Base',
         gravityG: '0.38g',
-        commDelay: '18m 10s ONE-WAY',
+        commDelay: `${commDelayForEnvironment('mars_base')} ONE-WAY`,
       });
 
       expect(ENVIRONMENT_META.earth_1g).toMatchObject({
         label: 'Earth Surface (1.00g)',
         shortLabel: 'Earth (1.00g)',
         gravityG: '1.00g',
-        commDelay: 'On-Site',
+        commDelay: `${commDelayForEnvironment('earth_1g')} ONE-WAY`,
       });
     });
 
@@ -360,16 +439,16 @@ describe('ARGUS Deterministic Triage Engine (specs/01-data-schema.md)', () => {
 
     it('tailors offline flight surgeon guidance hazard context to the active environment', () => {
       const g0g = getOfflineFlightSurgeonGuidance('nominal', 'neuro', '0g_transit');
-      expect(g0g.hazardContextSummary).toContain('14m 22s one-way Earth comm delay');
+      expect(g0g.hazardContextSummary).toContain(`${commDelayForEnvironment('0g_transit')} one-way Earth comm delay`);
 
       const gIss = getOfflineFlightSurgeonGuidance('nominal', 'neuro', 'iss_leo');
       expect(gIss.hazardContextSummary).toContain('real-time comm link to Mission Control');
 
       const gLunar = getOfflineFlightSurgeonGuidance('nominal', 'neuro', 'lunar_base');
-      expect(gLunar.hazardContextSummary).toContain('1.3s one-way Earth comm delay');
+      expect(gLunar.hazardContextSummary).toContain(`${commDelayForEnvironment('lunar_base')} one-way Earth comm delay`);
 
       const gMars = getOfflineFlightSurgeonGuidance('nominal', 'neuro', 'mars_base');
-      expect(gMars.hazardContextSummary).toContain('18m 10s one-way Earth comm delay');
+      expect(gMars.hazardContextSummary).toContain(`${commDelayForEnvironment('mars_base')} one-way Earth comm delay`);
 
       const gEarth = getOfflineFlightSurgeonGuidance('nominal', 'neuro', 'earth_1g');
       expect(gEarth.hazardContextSummary).toContain('1.00g terrestrial gravity');

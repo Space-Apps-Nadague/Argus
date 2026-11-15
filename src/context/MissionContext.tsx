@@ -57,7 +57,7 @@ import {
 } from '../utils/checkIns';
 import { crewApi, dataApi } from '../services/dataApi';
 import { findMetricLinks } from '../utils/driftAnalytics';
-import { DEFAULT_SPACE_LOCATION, environmentForLocation, isSpaceLocationId, SPACE_LOCATIONS } from '../data/spaceLocations';
+import { DEFAULT_SPACE_LOCATION, environmentForLocation, formatCommDelay, isSpaceLocationId, SPACE_LOCATIONS } from '../data/spaceLocations';
 import {
   createQuickRoutineCheckIn,
   evaluateReadinessMilestones,
@@ -1017,7 +1017,16 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
         note: `Interactive vital reading: ${metricKey} = ${value}`,
         scenarioId: state.scenarioId,
       };
-      dispatch({ type: 'ADD_CHECK_IN', payload: entry });
+      if (serverBacked) {
+        await dataApi.checkIn(
+          entry.crewId,
+          entry.values as Record<string, number>,
+          entry.note
+        );
+        await refreshServerZones([entry.crewId]);
+      } else {
+        dispatch({ type: 'ADD_CHECK_IN', payload: entry });
+      }
       dispatch({ type: 'SET_SELECTED_ZONE', payload: zoneId });
       dispatch({ type: 'SET_SELECTED_METRIC', payload: metricKey });
 
@@ -1048,6 +1057,8 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
       state.scenarioId,
       state.environment,
       state.runtimeApiKey,
+      serverBacked,
+      refreshServerZones,
     ]
   );
 
@@ -1203,7 +1214,7 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
         packetId: `PKT-${Math.floor(100000 + Math.random() * 900000)}`,
         timestampIso: new Date().toISOString(),
         missionDay: activeCrewMember.missionDaysLogged,
-        commDelayLabel: envMeta.commDelay,
+        commDelayLabel: `${formatCommDelay(spaceLocation)} ONE-WAY`,
         crewMember: {
           id: activeCrewMember.id,
           name: activeCrewMember.name,
@@ -1237,6 +1248,7 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
       shownCompletedStepIds,
       state.visualExamAnalysis,
       scenarioCheckIns,
+      spaceLocation,
     ]
   );
 

@@ -1444,3 +1444,34 @@ export function createThymusGeometry(): THREE.BufferGeometry {
   return geom;
 }
 
+/**
+ * Retroperitoneal pancreas & metabolic core: broader head on the right (-x), tapering tail toward the left (+x).
+ */
+export function createPancreasGeometry(): THREE.BufferGeometry {
+  const geom = new THREE.SphereGeometry(1, 28, 20);
+  const pos = geom.attributes.position;
+  const v = new THREE.Vector3();
+
+  const rx = 0.115;
+  const ry = 0.032;
+  const rz = 0.028;
+
+  for (let i = 0; i < pos.count; i++) {
+    v.fromBufferAttribute(pos, i);
+    const ux = v.x; // -1 (head, right) to +1 (tail, left)
+    const uy = v.y;
+    const uz = v.z;
+
+    // Head is thicker/taller on right (-x), tapering toward splenic tail (+x)
+    const taper = ux < 0 ? 1.15 - 0.15 * Math.abs(ux) : 1 - 0.55 * ux;
+    // Slight superior-posterior sweep toward left tail
+    const y = uy * ry * taper + 0.018 * ux;
+    const z = uz * rz * taper - 0.015 * ux * ux;
+
+    pos.setXYZ(i, ux * rx, y, z);
+  }
+
+  geom.computeVertexNormals();
+  return geom;
+}
+

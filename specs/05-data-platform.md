@@ -24,7 +24,7 @@ ARGUS stores crew health data in a shared **PostgreSQL** database instead of eac
 
   Azure's `Server=…;Database=…;User Id=…;Password=…` format is converted to a TLS URL. Values are server-only: never prefix them with `VITE_`.
 - **Production (argus-space.health):** web app `argus-space` uses the private database `argus-space-server` (reachable only through the app's private network). With `ARGUS_BOOTSTRAP_ON_START=1` the app seeds an empty database on first start, then generates 30 days of simulated history and loads the NASA reference CSVs. Every `ARGUS_SIMULATE_TOPUP_MIN` minutes (default 15) it extends the simulated history to the present (`server/jobs/bootstrap.ts`).
-- Extensions: `citext` (case-insensitive usernames) and `pgcrypto` (`gen_random_uuid`). `vector` is enabled but unused until RAG is added [SRC-062].
+- Extensions: `citext` (case-insensitive usernames) and `pgcrypto` (`gen_random_uuid`). `vector` is allowlisted on Azure [SRC-062] but **not required**: the AI knowledge base (§3.6) stores embeddings as `real[]` so the same migrations run on Azure, Docker and embedded PGlite (PGlite 0.5 ships no pgvector build).
 - Schema changes go **only** through Drizzle migrations (`server/db/migrations/`, `npm run db:migrate`). Nobody edits the Azure schema by hand.
 - Team access: one firewall rule per teammate IP, plus DB roles `argus_app` (the server) and `argus_analyst` (read-only, for notebooks). See `docs/DATABASE.md`.
 
@@ -72,12 +72,34 @@ Deleting an astronaut sets `archived_at` (a soft delete), which hides them and k
 | Reference | `ref_thresholds`, `ref_radiation_dose_rates`, `ref_osdr_studies`, `ref_osdr_lab_values` | Curated NASA reference data (§7). Every row has `source_id` and `ingest_run_id`. `ref_osdr_lab_values` is long-format (study, pseudonymous subject, timepoint, analyte, value, unit, reference range). |
 
 ### 3.5 AI chat link
-Stores what was said to the AI, which astronaut it was about, and the data the AI saw. That is all: no RAG, embeddings or chat analytics yet.
+Stores what was said to the AI, which astronaut it was about, and the data the AI saw. No chat analytics. Retrieved knowledge used in a reply is logged in `rag_citations` (§3.6).
 
 | Table | Columns |
 |---|---|
 | `conversations` | `id` uuid, `astronaut_id`, `started_by` (user), `started_at` |
 | `messages` | `id` uuid, `conversation_id`, `ts`, `role` (`user` \| `assistant`), `author_user_id` (null for assistant), `content`, `provider`, `model`, `source` (`ai` \| `offline_verified_cache`), `context_snapshot` jsonb (the zone statuses, flagged metrics and wellbeing summary sent with the prompt), `triage_event_id` (nullable: latest triage event at that time), `crisis_flag` bool |
+
+### 3.6 AI knowledge base (RAG)
+Verified reference text the AI looks up before giving clinical or procedural answers (issue #40). The AI never answers a protocol question from model weights alone: it cites a chunk, and every chunk traces to a `SRC-xxx` source.
+
+| Table | Columns | Notes |
+|---|---|---|
+| `rag_documents` | `id` text (stable slug, e.g. `emergency/fire`), `source_id` → `data_sources`, `title`, `kind` (`emergency_checklist` \| `countermeasure` \| `clinical_reference` \| `medication`), `origin` (repo file or corpus file it was built from), `url`, `zone_ids` text[] (body zones it applies to, empty = all), `content_hash`, `ingest_run_id`, `updated_at` | One row per source document. Re-ingest skips documents whose `content_hash` and embedding model are unchanged. |
+| `rag_chunks` | `id` uuid, `document_id` (cascade), `ordinal`, `heading`, `content`, `token_count`, `embedding` real[], `embedding_model`, `search_tsv` tsvector (generated from heading + content, GIN index) | One **clinical unit** per chunk: a whole checklist, a whole dosage with its contraindications, or a whole countermeasure. Chunks are split only at headings or between paragraphs, never inside a list or table. |
+| `rag_citations` | `id` bigserial, `ts`, `astronaut_id` (nullable), `message_id` → `messages` (nullable), `mode` (`search` \| `chat` \| `live-api` \| `on-ship-pipeline`), `query`, `chunk_id`, `document_id`, `source_id`, `rank`, `score` | Which chunks were shown to the AI for which turn. |
+
+**Corpus.** `npm run rag:ingest` (also run by the hosted bootstrap on every start; unchanged documents are skipped) builds documents from:
+1. in-repo content: `src/data/emergencyProtocols.ts` [SRC-004] and `server/models/countermeasureLibrary.ts` (no `SRC-xxx` yet, so its documents have `source_id = null` and cite their `origin` file until a primary source is registered);
+2. Markdown files in `server/rag/corpus/*.md` with front matter `id`, `title`, `source_id`, `kind`, optional `zones` ([SRC-004], [SRC-007], [SRC-008], [SRC-010]). A file without a `source_id` that exists in `SOURCES.md` is rejected (AGENTS.md §7).
+
+**Embeddings** (`AI_EMBEDDINGS`): `hash` (default, offline, deterministic 384-dim feature hashing of word unigrams + bigrams [SRC-083]), `local` (Ollama `/v1/embeddings` [SRC-085], default `nomic-embed-text`), `gemini` (OpenAI-compatible endpoint [SRC-086], default `gemini-embedding-001`) or `custom` (`AI_BASE_URL`). Only chunks embedded with the active model take part in vector scoring; changing the model means re-running `npm run rag:ingest`.
+
+**Retrieval** (`server/rag/retriever.ts`), target < 50 ms for a few thousand chunks:
+1. keyword: Postgres full-text search, `ts_rank_cd` over an OR query of the question's terms [SRC-084];
+2. vector: cosine similarity between the query embedding and cached chunk embeddings (in process);
+3. fusion: Reciprocal Rank Fusion with k = 60 [SRC-088]; optional `zoneId` boosts chunks for that zone.
+
+Without a database, the same corpus is indexed in memory (BM25 with k1 = 1.2, b = 0.75 [SRC-087] + hash embeddings), so offline and stateless modes still retrieve.
 
 ## 4. Passive Data: Assumed Kit (watch + dosimeter)
 No public dataset has per-astronaut, minute-level vitals. NASA LSDA and LSAH data are request-only or restricted [SRC-005, SRC-006]. **ARGUS assumes each astronaut wears exactly two devices: a smartwatch and a personal dosimeter.** Everything else arrives without typing. Data is simulated at realistic cadences until real devices are connected.
@@ -86,8 +108,7 @@ No public dataset has per-astronaut, minute-level vitals. NASA LSDA and LSAH dat
 - A current smartwatch measures heart rate, HRV, SpO₂, breathing rate, sleep, activity, ECG, overnight wrist temperature against a personal baseline [SRC-074] and cuff-calibrated blood pressure [SRC-075].
 - Watches have flown: an Apple Watch on Inspiration4 [SRC-027] and a Garmin on Polaris Dawn [SRC-028]. NASA crews already wear wrist actigraphs continuously [SRC-009, SRC-023, SRC-024].
 - A watch **cannot** measure radiation, so a personal dosimeter stays [SRC-026, SRC-079]. A dosimeter with a wristwatch display is in development [SRC-078].
-- A watch **cannot** measure blood sugar: no non-invasive watch is authorized [SRC-076]. Glucose therefore comes from a weekly finger-prick on a glucometer, read from a **photo** of the meter. The challenge names camera images and blood sugar in mg/dL as an input [SRC-077].
-- A CGM patch flew on Polaris Dawn [SRC-028] but was not adopted. It would be a third device and needs replacing every 10–15 days, while healthy crews' fasting glucose changes slowly.
+- A watch **cannot** measure blood sugar: no non-invasive watch is authorized [SRC-076]. A **CGM patch** (continuous glucose monitor, as flown on Polaris Dawn [SRC-028]) streams 5-minute interstitial `blood_glucose` readings automatically, catching postprandial excursions and spaceflight insulin resistance during comm blackouts [SRC-072, SRC-073]. A weekly finger-prick glucometer photo (`manual`) remains as a calibration/backup modality [SRC-077].
 
 ### 4.1 Sources of data (`devices.kind`)
 | Kind | Worn? | Streams | Cadence stored |
@@ -99,10 +120,11 @@ No public dataset has per-astronaut, minute-level vitals. NASA LSDA and LSAH dat
 | | | `pvt_lapses` (reaction-time app) | daily |
 | | | wellbeing tap-survey | daily |
 | `dosimeter` | worn | `dose_rate` (µGy/h); the daily `rad_dose` is derived from it | every 1 min |
+| `cgm` | worn | `blood_glucose` (interstitial mg/dL, trend, Time-in-Range) [SRC-028, SRC-072, SRC-073] | every 5 min |
 | `habitat_sensor` | no | `cabin_co2` | automatic |
 | `exercise_device` | no | `ared_load` from the device log | automatic, per session |
 | `clinical_exam` | no | `onsd`, `iop`, `wbc_lymph`, `bmd_delta`. Ultrasound and retina images go through the camera (Eyes tab) | every 3–7 days |
-| `manual` | no | `glucose` from a glucometer photo, fasting | weekly |
+| `manual` | no | `blood_glucose` backup from a glucometer photo, fasting [SRC-077] | as needed |
 
 Devices from the earlier kit (`smart_shirt`, `bp_cuff`, `wrist_actigraph`, `ring`, `core_temp_patch`) are retired: `devices.retired_at` is set. Their enum values remain so historic rows stay valid.
 
@@ -183,6 +205,7 @@ Both flags exclude the value from analytics. Raw data is never deleted.
 - **Lockout:** 15 minutes after 5 failed logins on an account. There is also a per-IP rate limit of 20 login attempts per minute.
 - **Sessions:** a 32-byte random token in the `argus_session` cookie (`HttpOnly`, `SameSite=Lax`, `Secure` outside localhost, 12 h). Only its SHA-256 is stored. Mutating requests must have an `Origin` header in `ARGUS_CORS_ORIGINS`.
 - **Face ID:** the face is matched in the browser (template stays on the device, specs/02 §6). Setting it up calls `POST /api/auth/face/enroll` (signed in), which returns a 32-byte random device token; only its SHA-256 is stored in `face_logins`. After a face match the browser sends the token to `POST /api/auth/face/login`, which opens a normal session (same lockout and disabled checks, per-IP limit of 20 per minute, audited as `login` with `method: face_id`). `POST /api/auth/face/remove` turns it off. A password reset or disabling the account deletes all Face ID tokens of that user. Limit: the face check runs on the client, so it protects a trusted device; it is not a substitute for the password on an untrusted one.
+- **Family email (Photobooth):** `POST /api/family/mail` (signed in; needs the database, otherwise 503; only for an astronaut the user can see; 30 per user per hour; audited without the addresses) queues the photo in memory and emails it after the one-way light time with nodemailer. SMTP from `SMTP_HOST/PORT/USER/PASS/MAIL_FROM`. Without SMTP nothing is sent and the status says email is not set up; `MAIL_TEST=ethereal` (demo only) sends to an Ethereal test inbox and returns a preview link. `GET /api/family/mail/:id` returns the status to the sender only. A server restart drops emails still waiting.
 - **First run:** `npm run db:seed` creates the admin from `ARGUS_BOOTSTRAP_ADMIN_USERNAME/PASSWORD`. Demo accounts are created only when `ARGUS_DEMO_PASSWORD` is set: one per default crew member (username = callsign, lower-case) plus `surgeon`.
 - **LLM privacy:**
   - Prompts carry the callsign, age band, sex, blood type and computed metrics.
@@ -230,3 +253,4 @@ All routes are under `/api`. Every route except `health`, `auth/login` and `inge
 | `GET /astronauts/:id/export` | self, flight surgeon | JSON export |
 | `POST /ingest/readings` | a device (`Authorization: Bearer <device token>`) | Batched readings (§4) |
 | `POST /ai/*` | signed-in user who may read the astronaut | Existing AI endpoints (spec 04). `crewId` is checked against the session. |
+| `POST /ai/rag/search`, `GET /ai/rag/status` | any signed-in user | Knowledge-base retrieval (§3.6, spec 04 §4.2). Reference text only, no crew data. |

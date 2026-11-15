@@ -62,8 +62,14 @@ export const ChatPanel: React.FC = () => {
   const abortRef = useRef<AbortController | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => endRef.current?.scrollIntoView({ block: 'nearest' }), [messages, streaming]);
-  useEffect(() => () => abortRef.current?.abort(), []);
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [messages, streaming]);
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
 
   const send = async (text: string) => {
     const content = text.trim();

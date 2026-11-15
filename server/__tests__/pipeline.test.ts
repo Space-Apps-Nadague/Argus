@@ -69,10 +69,10 @@ describe('detectors', () => {
   });
 });
 
-describe('two-device kit (spec 05 §4)', () => {
-  it('only the smartwatch and the dosimeter are worn; every simulated stream comes from the active kit', () => {
-    const worn = SENSOR_KIT.filter((k) => k.kind === 'smartwatch' || k.kind === 'dosimeter');
-    expect(worn).toHaveLength(2);
+describe('worn sensor kit (spec 05 §4)', () => {
+  it('smartwatch, dosimeter, and cgm are worn; every simulated stream comes from the active kit', () => {
+    const worn = SENSOR_KIT.filter((k) => k.kind === 'smartwatch' || k.kind === 'dosimeter' || k.kind === 'cgm');
+    expect(worn).toHaveLength(3);
     const crew = DEFAULT_CREW_ROSTER[0];
     const start = new Date('2026-11-01T00:00:00Z');
     const batch = simulate({ crew, scenarioId: 'nominal', from: start, to: new Date(start.getTime() + 8 * 86_400_000), templateStart: start });

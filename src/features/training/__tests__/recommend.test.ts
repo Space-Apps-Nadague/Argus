@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { BodyZoneId, TriageStatus, VitalSignReading } from '../../../types/argus';
-import { exercisesFor, MICROGRAVITY_EXERCISES } from '../exercises';
+import type { BodyZoneId, SpaceLocationId, TriageStatus, VitalSignReading } from '../../../types/argus';
+import { exercisesFor, GRAVITY_EXERCISES, MICROGRAVITY_EXERCISES, settingNote } from '../exercises';
+import { environmentForLocation, SPACE_LOCATIONS } from '../../../data/spaceLocations';
 import { recommendTraining } from '../recommend';
 
 const r = (metricId: string, value: number, label = metricId, unit = 'u'): VitalSignReading => ({
@@ -18,11 +19,12 @@ const zones = (over: Partial<Record<BodyZoneId, VitalSignReading[]>> = {}): Reco
   neuro: [],
   cardio: [r('spo2', 98), r('resting_hr', 60), r('hrv_rmssd', 60)],
   musculo: [r('bmd_delta', 0), r('ared_load', 20)],
+  metabolic: [],
   immune: [r('core_temp', 36.8)],
   behavioral: [],
   ...over,
 });
-const green: Record<BodyZoneId, TriageStatus> = { neuro: 'green', cardio: 'green', musculo: 'green', immune: 'green', behavioral: 'green' };
+const green: Record<BodyZoneId, TriageStatus> = { neuro: 'green', cardio: 'green', musculo: 'green', metabolic: 'green', immune: 'green', behavioral: 'green' };
 
 describe('recommendTraining', () => {
   it('uses ISS devices in microgravity and body-weight exercises with gravity', () => {
@@ -67,5 +69,21 @@ describe('recommendTraining', () => {
     const heart = recommendTraining(zones({ musculo: [r('bmd_delta', -2)] }), { ...green, cardio: 'red' }, '0g_transit');
     expect(heart.state).toBe('unsafe');
     expect(heart.exercises).toEqual([]);
+  });
+});
+
+describe('exercise set for every mission location', () => {
+  const MICRO_LOCATIONS: SpaceLocationId[] = ['leo', 'gateway', 'mars_transit'];
+
+  it.each(Object.keys(SPACE_LOCATIONS) as SpaceLocationId[])('%s picks the right gravity set', (id) => {
+    const env = environmentForLocation(id);
+    const expected = MICRO_LOCATIONS.includes(id) ? MICROGRAVITY_EXERCISES : GRAVITY_EXERCISES;
+    expect(exercisesFor(env)).toEqual(expected);
+    expect(settingNote(env)).toBeTruthy();
+    // Low bone density must trigger training, using only exercises available at this location.
+    const plan = recommendTraining(zones({ musculo: [r('bmd_delta', -5), r('ared_load', 20)] }), green, env);
+    expect(plan.state).toBe('required');
+    expect(plan.exercises.length).toBeGreaterThan(0);
+    plan.exercises.forEach((e) => expect(expected).toContain(e));
   });
 });

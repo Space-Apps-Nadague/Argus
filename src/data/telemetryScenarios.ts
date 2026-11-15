@@ -17,6 +17,7 @@ import {
   VitalSignReading,
   VisualExamSample,
 } from '../types/argus';
+import { commDelayForEnvironment } from './spaceLocations';
 import { evaluateZoneStatus } from '../utils/triageEngine';
 import { matchOfflineSymptomGuidance } from '../utils/symptomFallback';
 
@@ -112,6 +113,14 @@ export const BODY_ZONES: Record<BodyZoneId, BodyZoneMetadata> = {
     nasaHazardFocus:
       'Unloaded osteoclastic bone mineral loss (~1–1.5%/mo in 0g), intervertebral disc expansion, and EVA suit strain.',
   },
+  metabolic: {
+    id: 'metabolic',
+    name: 'Metabolic & Nutrition',
+    shortLabel: 'METAB / NUTR',
+    anatomicalSubtitle: 'Hepatic Core, Pancreatic Islets & Glycemic Balance',
+    nasaHazardFocus:
+      'Spaceflight insulin resistance, altered energy expenditure, hepatic lipid shifts, and closed-loop nutritional adequacy.',
+  },
   immune: {
     id: 'immune',
     name: 'Immune, Radiation & Dermal',
@@ -134,6 +143,7 @@ export const ZONE_ORDER: BodyZoneId[] = [
   'neuro',
   'cardio',
   'musculo',
+  'metabolic',
   'immune',
   'behavioral',
 ];
@@ -260,6 +270,17 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
             'Brachial systolic blood pressure. Reflects arterial compliance and cephalad vascular tone.',
           history: build30DaySeries(120, 118, 0, 1.2),
         },
+        {
+          metricId: 'hydration_intake',
+          label: 'Daily Hydration Intake',
+          unit: 'L/day',
+          currentValue: 2.9,
+          deltaFromBaseline: 'Fluid Balance Nominal',
+          flightNormLabel: '0g Norm: 2.5–3.8 L/day',
+          plainDescription:
+            'Cumulative potable water and rehydration fluid intake. Prevents hypohydration, orthostatic intolerance, and renal stones.',
+          history: build30DaySeries(2.8, 2.9, 1, 0.15),
+        },
       ],
       musculo: [
         {
@@ -284,6 +305,19 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
             'Total resistive exercise impulse logged on the Advanced Resistive Exercise Device.',
           history: build30DaySeries(22.5, 24.2, 1, 1.1),
         },
+        {
+          metricId: 'caloric_intake',
+          label: 'Daily Caloric Intake',
+          unit: 'kcal/day',
+          currentValue: 2680,
+          deltaFromBaseline: '100% EER Target Met',
+          flightNormLabel: '0g Norm: 2200–3200 kcal/day',
+          plainDescription:
+            'Total daily dietary energy intake. Sustains lean muscle mass and offsets ARED exercise expenditure.',
+          history: build30DaySeries(2620, 2680, 0, 80),
+        },
+      ],
+      metabolic: [
         {
           metricId: 'blood_glucose',
           label: 'Blood Glucose',
@@ -467,6 +501,17 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
             'Elevated brachial systolic pressure associated with cephalad fluid redistribution and jugular engorgement.',
           history: build30DaySeries(120, 134, 0, 1.2, 19),
         },
+        {
+          metricId: 'hydration_intake',
+          label: 'Daily Hydration Intake',
+          unit: 'L/day',
+          currentValue: 2.6,
+          deltaFromBaseline: '-0.2 L/day Fluid Shift',
+          flightNormLabel: '0g Norm: 2.5–3.8 L/day',
+          plainDescription:
+            'Fluid intake remains within nominal bounds despite cephalad fluid shift.',
+          history: build30DaySeries(2.8, 2.6, 1, 0.15),
+        },
       ],
       musculo: [
         {
@@ -489,6 +534,19 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
           plainDescription: 'Resistive load moderated to avoid transient intracranial pressure spikes.',
           history: build30DaySeries(24.0, 21.0, 1, 0.8),
         },
+        {
+          metricId: 'caloric_intake',
+          label: 'Daily Caloric Intake',
+          unit: 'kcal/day',
+          currentValue: 2450,
+          deltaFromBaseline: '-150 kcal/day Mild Appetite Dip',
+          flightNormLabel: '0g Norm: 2200–3200 kcal/day',
+          plainDescription:
+            'Caloric intake adequate; monitor for cranial-discomfort-related appetite suppression.',
+          history: build30DaySeries(2600, 2450, 0, 75),
+        },
+      ],
+      metabolic: [
         {
           metricId: 'blood_glucose',
           label: 'Blood Glucose',
@@ -666,6 +724,17 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
             'Hypercapnia-driven sympathetic vasoconstriction and elevated systemic blood pressure.',
           history: build30DaySeries(122, 138, 0, 1.5, 21),
         },
+        {
+          metricId: 'hydration_intake',
+          label: 'Daily Hydration Intake',
+          unit: 'L/day',
+          currentValue: 2.2,
+          deltaFromBaseline: '-0.6 L/day Hypercapnic Deficit',
+          flightNormLabel: '0g Norm: 2.5–3.8 L/day',
+          plainDescription:
+            'Reduced fluid intake during CO₂-induced headache and malaise; increases renal stone and orthostatic risk.',
+          history: build30DaySeries(2.8, 2.2, 1, 0.12, 22),
+        },
       ],
       musculo: [
         {
@@ -688,6 +757,19 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
           plainDescription: 'Exercise volume curtailed due to exertional shortness of breath in high CO₂.',
           history: build30DaySeries(24.0, 14.5, 1, 1.0, 22),
         },
+        {
+          metricId: 'caloric_intake',
+          label: 'Daily Caloric Intake',
+          unit: 'kcal/day',
+          currentValue: 2050,
+          deltaFromBaseline: '-600 kcal/day CO₂ Anorexia',
+          flightNormLabel: '0g Norm: 2200–3200 kcal/day',
+          plainDescription:
+            'Sub-target caloric intake caused by hypercapnic nausea and fatigue; risks lean mass catabolism.',
+          history: build30DaySeries(2650, 2050, 0, 85, 22),
+        },
+      ],
+      metabolic: [
         {
           metricId: 'blood_glucose',
           label: 'Blood Glucose',
@@ -901,6 +983,17 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
             'Transient sympathetic elevation during radiation storm shelter lockdown.',
           history: build30DaySeries(120, 132, 0, 1.2, 24),
         },
+        {
+          metricId: 'hydration_intake',
+          label: 'Daily Hydration Intake',
+          unit: 'L/day',
+          currentValue: 2.3,
+          deltaFromBaseline: '-0.5 L/day Shelter Rationing',
+          flightNormLabel: '0g Norm: 2.5–3.8 L/day',
+          plainDescription:
+            'Mild hypohydration during storm shelter confinement; maintain minimum 2.5 L/day to protect renal clearance.',
+          history: build30DaySeries(2.8, 2.3, 1, 0.12, 24),
+        },
       ],
       musculo: [
         {
@@ -925,6 +1018,19 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
             'Main ARED bay is in less-shielded module; crew restricted to compact resistive bands.',
           history: build30DaySeries(24.0, 13.2, 1, 1.2, 24),
         },
+        {
+          metricId: 'caloric_intake',
+          label: 'Daily Caloric Intake',
+          unit: 'kcal/day',
+          currentValue: 2100,
+          deltaFromBaseline: '-540 kcal/day Shelter Deficit',
+          flightNormLabel: '0g Norm: 2200–3200 kcal/day',
+          plainDescription:
+            'Reduced caloric intake in radiation storm shelter; supplement with compact high-protein meal bars.',
+          history: build30DaySeries(2640, 2100, 0, 80, 24),
+        },
+      ],
+      metabolic: [
         {
           metricId: 'blood_glucose',
           label: 'Blood Glucose',
@@ -1046,6 +1152,7 @@ export function getCrewAdjustedZones(
     neuro: baseZones.neuro.map(adjustReading),
     cardio: baseZones.cardio.map(adjustReading),
     musculo: baseZones.musculo.map(adjustReading),
+    metabolic: baseZones.metabolic.map(adjustReading),
     immune: baseZones.immune.map(adjustReading),
     behavioral: baseZones.behavioral.map(adjustReading),
   };
@@ -1079,13 +1186,13 @@ export function getOfflineFlightSurgeonGuidance(
 
   const envContextMap: Record<GravityEnvironment, string> = {
     '0g_transit':
-      'In 0g Deep-Space Transit (14m 22s one-way Earth comm delay), complete weightlessness drives ~2 liters of venous fluid headward while unloading skeletal structures.',
+      `In 0g Deep-Space Transit (${commDelayForEnvironment('0g_transit')} one-way Earth comm delay), complete weightlessness drives ~2 liters of venous fluid headward while unloading skeletal structures.`,
     'iss_leo':
       'Aboard the ISS in Low Earth Orbit (real-time comm link to Mission Control), microgravity produces cephalad fluid shifts while Earth magnetosphere offers partial radiation shielding.',
     'lunar_base':
-      'At the Artemis Lunar Base (1/6g partial gravity, 1.3s one-way Earth comm delay), partial weight-bearing mitigates fluid shift while lunar regolith and surface radiation pose unique operational hazards.',
+      `At the Artemis Lunar Base (1/6g partial gravity, ${commDelayForEnvironment('lunar_base')} one-way Earth comm delay), partial weight-bearing mitigates fluid shift while lunar regolith and surface radiation pose unique operational hazards.`,
     'mars_base':
-      'At Mars Surface Base (3/8g partial gravity, 18m 10s one-way Earth comm delay), substantial communications latency necessitates autonomous crew clinical protocols.',
+      `At Mars Surface Base (3/8g partial gravity, ${commDelayForEnvironment('mars_base')} one-way Earth comm delay), substantial communications latency necessitates autonomous crew clinical protocols.`,
     'earth_1g':
       'On Earth (1.00g terrestrial gravity, on-site real-time medical support), full hydrostatic pressure gradients and standard clinical baselines apply for pre-flight qualification and post-flight rehabilitation.',
   };
@@ -1279,9 +1386,18 @@ export function getOfflineFlightSurgeonGuidance(
           stepNumber: 2,
           title: 'Isotonic Hydration & Electrolyte Bolus Check',
           plainInstruction:
-            'Consume 450 mL electrolyte solution to maintain intravascular plasma volume and support HRV recovery.',
+            'Consume 450 mL electrolyte solution to maintain intravascular plasma volume, support HRV recovery, and meet the 2.5 L/day NASA-STD-3001 hydration baseline.',
           hardwareRequired: 'Galley Hydration Dispenser',
           estimatedMinutes: 5,
+        },
+        {
+          id: 'cardio-def-3',
+          stepNumber: 3,
+          title: 'Log Potable Water & Rehydration Fluid Intake',
+          plainInstruction:
+            'Check your daily dispenser total. If below 2.5 L/day (or 2.7 L/day on Lunar/Mars EVA), drink 250 mL/hour over the next 2 hours to prevent hypohydration and kidney stones.',
+          hardwareRequired: 'Galley Water Dispenser + ARGUS Log',
+          estimatedMinutes: 3,
         },
       ],
     },
@@ -1292,7 +1408,7 @@ export function getOfflineFlightSurgeonGuidance(
           : 'Reduced Skeletal Loading — Resume Resistive Countermeasures',
       hazardContextSummary: `${envContextMap[environment]} Without Earth-normal axial loading, femoral neck and lumbar spine lose bone mineral density unless countered by high-force resistive exercise.`,
       plainLanguageExplanation:
-        'Your bones and postural muscles need daily heavy resistance loading so they do not weaken in reduced gravity. Keep your ARED squat and deadlift impulse inside the target zone.',
+        'Your bones and postural muscles need daily heavy resistance loading and adequate caloric intake so they do not weaken in reduced gravity. Keep your ARED squat impulse and daily nutrition inside the target zone.',
       earthConsultUrgency: triageStatus === 'green' ? 'routine_downlink' : 'priority_packet',
       guidedSteps: [
         {
@@ -1312,6 +1428,45 @@ export function getOfflineFlightSurgeonGuidance(
             'Confirm daily Vitamin D3 intake and ensure urinary calcium excretion strip remains below hypercalciuria threshold.',
           hardwareRequired: 'Nutritional Pack + Urine Test Strip',
           estimatedMinutes: 5,
+        },
+        {
+          id: 'musc-def-3',
+          stepNumber: 3,
+          title: 'Caloric & Protein Energy-Balance Supplement',
+          plainInstruction:
+            'If daily caloric intake drops below 2200 kcal/day (2400 kcal/day on EVA days), add a high-protein spaceflight meal bar and rehydrated entrée to prevent muscle catabolism.',
+          hardwareRequired: 'Galley Food Warmer + Crew Nutrition Log',
+          estimatedMinutes: 10,
+        },
+      ],
+    },
+    metabolic: {
+      headline:
+        triageStatus === 'green'
+          ? 'Glycemic & Metabolic Balance Nominal'
+          : 'Glycemic Excursion Detected — Metabolic Countermeasure Protocol',
+      hazardContextSummary: `${envContextMap[environment]} Microgravity muscle unloading and altered circadian meal timing can induce subclinical insulin resistance and glycemic variability.`,
+      plainLanguageExplanation:
+        'Your Continuous Glucose Monitor (CGM) tracks how your body processes fuel in space. Keep blood glucose steady with balanced protein-fiber meals and post-meal resistive or aerobic activity.',
+      earthConsultUrgency: triageStatus === 'green' ? 'routine_downlink' : 'priority_packet',
+      guidedSteps: [
+        {
+          id: 'met-def-1',
+          stepNumber: 1,
+          title: 'Verify CGM Patch & Finger-Prick Glucometer Calibration',
+          plainInstruction:
+            'Confirm CGM interstitial glucose trend arrow and perform a backup capillary finger-prick check if readings are < 70 or > 140 mg/dL.',
+          hardwareRequired: 'CGM Patch + Capillary Glucometer',
+          estimatedMinutes: 4,
+        },
+        {
+          id: 'met-def-2',
+          stepNumber: 2,
+          title: 'Post-Meal Glycemic Stabilization & Hydration',
+          plainInstruction:
+            'Pair complex carbohydrates with lean protein and 300 mL water; avoid isolated simple-sugar boluses outside EVA recovery.',
+          hardwareRequired: 'Galley Nutrition Pack + Potable Water Dispenser',
+          estimatedMinutes: 10,
         },
       ],
     },
