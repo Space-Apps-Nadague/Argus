@@ -53,6 +53,7 @@ export type HudTabId =
   | 'eyes'
   | 'ai'
   | 'emergency'
+  | 'cognition'
   | 'training'
   | 'crew'
   | 'users'

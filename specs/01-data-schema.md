@@ -537,3 +537,62 @@ export interface ReadinessMilestone {
 5. `'peak_readiness'` — **Peak Condition**: Maintained Crew Readiness Score $\ge 95\%$ (target: 95%).
 6. `'countermeasure_pro'` — **Countermeasure Specialist**: Completed $\ge 2$ active countermeasure checklist items (target: 2 steps).
 
+
+## 12. Cognition Games (`src/features/cognition/`)
+
+Daily gamified cognitive readiness check. Each game implements one test of NASA's **Cognition** battery [SRC-089]. Emotion Recognition comes from a separate team system and is not in this rotation.
+
+### 12.1 Game catalog (`catalog.ts`)
+
+| `CognitionGameId` | Game | NASA test | Domain | Primary metric (direction) |
+|---|---|---|---|---|
+| `pvt` | Reflex | Psychomotor Vigilance, brief 3-min (PVT-B) [SRC-090] | Vigilant attention | mean 1/RT, s⁻¹ (higher) |
+| `motor_praxis` | Target Lock | Motor Praxis [SRC-094] | Sensory-motor speed | hits/s (higher) |
+| `fractal_2back` | Echo | Fractal N-Back, played as 3-back | Working memory | hit rate − false-alarm rate (higher) |
+| `volt` | Cargo Memory | Visual Object Learning [SRC-094] | Spatial learning & memory | accuracy % (higher) |
+| `dsst` | Code Breaker | Digit Symbol Substitution [SRC-095] | Complex scanning & visual tracking | correct/min (higher) |
+| `bart` | Pressure Run | Balloon Analog Risk | Risk decision making | adjusted pumps (both directions) |
+| `line_orientation` | Docking Align | Line Orientation [SRC-094] | Spatial orientation | mean angle error ° (lower) |
+| `abstract_matching` | Pattern Sort | Abstract Matching | Abstraction | accuracy % (higher) |
+| `matrix_reasoning` | Grid Logic | Matrix Reasoning | Abstract reasoning | accuracy % (higher) |
+
+- PVT-B: 3 min, inter-stimulus interval 1–4 s, lapse ≥ 355 ms, false start < 100 ms [SRC-090]. The game also counts lapses ≥ 500 ms and writes them as a `pvt_lapses` check-in, because that is the definition the existing `pvt_lapses` vital uses (§2).
+- Stimuli are procedural SVG glyphs (shape × color × fill × count × rotation), not the original Cognition images.
+- **Hard level, 3 minutes each (ARGUS choice, no primary source):** every game runs for 180 s at a fixed hard level (`useTimeBox`); trials keep coming until time is up.
+  - Target Lock: targets shrink 48 → 14 px per wave of 20 and vanish after 1.1 s (time-out = miss).
+  - Echo: 3-back, one glyph every 1.5 s (120 glyphs).
+  - Cargo Memory: rounds of 12 learned (1.2 s each) and 24 tested; half of the new items are look-alikes (one detail changed).
+  - Code Breaker: the symbol key is reshuffled every 60 s.
+  - Pressure Run: burst point uniform 1–64 pumps.
+  - Docking Align: lines 40–80 px, 2° steps, 10 s per pair (auto-lock).
+  - Pattern Sort: 4 s per object; the target also copies one non-rule detail from the wrong pair (decoy).
+  - Grid Logic: a third rule (fill changes along diagonals), 5 options, 15 s per grid.
+  - Reflex (PVT-B) is unchanged: it is already the standard 3-minute test.
+- `points` (0–1000) are for the leaderboard only. Anomaly detection uses the primary metric.
+
+### 12.2 Daily schedule (`schedule.ts`)
+
+- One game per crew member per **calendar day**, chosen by a seeded shuffle bag: every game once per 9-day cycle, a new order each cycle, never the same game two days running. Deterministic from `crewId` + date.
+- The daily game appears in the Scheduled Routine banner (§11) and the Cognition tab. A **retest** after an alert is stored with `daily: false` and does not score on the leaderboard.
+
+### 12.3 Personal baseline & status (`scoring.ts`)
+
+- Baseline = the astronaut's last **5** sessions of the **same game**; at least **3** are needed, otherwise status is `calibrating`. A rolling window absorbs the practice effect of repeated testing [SRC-091].
+- Decline z = robust z (median, MAD with a per-game floor `madFloor`) [SRC-063], signed so negative = worse; for `both` games any large change counts.
+- Status: decline z ≤ **−3.5** → `red` [SRC-063]; ≤ **−2** → `yellow` (assumption, matches the 2σ drifting band [SRC-064]); otherwise `green`. Deterministic, never set by AI.
+- Leaderboard: daily-game points over the last 7 days, ties broken by streak.
+
+### 12.4 Care routing (`routing.ts`)
+
+The ISS Crew Medical Officer is usually not a physician and acts as an extender of the ground flight surgeons, treating with onboard supplies on their advice [SRC-092][SRC-093].
+
+| Condition | Route | Action |
+|---|---|---|
+| `green` / `calibrating` | none | — |
+| single `yellow`, previous game not in decline, neuro zone not red | **onboard** | CMO screen: sleep, SpO₂ + cabin ppCO₂, hydration/food, medication, rest 20 min and retest |
+| `red`, **or** previous game also declined, **or** neuro zone `red` | **earth** | Pause safety-critical tasks, onboard checks, Earth packet queued via `queueEarthPacket` with the decline details |
+| neuro zone `red` | earth + | Neuro red-flag check; offer the Emergency → Crew medical emergency protocol |
+
+### 12.5 Storage (`store.ts`)
+
+`CognitionSession` records live in `localStorage` key `argus.cognition.sessions.v2` (v2 = hard 3-minute games; v1 scores are not comparable, so baselines start again), keyed by crew. No demo data is generated; the team loads mock sessions with `importCognitionSessions()`. Server persistence is a follow-up.

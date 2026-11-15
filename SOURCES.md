@@ -69,8 +69,8 @@ Columns:
 | SRC-060 | [OWASP Password Storage Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html) (argon2id parameters) | standard | open | `server/auth/passwords.ts` |
 | SRC-061 | [Azure PostgreSQL Flexible Server on the free account](https://learn.microsoft.com/azure/postgresql/flexible-server/how-to-deploy-on-azure-free-account) | web | open | `scripts/azure/provision.sh`, `docs/DATABASE.md` |
 | SRC-062 | [Azure PostgreSQL extensions by engine version](https://learn.microsoft.com/azure/postgresql/extensions/concepts-extensions-by-engine) | web | open | `specs/05-data-platform.md` §2, `scripts/azure/provision.sh` |
-| SRC-063 | [Robust z-score with MAD (Iglewicz & Hoaglin, NIST e-Handbook 1.3.5.17)](https://www.itl.nist.gov/div898/handbook/eda/section3/eda35h.htm) | standard | open | `shared/analytics/detectors.ts` (robust z), `server/jobs/analytics.ts` |
-| SRC-064 | [EWMA and CUSUM control charts (NIST e-Handbook 6.3.2)](https://www.itl.nist.gov/div898/handbook/pmc/section3/pmc32.htm) | standard | open | `shared/analytics/detectors.ts` (EWMA, CUSUM), `server/jobs/analytics.ts` |
+| SRC-063 | [Robust z-score with MAD (Iglewicz & Hoaglin, NIST e-Handbook 1.3.5.17)](https://www.itl.nist.gov/div898/handbook/eda/section3/eda35h.htm) | standard | open | `shared/analytics/detectors.ts` (robust z), `server/jobs/analytics.ts`, `src/features/cognition/scoring.ts` (decline z) |
+| SRC-064 | [EWMA and CUSUM control charts (NIST e-Handbook 6.3.2)](https://www.itl.nist.gov/div898/handbook/pmc/section3/pmc32.htm) | standard | open | `shared/analytics/detectors.ts` (EWMA, CUSUM), `server/jobs/analytics.ts`, `src/features/cognition/scoring.ts` (2σ caution band) |
 
 ## Smartwatch capabilities and clinical thresholds (challenge core indicators)
 
@@ -106,4 +106,14 @@ Columns:
 | SRC-087 | [Robertson & Zaragoza 2009, The Probabilistic Relevance Framework: BM25 and Beyond](https://doi.org/10.1561/1500000019) (k1 = 1.2, b = 0.75) | paper | open | `server/rag/memoryIndex.ts` (BM25), `specs/05-data-platform.md` §3.6 |
 | SRC-088 | [Cormack, Clarke & Büttcher 2009, Reciprocal Rank Fusion](https://doi.org/10.1145/1571941.1572114) (k = 60) | paper | open | `server/rag/retriever.ts` (fusion), `specs/05-data-platform.md` §3.6 |
 
+## Cognition testing & crew medical care
 
+| ID | Source | Type | Access | Used in |
+|---|---|---|---|---|
+| SRC-089 | [Cognition vs WinSCAT validation, NTRS 20180003970](https://ntrs.nasa.gov/api/citations/20180003970/downloads/20180003970.pdf) (the 10 Cognition tests, domains, typical durations) | paper | open | `src/features/cognition/catalog.ts`, `src/features/cognition/games/*`, `specs/01-data-schema.md` §12.1 |
+| SRC-090 | [Basner, Mollicone & Dinges 2011: Brief PVT (PVT-B), Acta Astronautica](https://pmc.ncbi.nlm.nih.gov/articles/PMC3197786) (3 min, ISI 1–4 s, lapse ≥ 355 ms) | paper | open | `src/features/cognition/games/Pvt.tsx`, `src/features/cognition/catalog.ts`, `specs/01-data-schema.md` §12.1 |
+| SRC-091 | [Basner et al. 2020: practice and stimulus-set effects with repeated Cognition administration](https://pmc.ncbi.nlm.nih.gov/articles/PMC7375457) (learning trend in 6 of 10 tests) | paper | open | `src/features/cognition/scoring.ts` (rolling personal baseline), `specs/01-data-schema.md` §12.3 |
+| SRC-092 | [Assessing Crew Medical Officer Preparedness for ISS Missions, NTRS 20230013415](https://ntrs.nasa.gov/citations/20230013415) (CMO as healthcare extender to ground flight surgeons) | paper | open | `src/features/cognition/routing.ts`, `specs/01-data-schema.md` §12.4 |
+| SRC-093 | [JAXA: Medical operations system on the ISS](https://humans-in-space.jaxa.jp/en/biz-lab/med-in-space/healthcare/medops/system) (CMO treats with onboard supplies following ground flight-surgeon advice) | web | open | `src/features/cognition/routing.ts`, `specs/01-data-schema.md` §12.4 |
+| SRC-094 | [Cognition task descriptions (supplementary table, Research Square preprint rs-8959949)](https://assets-eu.researchsquare.com/files/rs-8959949/v1/49a00054858a43a9120f8546.docx) (MP 20 shrinking squares, VOLT 10 learn/20 test, LOT 12 pairs, AM pairs) | paper | open | `src/features/cognition/games/*` |
+| SRC-095 | [Basner et al. 2020: Cognition performance and simulated 6-DOF docking, AMHP 91(11)](https://asma.kglmeridian.com/view/journals/amhp/91/11/article-p861.xml) (DSST best single predictor) | paper | open | `src/features/cognition/games/Dsst.tsx` |

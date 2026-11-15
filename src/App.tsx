@@ -22,6 +22,7 @@ import { ForecastTab } from './components/ForecastTab';
 import { EyesTab } from './components/EyesTab';
 import { AiTab } from './components/AiTab';
 import { EmergencyTab } from './components/EmergencyTab';
+import { CognitionTab } from './components/CognitionTab';
 import { TrainingTab } from './components/TrainingTab';
 import { CrewTab } from './components/CrewTab';
 import { UsersTab } from './components/UsersTab';
@@ -36,6 +37,7 @@ const PANELS: Record<HudTabId, React.FC> = {
   eyes: EyesTab,
   ai: AiTab,
   emergency: EmergencyTab,
+  cognition: CognitionTab,
   training: TrainingTab,
   crew: CrewTab,
   users: UsersTab,

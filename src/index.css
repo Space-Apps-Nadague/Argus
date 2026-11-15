@@ -14,6 +14,13 @@
   --status-green: #22c55e;
   --status-yellow: #eab308;
   --status-red: #ef4444;
+  /* Cognition games stimulus palette (categorical, never status) */
+  --game-1: #22d3ee;
+  --game-2: #f472b6;
+  --game-3: #a3e635;
+  --game-4: #fb923c;
+  --game-5: #a78bfa;
+  --game-6: #facc15;
   color-scheme: dark;
 }
 
@@ -113,4 +120,15 @@
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(56, 189, 248, 0.45);
+}
+
+/* Cognition games motion (respects reduced motion) */
+@keyframes game-pop { 0% { transform: scale(0.6); opacity: 0; } 60% { transform: scale(1.08); opacity: 1; } 100% { transform: scale(1); } }
+@keyframes game-shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+@keyframes game-float { 0% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(-28px); opacity: 0; } }
+.game-pop { animation: game-pop 220ms ease-out both; }
+.game-shake { animation: game-shake 240ms ease-in-out; }
+.game-float { animation: game-float 700ms ease-out forwards; }
+@media (prefers-reduced-motion: reduce) {
+  .game-pop, .game-shake, .game-float { animation: none; }
 }
