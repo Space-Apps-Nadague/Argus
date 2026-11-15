@@ -49,6 +49,7 @@ export const CheckInEntrySchema = z.object({
   timestampIso: text(40),
   values: z.record(z.string(), num()),
   note: text(1000).optional(),
+  scenarioId: ScenarioIdSchema.optional(),
 });
 
 export const CrewContextSchema = z.object({

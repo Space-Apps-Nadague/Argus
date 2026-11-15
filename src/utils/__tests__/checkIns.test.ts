@@ -3,6 +3,8 @@ import {
   applyCheckIns,
   buildCheckInEntry,
   checkInStreak,
+  entriesForScenario,
+  sanitizeCheckIns,
   latestMissionDay,
   validateCheckInValue,
 } from '../checkIns';
@@ -83,5 +85,36 @@ describe('checkIns', () => {
     expect(checkInStreak([])).toBe(0);
     expect(checkInStreak([entry(28, {}), entry(29, {}), entry(30, {}), entry(25, {})])).toBe(3);
     expect(checkInStreak([entry(30, {}), entry(30, {})])).toBe(1);
+  });
+});
+
+describe('entriesForScenario', () => {
+  const tagged = (scenarioId?: CheckInEntry['scenarioId']): CheckInEntry => ({ ...entry(30, { onsd: 5 }), scenarioId });
+  it('keeps entries logged in the scenario and maps legacy entries to the default scenario', () => {
+    const list = [tagged('nominal'), tagged('sans_alert'), tagged(undefined)];
+    expect(entriesForScenario(list, 'sans_alert', 'nominal')).toEqual([list[1]]);
+    expect(entriesForScenario(list, 'nominal', 'nominal')).toEqual([list[0], list[2]]);
+  });
+  it('does not let a nominal check-in mask the SANS scenario values', () => {
+    const sans = TELEMETRY_SCENARIOS.sans_alert.zones;
+    const scoped = entriesForScenario([tagged('nominal')], 'sans_alert', 'nominal');
+    expect(applyCheckIns(sans, scoped).neuro[0].currentValue).toBe(sans.neuro[0].currentValue);
+  });
+});
+
+describe('sanitizeCheckIns', () => {
+  it('drops malformed crews, entries and values instead of throwing', () => {
+    const good = { ...entry(3, { onsd: 5.2 }), crewId: 'c1' };
+    const out = sanitizeCheckIns({
+      c1: [good, { id: 'x', missionDay: 30 }, null, { ...good, id: 'bad-values', values: { onsd: 'NaN', nope: 1 } }],
+      c2: 'not-a-list',
+      c3: [{ ...good, id: 'mixed', values: { onsd: 5, hacked: 3 }, scenarioId: 'mars' }],
+    });
+    expect(Object.keys(out)).toEqual(['c1', 'c3']);
+    expect(out.c1).toEqual([good]);
+    expect(out.c3[0].values).toEqual({ onsd: 5 });
+    expect(out.c3[0].scenarioId).toBeUndefined();
+    expect(sanitizeCheckIns([1, 2])).toEqual({});
+    expect(sanitizeCheckIns(null)).toEqual({});
   });
 });

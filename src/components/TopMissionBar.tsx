@@ -11,7 +11,7 @@ import { formatCommDelay, SPACE_LOCATION_ORDER, SPACE_LOCATIONS } from '../data/
 import { MissionClock } from './MissionClock';
 import { ScenarioId, SpaceLocationId, TriageStatus, UserRole } from '../types/argus';
 import { getCrewAdjustedZones, TELEMETRY_SCENARIOS } from '../data/telemetryScenarios';
-import { applyCheckIns } from '../utils/checkIns';
+import { applyCheckIns, entriesForScenario } from '../utils/checkIns';
 import { evaluateAllZones } from '../utils/triageEngine';
 import { hasConfiguredAiKey } from '../services/flightSurgeonAi';
 import { ProviderBadge, useAiStatus } from './ai/shared';
@@ -250,7 +250,7 @@ export const TopMissionBar: React.FC = () => {
             {crewRoster.map((member) => {
               const isSelected = member.id === activeCrewMember.id;
               const sc = isSelected ? scenarioId : member.defaultScenarioId;
-              const zones = zonesForCrew(member, sc) ?? applyCheckIns(getCrewAdjustedZones(sc, member), checkIns[member.id] || []);
+              const zones = zonesForCrew(member, sc) ?? applyCheckIns(getCrewAdjustedZones(sc, member), entriesForScenario(checkIns[member.id] || [], sc, member.defaultScenarioId));
               const st = Object.values(evaluateAllZones(zones, environment));
               const worst: TriageStatus = st.includes('red') ? 'red' : st.includes('yellow') ? 'yellow' : 'green';
               return (

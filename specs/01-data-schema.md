@@ -339,18 +339,22 @@ export interface CheckInEntry {
   timestampIso: string;
   values: Partial<Record<MetricId, number>>;        // only fields the crew filled in
   note?: string;
+  scenarioId?: ScenarioId;                          // scenario active when logged (stamped by ADD_CHECK_IN)
 }
 ```
 
 - **Validation:** `validateCheckInValue(metricId, value)` rejects non-finite values and values outside `METRIC_INPUT_RANGES`. Empty fields are skipped. An entry needs at least one valid value.
+- **Scenario scope:** `entriesForScenario(entries, scenarioId, defaultScenarioId)` keeps only entries logged in the given scenario. Entries without `scenarioId` (stored before this field existed) count for the crew member's `defaultScenarioId`. All overlays (HUD, crew strip, crew cards, AI requests, Earth packets) use the scoped entries; streaks and milestones use all of the crew member's entries.
 - **Overlay:** `applyCheckIns(zones, entries)` is pure. Entries are applied in `(missionDay, timestampIso)` order. Each value replaces the history point for that mission day, or is appended (`dateLabel: "MD-<day>"`) if the day is beyond the series. The point gets `source: 'check_in'`. `currentValue` becomes the value at the highest mission day. `deltaFromBaseline` and `flightNormLabel` are left unchanged.
 - **Downstream:** triage (`evaluateAllZones`), readiness score, drift, forecast and links all run on the overlaid zones, so a check-in updates the whole HUD deterministically.
 - **Flight Surgeon guidance follows live status:** offline guidance is keyed by scenario, so a check-in can make it stale. When the live (overlaid) status of the guidance zone differs from `guidance.triageStatus`, ARGUS deterministically re-selects guidance (`resolveLiveGuidance`):
-  1. Use the first offline protocol from the 4 scenarios (`nominal`, `sans_alert`, `high_co2`, `solar_storm`, in that order) whose guidance for the same zone has the live status, keeping the active `scenarioId`.
-  2. If none matches, keep the cached guidance but set `triageStatus` to the live status, escalate `earthConsultUrgency` (`yellow` → `priority_packet`, `red` → `immediate_emergency_packet`), and prefix the headline with `Check-in out of range — `.
-  Live AI guidance (`source: 'live_ai'`) is never replaced.
+  1. The *driver metrics* are the live zone's metrics whose status equals the live status. Use the first offline protocol from the 4 scenarios (`nominal`, `sans_alert`, `high_co2`, `solar_storm`, in that order) whose guidance for the same zone has the live status **and** whose own driver metrics (in that scenario's crew-adjusted zone) include every live driver metric, keeping the active `scenarioId`. A protocol for a different cause is never shown.
+  2. If none matches, keep the cached guidance but set `triageStatus` to the live status, escalate `earthConsultUrgency` (`yellow` → `priority_packet`, `red` → `immediate_emergency_packet`; never downgraded), and prefix the headline with `Check-in out of range — `.
+  Live AI guidance (`source: 'live_ai'`) keeps its content, but when its status is stale it gets the step-2 status, urgency and headline treatment.
+- **Completed steps follow the shown guidance:** readiness, the step counter, milestones and Earth packets count only `completedStepIds` that belong to the displayed guidance's `guidedSteps`.
+- **Re-selecting the active crew member** (crew strip click, `SET_ROSTER` refresh) keeps scenario, zone, guidance and completed steps; only the profile-derived countermeasure streak is refreshed.
 - **Streak:** `checkInStreak(entries)` = number of consecutive mission days with ≥ 1 entry, ending at the most recent logged day.
-- **Persistence:** `localStorage` key `argus_checkins_v1` → `Record<crewId, CheckInEntry[]>`. Deleting a crew member deletes their check-ins.
+- **Persistence:** `localStorage` key `argus_checkins_v1` → `Record<crewId, CheckInEntry[]>`, loaded through `sanitizeCheckIns`, which drops malformed entries and non-metric or non-finite values instead of crashing. Deleting a crew member deletes their check-ins.
 - **Quick Interactive Vital Logging (`logVitalReading`, `src/components/TelemetryPanel.tsx`):**
   In addition to multi-metric batch check-ins on `CheckInTab`, astronauts can log individual vital readings live via `logVitalReading(zoneId, metricKey, value)`. This action immediately updates the active crew member's latest day (`MD-30`) reading, re-evaluates deterministic Green/Yellow/Red triage (`evaluateMetricStatus` & `evaluateZoneStatus`), recalculates the Crew Readiness Score (`calculateCrewReadinessScore`), updates the 3D Bio-Twin status color, and triggers Flight Surgeon AI guidance synthesis for that zone.
 

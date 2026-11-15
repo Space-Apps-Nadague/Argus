@@ -86,6 +86,7 @@ export const CompanionDrawer: React.FC = () => {
     zoneStatuses,
     zones,
     activeCheckIns,
+    scenarioCheckIns,
     spaceLocationId,
     checkInStreakDays,
     metricLinks,
@@ -371,7 +372,7 @@ export const CompanionDrawer: React.FC = () => {
           environment,
           locationId: spaceLocationId,
           crewMember: activeCrewMember,
-          telemetryCheckIns: activeCheckIns,
+          telemetryCheckIns: scenarioCheckIns,
           messages: [
             ...messages.slice(-8).map((m) => ({
               role: m.role === 'crew' ? ('user' as const) : ('assistant' as const),

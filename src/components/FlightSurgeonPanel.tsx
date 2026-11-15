@@ -105,7 +105,7 @@ export const FlightSurgeonPanel: React.FC = () => {
     clearVisualExam,
     queuedPackets,
     queueEarthPacket,
-    activeCheckIns,
+    scenarioCheckIns,
     crewSymptoms,
     setCrewSymptoms,
     consultFlightSurgeon,
@@ -127,10 +127,10 @@ export const FlightSurgeonPanel: React.FC = () => {
       scenarioId,
       environment,
       spaceLocationId,
-      checkIns: activeCheckIns,
+      checkIns: scenarioCheckIns,
       completedStepsCount: completedStepIds.length,
     }),
-    [activeCrewMember, scenarioId, environment, spaceLocationId, activeCheckIns, completedStepIds.length]
+    [activeCrewMember, scenarioId, environment, spaceLocationId, scenarioCheckIns, completedStepIds.length]
   );
 
   const sessionRef = useRef<RealtimeDoctorSession | null>(null);
@@ -1105,7 +1105,7 @@ export const FlightSurgeonPanel: React.FC = () => {
           <ul className="flex flex-wrap gap-2 text-xs text-hud-muted">
             <li className="rounded-full border border-hud-line px-2.5 py-1">{done} steps</li>
             <li className="rounded-full border border-hud-line px-2.5 py-1">{visualExamAnalysis ? '1 exam' : 'No exam'}</li>
-            <li className="rounded-full border border-hud-line px-2.5 py-1">{Math.min(activeCheckIns.length, 5)} check-ins</li>
+            <li className="rounded-full border border-hud-line px-2.5 py-1">{Math.min(scenarioCheckIns.length, 5)} check-ins</li>
           </ul>
 
           <div className="space-y-1.5">

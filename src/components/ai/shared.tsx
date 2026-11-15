@@ -12,13 +12,13 @@ import type { WellbeingCheckIn } from '../../types/aiApi';
 
 /** Crew context sent with every AI request. */
 export function useCrewContextRequest(): CrewContextRequest {
-  const { activeCrewMember, scenarioId, environment, spaceLocationId, activeCheckIns } = useMission();
+  const { activeCrewMember, scenarioId, environment, spaceLocationId, scenarioCheckIns } = useMission();
   return {
     crewMember: activeCrewMember,
     scenarioId,
     environment,
     locationId: spaceLocationId,
-    telemetryCheckIns: activeCheckIns,
+    telemetryCheckIns: scenarioCheckIns,
   };
 }
 
