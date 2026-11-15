@@ -1,7 +1,6 @@
 // Prepares the Photobooth vision assets (src/features/photobooth/vision.ts). Runs before `dev` and `build`.
 //  1. Copies the MediaPipe Tasks WASM runtime into public/vision/wasm so Vite serves it offline.
 //  2. Downloads the gesture model (8 MB, too large to keep in git) into public/models/vision once.
-//     The two small models (segmenter, face detector) are committed.
 import { copyFileSync, existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';

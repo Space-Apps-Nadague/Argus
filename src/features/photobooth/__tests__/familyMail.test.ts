@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deliveryStatus, formatCountdown, loadContacts, loadPostcards, MAX_POSTCARDS, newPostcard, saveContacts, savePostcard, type KeyValueStore } from '../familyMail';
+import { deliveryStatus, formatCountdown, isEmail, loadContacts, loadPostcards, MAX_POSTCARDS, newPostcard, saveContacts, savePostcard, updatePostcard, type KeyValueStore } from '../familyMail';
 
 const memory = (limit = Infinity): KeyValueStore & { data: Record<string, string> } => {
   const data: Record<string, string> = {};
@@ -43,6 +43,19 @@ describe('family mail', () => {
     for (let i = 0; i < 6; i++) savePostcard(card(i, 'data:image/jpeg;base64,' + 'A'.repeat(300)), tight);
     expect(loadPostcards('c1', tight).length).toBeGreaterThan(0);
     expect(loadPostcards('c1', tight)[0].id).toBe('p5');
+  });
+
+  it('updates the email status of a stored postcard', () => {
+    const s = memory();
+    savePostcard(card(1), s);
+    updatePostcard('c1', 'p1', { email: { status: 'sent', recipients: ['mom@example.com'], mode: 'smtp' } }, s);
+    expect(loadPostcards('c1', s)[0].email?.status).toBe('sent');
+  });
+
+  it('checks email addresses', () => {
+    expect(isEmail('mom@example.com')).toBe(true);
+    expect(isEmail('mom@example')).toBe(false);
+    expect(isEmail('not an email')).toBe(false);
   });
 
   it('formats the time left', () => {

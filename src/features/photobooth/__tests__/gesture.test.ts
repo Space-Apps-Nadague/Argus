@@ -51,4 +51,11 @@ describe('fist shutter', () => {
     const { captures } = run(frames(1000, 4200, false), startCountdown(1000));
     expect(captures).toEqual([4000]);
   });
+
+  it('supports a shorter countdown between strip photos', () => {
+    const { captures } = run(frames(0, 2500, false), startCountdown(0, 2000));
+    expect(captures).toEqual([2000]);
+    expect(stepShutter(startCountdown(0, 2000), false, 100).secondsLeft).toBe(2);
+    expect(stepShutter(startCountdown(0, 2000), false, 1500).secondsLeft).toBe(1);
+  });
 });

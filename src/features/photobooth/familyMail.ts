@@ -1,15 +1,30 @@
 /**
  * ARGUS — Family mail: photos from the Photobooth sent home (specs/02-ui-dashboard.md §2.7)
  * Postcards go into an Earth downlink queue and arrive after the live one-way light time
- * (e.g. 11 minutes from Mars, instantly on Earth). Contacts and postcards are kept per astronaut
- * on this device.
+ * (e.g. 11 minutes from Mars, instantly on Earth). With the ARGUS server, family members with an
+ * email address also receive the photo by email at that moment (server/family/mailer.ts).
+ * Contacts and postcards are kept per astronaut on this device.
  */
 
 export interface FamilyContact {
   id: string;
   name: string;
   relation: string;
+  /** Where the photos are emailed (optional). */
+  email?: string;
 }
+
+/** Email delivery of a postcard (server mode). */
+export interface PostcardEmail {
+  status: 'scheduled' | 'sent' | 'failed' | 'no_server';
+  recipients: string[];
+  /** smtp: really delivered. test: Ethereal test mailbox, see previewUrl. */
+  mode?: 'smtp' | 'test';
+  previewUrl?: string;
+  error?: string;
+}
+
+export const isEmail = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim());
 
 export interface FamilyPostcard {
   id: string;
@@ -22,6 +37,7 @@ export interface FamilyPostcard {
   sentAtIso: string;
   arrivesAtIso: string;
   delaySeconds: number;
+  email?: PostcardEmail;
 }
 
 export const CONTACTS_KEY = 'argus_family_contacts_v1';
@@ -86,6 +102,24 @@ export function savePostcard(card: FamilyPostcard, store: KeyValueStore | null =
     }
   }
   return [];
+}
+
+/** Updates one stored postcard (e.g. its email status) and returns the new list. */
+export function updatePostcard(
+  crewId: string,
+  id: string,
+  patch: Partial<FamilyPostcard>,
+  store: KeyValueStore | null = safeStore()
+): FamilyPostcard[] {
+  const map = readMap<FamilyPostcard>(MAIL_KEY, store);
+  const list = (map[crewId] ?? []).map((p) => (p.id === id ? { ...p, ...patch } : p));
+  map[crewId] = list;
+  try {
+    store?.setItem(MAIL_KEY, JSON.stringify(map));
+  } catch {
+    /* storage full: keep the in-memory list */
+  }
+  return list;
 }
 
 export function newPostcard(params: {

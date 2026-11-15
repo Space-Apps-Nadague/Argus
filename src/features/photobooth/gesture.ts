@@ -15,6 +15,8 @@ export type ShutterPhase = 'idle' | 'arming' | 'countdown' | 'cooldown';
 export interface ShutterState {
   phase: ShutterPhase;
   since: number;
+  /** Countdown length, ms (default 3 s; shorter between the photos of a strip). */
+  duration?: number;
 }
 
 export interface ShutterStep {
@@ -28,8 +30,8 @@ export interface ShutterStep {
 export const IDLE: ShutterState = { phase: 'idle', since: 0 };
 
 /** Starts the countdown now (the on-screen button uses the same timer). */
-export function startCountdown(now: number): ShutterState {
-  return { phase: 'countdown', since: now };
+export function startCountdown(now: number, duration = COUNTDOWN_MS): ShutterState {
+  return { phase: 'countdown', since: now, duration };
 }
 
 export function stepShutter(state: ShutterState, fist: boolean, now: number): ShutterStep {
@@ -41,9 +43,11 @@ export function stepShutter(state: ShutterState, fist: boolean, now: number): Sh
       if (!fist) return { state: IDLE, capture: false, secondsLeft: null };
       if (elapsed >= FIST_ARM_MS) return { state: startCountdown(now), capture: false, secondsLeft: 3 };
       return { state, capture: false, secondsLeft: null };
-    case 'countdown':
-      if (elapsed >= COUNTDOWN_MS) return { state: { phase: 'cooldown', since: now }, capture: true, secondsLeft: null };
-      return { state, capture: false, secondsLeft: Math.ceil((COUNTDOWN_MS - elapsed) / 1000) };
+    case 'countdown': {
+      const duration = state.duration ?? COUNTDOWN_MS;
+      if (elapsed >= duration) return { state: { phase: 'cooldown', since: now }, capture: true, secondsLeft: null };
+      return { state, capture: false, secondsLeft: Math.ceil((duration - elapsed) / 1000) };
+    }
     case 'cooldown':
       if (!fist && elapsed >= COOLDOWN_MS) return { state: IDLE, capture: false, secondsLeft: null };
       return { state, capture: false, secondsLeft: null };

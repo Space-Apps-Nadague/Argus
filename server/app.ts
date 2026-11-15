@@ -12,6 +12,7 @@ import { astronautRoutes } from './routes/astronauts';
 import { authRoutes } from './routes/auth';
 import { chatRoutes } from './routes/chat';
 import { dataRoutes } from './routes/data';
+import { familyRoutes } from './routes/family';
 import { diagnosticsRoutes } from './routes/diagnostics';
 import { guidanceRoutes } from './routes/guidance';
 import { healthRoutes } from './routes/health';
@@ -37,6 +38,7 @@ export function createApp(): Hono<AppEnv> {
   app.route('/api', adminRoutes);
   app.route('/api', astronautRoutes);
   app.route('/api', dataRoutes);
+  app.route('/api', familyRoutes);
   const ai = new Hono<AppEnv>();
   ai.use('*', requireAuth(), aiGuard);
   ai.route('/', guidanceRoutes);
