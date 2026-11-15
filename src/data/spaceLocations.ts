@@ -11,7 +11,7 @@ export const SPACE_LOCATIONS: Record<SpaceLocationId, SpaceLocation> = {
     id: 'earth_pre',
     label: 'Earth · before mission',
     gravityG: 1,
-    gravityLabel: '1 g',
+    gravityLabel: '1.00g',
     commDelaySec: [0, 0],
     radiation: 'shielded',
     clock: 'earth',
@@ -21,7 +21,7 @@ export const SPACE_LOCATIONS: Record<SpaceLocationId, SpaceLocation> = {
     id: 'earth_post',
     label: 'Earth · after mission',
     gravityG: 1,
-    gravityLabel: '1 g',
+    gravityLabel: '1.00g',
     commDelaySec: [0, 0],
     radiation: 'shielded',
     clock: 'earth',
@@ -105,11 +105,11 @@ export const DEFAULT_SPACE_LOCATION: SpaceLocationId = 'mars_transit';
 
 /**
  * Which threshold set (specs/01-data-schema.md §2, `ENVIRONMENT_METRIC_THRESHOLDS`) applies at a location.
- * Earth phases use the ISS/LEO set (shielded, closest to clinical norms); open space and transit use 0g.
+ * Earth pre/post-flight phases use earth_1g; LEO uses iss_leo; open space and transit use 0g.
  */
 export const LOCATION_ENVIRONMENT: Record<SpaceLocationId, GravityEnvironment> = {
-  earth_pre: 'iss_leo',
-  earth_post: 'iss_leo',
+  earth_pre: 'earth_1g',
+  earth_post: 'earth_1g',
   leo: 'iss_leo',
   gateway: '0g_transit',
   mars_transit: '0g_transit',
