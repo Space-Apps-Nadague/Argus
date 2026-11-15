@@ -50,7 +50,7 @@ describe('vitalLogger', () => {
     expect(empty.error).toBeNull();
     expect(empty.status).toBeNull();
 
-    const tooHigh = evaluateVitalInputPreview('blood_glucose', '999', '0g_transit');
+    const tooHigh = evaluateVitalInputPreview('blood_glucose', '2500', '0g_transit');
     expect(tooHigh.valid).toBe(false);
     expect(tooHigh.error).toContain('Allowed');
     expect(tooHigh.status).toBeNull();

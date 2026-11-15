@@ -25,7 +25,7 @@ describe('checkIns', () => {
   it('validates against METRIC_INPUT_RANGES', () => {
     expect(validateCheckInValue('resting_hr', '')).toEqual({ ok: 'empty' });
     expect(validateCheckInValue('resting_hr', 'abc')).toEqual({ ok: false, error: 'Enter a number' });
-    expect(validateCheckInValue('resting_hr', '300')).toEqual({ ok: false, error: 'Allowed 30–180' });
+    expect(validateCheckInValue('resting_hr', '300')).toEqual({ ok: false, error: 'Not physically possible (allowed 20–250)' });
     expect(validateCheckInValue('onsd', '5,2')).toEqual({ ok: true, value: 5.2 });
   });
 

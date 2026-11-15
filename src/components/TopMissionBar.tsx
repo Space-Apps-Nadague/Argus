@@ -10,6 +10,7 @@ import { useAuth } from '../context/AuthContext';
 import { formatCommDelay, SPACE_LOCATION_ORDER, SPACE_LOCATIONS } from '../data/spaceLocations';
 import { MissionClock } from './MissionClock';
 import { FaceIdSettings } from '../features/faceId/FaceIdSettings';
+import { SettingsMenu } from './SettingsMenu';
 import { ScenarioId, SpaceLocationId, TriageStatus, UserRole } from '../types/argus';
 import { getCrewAdjustedZones, TELEMETRY_SCENARIOS } from '../data/telemetryScenarios';
 import { applyCheckIns, entriesForScenario } from '../utils/checkIns';
@@ -201,6 +202,8 @@ export const TopMissionBar: React.FC = () => {
               </div>
             )}
           </div>
+
+          <SettingsMenu />
 
           <button
             type="button"

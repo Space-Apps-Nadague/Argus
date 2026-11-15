@@ -38,7 +38,7 @@ export function validateCheckInValue(
     return { ok: false, error: 'Enter a number' };
   }
   if (value < range.min || value > range.max) {
-    return { ok: false, error: `Allowed ${range.min}–${range.max}` };
+    return { ok: false, error: `Not physically possible (allowed ${range.min}–${range.max})` };
   }
   return { ok: true, value };
 }

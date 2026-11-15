@@ -26,6 +26,7 @@ import { CrewTab } from './components/CrewTab';
 import { UsersTab } from './components/UsersTab';
 import { CrewManagerModal } from './components/CrewManagerModal';
 import { CompanionDrawer } from './components/CompanionDrawer';
+import { LifeThreatAlert } from './components/LifeThreatAlert';
 
 const PANELS: Record<HudTabId, React.FC> = {
   biotwin: BioTwinTab,
@@ -51,6 +52,7 @@ const Hud: React.FC = () => {
       <TopMissionBar />
       {canManageRoster && <CrewManagerModal />}
       <CompanionDrawer />
+      {canViewHealth && <LifeThreatAlert />}
       {mode === 'local' && (
         <div role="status" className="border-b border-yellow-500/40 bg-yellow-500/10 px-4 py-1 text-center text-[11px] text-yellow-200">
           Offline demo · no ARGUS database connected, data stays in this browser
