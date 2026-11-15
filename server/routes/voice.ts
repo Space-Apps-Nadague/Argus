@@ -68,6 +68,9 @@ import {
   VoiceTurnRequestSchema,
 } from '../schemas';
 import { keyFromHeader, liveMeta, OFFLINE_META, parseBody } from './util';
+import { DEFAULT_GEMINI_VOICE, GEMINI_VOICES, isGeminiVoice } from '../ai/geminiVoices';
+import { LOCAL_VOICES, localSpeechConfig, localSynthesize, localTranscribe, probeLocalSpeech } from '../ai/localSpeech';
+import type { VoicesResponse } from '../../src/types/assistant';
 
 export const voiceRoutes = new Hono<AppEnv>();
 
@@ -645,10 +648,13 @@ voiceRoutes.post('/stt', async (c) => {
   const mode: VoiceTransportMode = req.mode ?? 'on-ship-pipeline';
   const nodeLabel: VoiceNodeLabel = mode === 'on-ship-pipeline' ? 'on-ship-local' : 'gemini-live';
   const headerKey = keyFromHeader(c) || c.req.header('X-Argus-Api-Key')?.trim();
-  const geminiKey = resolveGeminiApiKey(process.env, headerKey);
+  // On-ship tier: audio never leaves the ship (specs/04-ai-backend.md §4.2).
+  const geminiKey = req.tier === 'autonomous' ? undefined : resolveGeminiApiKey(process.env, headerKey);
+  const localSpeech = currentPrivacy().offlineOnly ? null : localSpeechConfig();
 
   let transcript = '';
   let usedLiveStt = false;
+  let usedLocalStt = false;
 
   if (req.audioBase64 && geminiKey) {
     try {
@@ -708,8 +714,17 @@ voiceRoutes.post('/stt', async (c) => {
     }
   }
 
+  if (!transcript && req.audioBase64 && localSpeech) {
+    const local = await localTranscribe(localSpeech, req.audioBase64, req.mimeType, req.languageCode);
+    if (local) {
+      transcript = local;
+      usedLocalStt = true;
+    }
+  }
+
   if (!transcript) {
-    transcript = req.fallbackTranscript?.trim() || 'Check my current readiness and zone vitals.';
+    // With a tier the caller is the unified console: an empty transcript means "heard nothing".
+    transcript = req.fallbackTranscript?.trim() || (req.tier ? '' : 'Check my current readiness and zone vitals.');
   }
 
   const crisis = detectCrisisLanguage(transcript);
@@ -725,14 +740,16 @@ voiceRoutes.post('/stt', async (c) => {
       earthConsultUrgency: urgency,
       confidence: usedLiveStt ? 0.96 : 0.9,
     },
-    meta: usedLiveStt
-      ? {
-          source: 'live_ai',
-          provider: mode === 'on-ship-pipeline' ? 'local' : 'gemini',
-          model: mode === 'on-ship-pipeline' ? 'on-ship-stt-v1' : DEFAULT_STT_MODEL,
-          latencyMs: Date.now() - started,
-        }
-      : OFFLINE_META,
+    meta: usedLocalStt
+      ? { source: 'live_ai', provider: 'local', model: localSpeech!.sttModel, latencyMs: Date.now() - started }
+      : usedLiveStt
+        ? {
+            source: 'live_ai',
+            provider: req.tier ? 'gemini' : mode === 'on-ship-pipeline' ? 'local' : 'gemini',
+            model: req.tier ? process.env.GEMINI_STT_MODEL?.trim() || 'gemini-3.8-flash' : mode === 'on-ship-pipeline' ? 'on-ship-stt-v1' : DEFAULT_STT_MODEL,
+            latencyMs: Date.now() - started,
+          }
+        : OFFLINE_META,
   };
   return c.json(envelope);
 });
@@ -749,8 +766,10 @@ voiceRoutes.post('/tts', async (c) => {
   const nodeLabel: VoiceNodeLabel = mode === 'on-ship-pipeline' ? 'on-ship-local' : 'gemini-live';
   const cleanText = req.text.replace(/[*#_`]/g, '').trim();
   const headerKey = keyFromHeader(c) || c.req.header('X-Argus-Api-Key')?.trim();
-  const geminiKey = resolveGeminiApiKey(process.env, headerKey);
+  const geminiKey = req.tier === 'autonomous' ? undefined : resolveGeminiApiKey(process.env, headerKey);
+  const localSpeech = currentPrivacy().offlineOnly ? null : localSpeechConfig();
   const ttsModel = process.env.GEMINI_TTS_MODEL?.trim() || DEFAULT_TTS_MODEL;
+  const geminiVoice = isGeminiVoice(req.voice) ? req.voice : req.tier ? DEFAULT_GEMINI_VOICE : 'Kore';
 
   if (geminiKey && cleanText) {
     try {
@@ -772,7 +791,7 @@ voiceRoutes.post('/tts', async (c) => {
                   annotations: [
                     {
                       type: 'speech_metadata',
-                      style: req.style || 'calm, clear clinical flight surgeon',
+                      style: req.style || (req.tier ? 'warm, calm and unhurried, like a trusted doctor talking with a friend' : 'calm, clear clinical flight surgeon'),
                     },
                   ],
                 },
@@ -781,7 +800,7 @@ voiceRoutes.post('/tts', async (c) => {
           ],
           response_format: { type: 'audio' },
           generation_config: {
-            speech_config: [{ voice: req.voice || 'Kore' }],
+            speech_config: [{ voice: geminiVoice }],
           },
         }),
         signal: AbortSignal.timeout(15_000),
@@ -816,8 +835,8 @@ voiceRoutes.post('/tts', async (c) => {
             },
             meta: {
               source: 'live_ai',
-              provider: mode === 'on-ship-pipeline' ? 'local' : 'gemini',
-              model: mode === 'on-ship-pipeline' ? 'on-ship-tts-v1' : ttsModel,
+              provider: req.tier ? 'gemini' : mode === 'on-ship-pipeline' ? 'local' : 'gemini',
+              model: req.tier ? ttsModel : mode === 'on-ship-pipeline' ? 'on-ship-tts-v1' : ttsModel,
               latencyMs: Date.now() - started,
             },
           };
@@ -826,6 +845,25 @@ voiceRoutes.post('/tts', async (c) => {
       }
     } catch (err) {
       console.warn('[ARGUS Voice TTS] Behind-the-scenes synthesis fallback:', err);
+    }
+  }
+
+  if (localSpeech && cleanText) {
+    const local = await localSynthesize(localSpeech, cleanText, req.voice, req.speed);
+    if (local) {
+      const envelope: AiEnvelope<VoiceTtsResponse> = {
+        result: {
+          audioBase64: local.audioBase64,
+          mimeType: local.mimeType,
+          mode,
+          nodeLabel: 'on-ship-local',
+          pipelineStage: 'tts',
+          useBrowserSpeechFallback: false,
+          durationEstimateMs: Math.max(1200, cleanText.split(/\s+/).length * 360),
+        },
+        meta: { source: 'live_ai', provider: 'local', model: localSpeech.ttsModel, latencyMs: Date.now() - started },
+      };
+      return c.json(envelope);
     }
   }
 
@@ -1100,4 +1138,23 @@ voiceRoutes.post('/voice-turn', async (c) => {
     meta: llmMeta,
   };
   return c.json(envelope);
+});
+
+// ── 6. GET /api/ai/voices ────────────────────────────────────────────────────
+
+/** Voices the crew can choose, per engine, and which engines are reachable right now. */
+voiceRoutes.get('/voices', async (c) => {
+  const headerKey = keyFromHeader(c) || c.req.header('X-Argus-Api-Key')?.trim();
+  const geminiKey = resolveGeminiApiKey(process.env, headerKey);
+  const localSpeech = currentPrivacy().offlineOnly ? null : localSpeechConfig();
+  const localUp = localSpeech ? await probeLocalSpeech(localSpeech) : false;
+  const body: VoicesResponse = {
+    voices: [...GEMINI_VOICES, ...LOCAL_VOICES],
+    defaults: { gemini: DEFAULT_GEMINI_VOICE, local: localSpeech?.defaultVoice ?? LOCAL_VOICES[0].id },
+    engines: {
+      gemini: { available: Boolean(geminiKey), model: process.env.GEMINI_TTS_MODEL?.trim() || DEFAULT_TTS_MODEL },
+      local: { available: localUp, model: localSpeech?.ttsModel },
+    },
+  };
+  return c.json(body);
 });

@@ -58,6 +58,7 @@ import {
 import { crewApi, dataApi } from '../services/dataApi';
 import { findMetricLinks } from '../utils/driftAnalytics';
 import { DEFAULT_SPACE_LOCATION, environmentForLocation, formatCommDelay, isSpaceLocationId, SPACE_LOCATIONS } from '../data/spaceLocations';
+import { findLifeThreats, LifeThreat, sanitizeZones } from '../utils/vitalLimits';
 import {
   createQuickRoutineCheckIn,
   evaluateReadinessMilestones,
@@ -146,7 +147,7 @@ export function resolveLiveGuidance(
   return escalateStaleGuidance(guidance, liveStatus);
 }
 const TAB_STORAGE_KEY = 'argus_active_tab_v1';
-const HUD_TABS: HudTabId[] = ['biotwin', 'trends', 'forecast', 'eyes', 'ai', 'cognition', 'crew', 'users'];
+const HUD_TABS: HudTabId[] = ['biotwin', 'trends', 'forecast', 'eyes', 'console', 'cognition', 'crew', 'users', 'photobooth'];
 const LOCATIONS_STORAGE_KEY = 'argus_locations_v1';
 
 function loadInitialLocations(): Record<string, SpaceLocationId> {
@@ -185,8 +186,10 @@ function loadInitialEnvironment(): GravityEnvironment {
 
 function loadInitialTab(): HudTabId {
   try {
-    const raw = localStorage.getItem(TAB_STORAGE_KEY) as HudTabId | null;
-    if (raw && HUD_TABS.includes(raw)) return raw;
+    const raw = localStorage.getItem(TAB_STORAGE_KEY);
+    // The old ARGUS AI and Emergency tabs are now the one ARGUS console.
+    if (raw === 'ai' || raw === 'emergency') return 'console';
+    if (raw && HUD_TABS.includes(raw as HudTabId)) return raw as HudTabId;
   } catch {
     // Ignore storage errors in restricted environments
   }
@@ -612,6 +615,8 @@ interface MissionContextValue extends MissionState {
   completeScheduledRoutine: () => void;
   zoneStatuses: Record<BodyZoneId, TriageStatus>;
   currentZoneReadings: VitalSignReading[];
+  /** Active crew member's latest readings that are possible but immediately life-threatening. */
+  lifeThreats: LifeThreat[];
   readinessScore: number;
   selectCrewMember: (crewId: string) => void;
   createCrewMember: (newMember: Omit<CrewMemberProfile, 'id' | 'isCustom'>) => void;
@@ -791,10 +796,15 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
 
   const zonesForCrew = useCallback(
     (member: CrewMemberProfile, scenario: ScenarioId = member.defaultScenarioId) => {
-      if (serverBacked) return serverZones[member.id] ?? null;
-      return applyCheckIns(
-        getCrewAdjustedZones(scenario, member),
-        entriesForScenario(state.checkIns[member.id] || [], scenario, member.defaultScenarioId)
+      if (serverBacked) {
+        const z = serverZones[member.id];
+        return z ? sanitizeZones(z) : null;
+      }
+      return sanitizeZones(
+        applyCheckIns(
+          getCrewAdjustedZones(scenario, member),
+          entriesForScenario(state.checkIns[member.id] || [], scenario, member.defaultScenarioId)
+        )
       );
     },
     [serverBacked, serverZones, state.checkIns]
@@ -804,10 +814,13 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
   const zonesSource: 'database' | 'demo' = activeServerZones ? 'database' : 'demo';
   const adjustedZones = useMemo(
     () =>
-      activeServerZones ??
-      applyCheckIns(
-        getCrewAdjustedZones(state.scenarioId, activeCrewMember),
-        scenarioCheckIns
+      // Physically impossible points (typos, sensor faults, bad mock data) never reach the UI.
+      sanitizeZones(
+        activeServerZones ??
+          applyCheckIns(
+            getCrewAdjustedZones(state.scenarioId, activeCrewMember),
+            scenarioCheckIns
+          )
       ),
     [activeServerZones, state.scenarioId, activeCrewMember, scenarioCheckIns]
   );
@@ -824,6 +837,11 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
   const zoneStatuses = useMemo(
     () => evaluateAllZones(adjustedZones, state.environment),
     [adjustedZones, state.environment]
+  );
+
+  const lifeThreats = useMemo(
+    () => (canViewHealth ? findLifeThreats(adjustedZones, activeCrewMember.id) : []),
+    [canViewHealth, adjustedZones, activeCrewMember.id]
   );
 
   const currentZoneReadings = useMemo(
@@ -1308,6 +1326,7 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
       deleteCheckIn,
       zoneStatuses,
       currentZoneReadings,
+      lifeThreats,
       readinessScore,
       selectCrewMember,
       createCrewMember,
@@ -1361,6 +1380,7 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
       setCompanionOpen,
       zoneStatuses,
       currentZoneReadings,
+      lifeThreats,
       readinessScore,
       selectCrewMember,
       createCrewMember,

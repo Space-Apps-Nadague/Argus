@@ -88,16 +88,19 @@ export const TRIAGE_METRICS: MetricDef[] = [
   triage('hyperopic_shift', 'Near-Vision Hyperopic Shift', 'D', 'neuro', 'clinical', 'SRC-009'),
 ];
 
-/** Minute-level passive streams from the assumed sensor kit (spec 05 §4.2). */
+/**
+ * Minute-level passive streams from the assumed sensor kit (spec 05 §4.2).
+ * plausibleMin/Max are survivable extremes: deadly values pass, physically impossible ones are flagged out_of_range.
+ */
 export const PASSIVE_METRICS: MetricDef[] = [
-  { id: 'heart_rate', label: 'Heart Rate', unit: 'bpm', zone: 'cardio', kind: 'passive', plausibleMin: 25, plausibleMax: 220, sourceId: 'SRC-021' },
-  { id: 'resp_rate', label: 'Respiration Rate', unit: 'breaths/min', zone: 'cardio', kind: 'passive', plausibleMin: 4, plausibleMax: 60, sourceId: 'SRC-021' },
-  { id: 'skin_temp', label: 'Skin Temperature', unit: '°C', zone: 'immune', kind: 'passive', plausibleMin: 25, plausibleMax: 42, sourceId: 'SRC-021' },
-  { id: 'diastolic_bp', label: 'Diastolic Blood Pressure', unit: 'mmHg', zone: 'cardio', kind: 'passive', plausibleMin: 30, plausibleMax: 150, sourceId: 'SRC-075' },
+  { id: 'heart_rate', label: 'Heart Rate', unit: 'bpm', zone: 'cardio', kind: 'passive', plausibleMin: 20, plausibleMax: 300, sourceId: 'SRC-021' },
+  { id: 'resp_rate', label: 'Respiration Rate', unit: 'breaths/min', zone: 'cardio', kind: 'passive', plausibleMin: 2, plausibleMax: 80, sourceId: 'SRC-021' },
+  { id: 'skin_temp', label: 'Skin Temperature', unit: '°C', zone: 'immune', kind: 'passive', plausibleMin: 20, plausibleMax: 46.5, sourceId: 'SRC-021' },
+  { id: 'diastolic_bp', label: 'Diastolic Blood Pressure', unit: 'mmHg', zone: 'cardio', kind: 'passive', plausibleMin: 20, plausibleMax: 200, sourceId: 'SRC-075' },
   { id: 'activity', label: 'Activity', unit: 'g', zone: 'musculo', kind: 'passive', plausibleMin: 0, plausibleMax: 8, sourceId: 'SRC-023' },
   { id: 'sleep_state', label: 'Sleep State', unit: '0=awake 1=asleep', zone: 'behavioral', kind: 'passive', plausibleMin: 0, plausibleMax: 1, sourceId: 'SRC-023' },
-  { id: 'wrist_temp', label: 'Wrist Skin Temperature (overnight)', unit: '°C', zone: 'immune', kind: 'passive', plausibleMin: 25, plausibleMax: 42, sourceId: 'SRC-074' },
-  { id: 'dose_rate', label: 'Radiation Dose Rate', unit: 'µGy/h', zone: 'immune', kind: 'passive', plausibleMin: 0, plausibleMax: 10000, sourceId: 'SRC-026' },
+  { id: 'wrist_temp', label: 'Wrist Skin Temperature (overnight)', unit: '°C', zone: 'immune', kind: 'passive', plausibleMin: 20, plausibleMax: 46.5, sourceId: 'SRC-074' },
+  { id: 'dose_rate', label: 'Radiation Dose Rate', unit: 'µGy/h', zone: 'immune', kind: 'passive', plausibleMin: 0, plausibleMax: 1000000, sourceId: 'SRC-026' },
 ];
 
 export const ALL_METRICS: MetricDef[] = [...TRIAGE_METRICS, ...PASSIVE_METRICS];

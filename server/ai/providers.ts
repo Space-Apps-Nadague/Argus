@@ -5,6 +5,7 @@
  * local model, a free cloud tier, or a hosted agent gateway is configuration, not code.
  */
 
+import type { CommTier } from '../../shared/commProfile';
 import type { AiFeature, AiProviderId, AiProviderInfo } from '../../src/types/aiApi';
 
 export interface ProviderConfig {
@@ -186,12 +187,19 @@ function expand(ids: string[], env: Env): ProviderConfig[] {
 
 /**
  * Resolves the ordered provider chain for a feature.
- * Precedence: `X-AI-Key` override (tried first) → `AI_ROUTE_<FEATURE>` → `AI_PROVIDERS` → `auto`.
+ * `tier: 'autonomous'` forces the on-ship (local) provider only.
+ * Otherwise precedence: `X-AI-Key` override (tried first) → `AI_ROUTE_<FEATURE>` → `AI_PROVIDERS` → `auto`.
  */
 export function resolveProviderChain(
   env: Env,
-  options: { feature?: AiFeature; keyOverride?: string } = {}
+  options: { feature?: AiFeature; keyOverride?: string; tier?: CommTier } = {}
 ): ProviderConfig[] {
+  // Deep space / blackout: nothing may leave the ship, whatever the env or a typed key says
+  // (specs/04-ai-backend.md §4.2).
+  if (options.tier === 'autonomous') {
+    const local = buildProvider('local', env);
+    return local ? [local] : [];
+  }
   const route = options.feature
     ? parseList(env[`AI_ROUTE_${options.feature.toUpperCase()}`])
     : [];

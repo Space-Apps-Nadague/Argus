@@ -172,25 +172,36 @@ With the two-device kit (`specs/05-data-platform.md` §4) nothing needs typing:
 ### Typical Day-to-Day Variability (`METRIC_TYPICAL_SD`) & Check-In Input Ranges (`METRIC_INPUT_RANGES`)
 Both tables live in `src/utils/triageEngine.ts` next to `METRIC_THRESHOLDS`. Neither table affects triage status.
 - `METRIC_TYPICAL_SD` is the minimum standard deviation used for personal-baseline drift (§5), so a very flat baseline week does not turn tiny changes into huge σ values.
-- `METRIC_INPUT_RANGES` gives hard plausibility limits for manual check-in entry (§6). Values outside `[min, max]` are rejected as typos or sensor errors before they reach triage. Each entry also carries a one-line `how` measurement instruction for non-physician crew.
+- `METRIC_INPUT_RANGES` gives hard physiological limits. They are **survivable extremes**: a value inside can be deadly but is possible (e.g. 42 °C body temperature in heat stroke; the highest recorded survived temperature is 46.5 °C). A value outside is physically impossible for a living person (e.g. 50 °C), so it is treated as a typo or sensor fault and dropped on every data path: manual and voice check-ins are rejected ("Not physically possible"), server ingest flags it `out_of_range`, and `sanitizeZones` removes it from server and demo/mock series before triage, charts or the AI see it. Each entry also carries a one-line `how` measurement instruction for non-physician crew.
+- `LIFE_THREAT_LIMITS` (`src/utils/vitalLimits.ts`) are the acute, immediately life-threatening cut-offs that raise the full-screen alarm (specs/02-ui-dashboard.md §7). Only metrics that can kill within hours are listed:
+
+| Metric ID | Life threat at or below | Life threat at or above | Anchor |
+|---|---|---|---|
+| `core_temp` | `32.0` °C | `40.0` °C | Moderate hypothermia; heat stroke |
+| `spo2` | `85` % | — | Severe hypoxaemia |
+| `resting_hr` | `40` bpm | `150` bpm | Resting brady-/tachyarrhythmia |
+| `systolic_bp` | `80` mmHg | `180` mmHg | Shock; hypertensive crisis |
+| `blood_glucose` | `54` mg/dL | `400` mg/dL | ADA level 2 hypoglycaemia; hyperglycaemic crisis |
+| `cabin_co2` | — | `30` mmHg | NIOSH CO₂ IDLH 40,000 ppm |
+| `rad_dose` | — | `700` mGy | CDC acute radiation syndrome > 0.7 Gy |
 
 | Metric ID | Typical SD | Input min | Input max | How to measure (`how`) |
 |---|---|---|---|---|
-| `onsd` | `0.10` | `3.0` | `8.0` | Ocular ultrasound, transverse plane, 3 mm behind globe; average both eyes. |
-| `iop` | `1.0` | `5` | `40` | Rebound tonometer, seated, average of 3 readings per eye. |
-| `cabin_co2` | `0.3` | `0` | `15` | Read the nearest cabin CO₂ monitor (CDM) at crew head height. |
-| `resting_hr` | `3` | `30` | `180` | On waking, before moving: wearable or 30 s pulse count × 2. |
-| `hrv_rmssd` | `6` | `5` | `250` | Overnight RMSSD from your wearable. |
-| `spo2` | `0.7` | `70` | `100` | Finger oximeter, warm hand, still for 30 s. |
-| `systolic_bp` | `4` | `60` | `240` | Automatic: watch spot readings, seated (watch cuff-calibrated every 28 days). |
+| `onsd` | `0.10` | `2.0` | `10.0` | Ocular ultrasound, transverse plane, 3 mm behind globe; average both eyes. |
+| `iop` | `1.0` | `0` | `80` | Rebound tonometer, seated, average of 3 readings per eye. |
+| `cabin_co2` | `0.3` | `0` | `76` | Read the nearest cabin CO₂ monitor (CDM) at crew head height. |
+| `resting_hr` | `3` | `20` | `250` | On waking, before moving: wearable or 30 s pulse count × 2. |
+| `hrv_rmssd` | `6` | `1` | `300` | Overnight RMSSD from your wearable. |
+| `spo2` | `0.7` | `40` | `100` | Finger oximeter, warm hand, still for 30 s. |
+| `systolic_bp` | `4` | `40` | `300` | Automatic: watch spot readings, seated (watch cuff-calibrated every 28 days). |
 | `hydration_intake` | `0.25` | `0.3` | `8.0` | Cumulative potable water & rehydration fluid dispenser log (L/day) [SRC-081]. |
-| `bmd_delta` | `0.15` | `-5` | `3` | Monthly QCT/DXA-equivalent scan result vs previous scan (%). |
+| `bmd_delta` | `0.15` | `-10` | `5` | Monthly QCT/DXA-equivalent scan result vs previous scan (%). |
 | `ared_load` | `2.5` | `0` | `60` | Total from the ARED/resistance device log for today. |
-| `blood_glucose` | `5` | `40` | `400` | Continuous Glucose Monitor (CGM) 5-min patch; finger-prick glucometer photo backup. |
+| `blood_glucose` | `5` | `10` | `2000` | Continuous Glucose Monitor (CGM) 5-min patch; finger-prick glucometer photo backup. |
 | `caloric_intake` | `180` | `500` | `6000` | Total daily food & beverage energy from the crew nutrition log (kcal/day) [SRC-081]. |
-| `rad_dose` | `0.15` | `0` | `50` | Personal dosimeter: last 24 h reading. |
-| `wbc_lymph` | `0.2` | `0.1` | `10` | Point-of-care blood analyzer, finger-prick sample. |
-| `core_temp` | `0.15` | `34.0` | `42.0` | Automatic: estimated from overnight watch wrist temperature. |
+| `rad_dose` | `0.15` | `0` | `20000` | Personal dosimeter: last 24 h reading. |
+| `wbc_lymph` | `0.2` | `0` | `100` | Point-of-care blood analyzer, finger-prick sample. |
+| `core_temp` | `0.15` | `20.0` | `46.5` | Automatic: estimated from overnight watch wrist temperature. |
 | `sleep_eff` | `3` | `0` | `100` | Wearable sleep efficiency for last night (%). |
 | `pvt_lapses` | `0.8` | `0` | `50` | 3-minute Psychomotor Vigilance Test on the watch. |
 | `daily_sleep_hours` | `0.5` | `0` | `24` | Automatic: sleep duration from the watch. |
@@ -355,8 +366,14 @@ export interface EarthTelemetryPacket {
   visualExamAttached?: VisualExamAnalysis | null;
   recentCheckIns?: CheckInEntry[]; // Up to the 5 most recent check-ins of the active crew member (§6)
   crewNotes: string;
+  urgency?: 'routine_downlink' | 'priority_packet' | 'immediate_emergency_packet'; // absent on old packets = routine
+  kind?: 'medical' | 'behavioral' | 'emergency' | 'digest';
+  behavioralHealth?: BehavioralHealthReport | null;  // spec 04 §4.4 (src/types/assistant.ts)
+  visualObservation?: VisualObservation | null;      // on-device camera summary, spec 04 §4.3; never images
 }
 ```
+
+`VisualObservation` (camera, last 30 s): `facePresent`, `presenceRatio`, `blinkRatePerMin`, `perclos`, `yawnsPerMin`, `emotion` (`label` of neutral/happy/sad/angry/fearful/surprised/disgusted, `confidence`, per-label `scores`), `affect`, `fatigue`, `posture`, `restlessness`, `pulseBpmEstimate` + `pulseConfidence` (estimate only, never stored as a vital), `notes`. `MentalStateAssessment`: cue strengths 0–3 (low mood, stress, anxiety, sleep trouble, isolation, conflict, low motivation, hopelessness, fatigue), `mood`, `stress`, `fatigue`, `concernLevel` (none/watch/concern/urgent, set in code), `score` 0–100, `trend`, `evidence[]`, `summary`.
 
 ---
 
@@ -497,9 +514,9 @@ export interface UserAccount {
 - Passwords: argon2id on the server, at least 10 characters. The first run creates the admin (`POST /api/auth/setup`, or `npm run db:seed`).
 - Archiving a crew member keeps their accounts and history; an admin purge deletes both.
 
-## 10. Emergency Protocols (removed)
+## 10. Emergency Protocols (`src/data/emergencyProtocols.ts`)
 
-The Emergency tab, its protocol checklists (`EmergencyProtocol`, `EmergencyRun`, `src/data/emergencyProtocols.ts`) and the SOS shortcut were removed from the HUD.
+The Emergency tab and the SOS shortcut were removed (PR #66). The protocol checklists remain and run inside the ARGUS console (spec 02 §2.4): `EmergencyProtocol { id: 'fire' | 'depress' | 'toxic' | 'medical' | 'radiation' | 'co2', title, icon, trigger, steps[] }`, defined in the data file. A running protocol is the console's `EmergencyRunState` (`src/context/AssistantContext.tsx`: protocol, start time, reason, step completion times), saved per crew member. Generic training aid based on public ISS practice, not mission flight rules.
 
 ## 11. Scheduled Mission Routine & Gamification Milestones (`REQ-08`, `REQ-09`)
 
