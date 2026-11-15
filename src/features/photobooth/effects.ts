@@ -397,7 +397,9 @@ export class BoothRenderer {
     ctx.restore();
 
     if (opts.stickers.includes('float')) drawFloaties(ctx, t);
-    if (opts.stickers.includes('patch')) drawPatch(ctx, W - 92, 92, info);
+    // Keep the patch inside the frame and clear of the viewfinder corners.
+    const inset = opts.frame === 'postcard' ? 22 : opts.frame === 'polaroid' ? 30 : 0;
+    if (opts.stickers.includes('patch')) drawPatch(ctx, W - inset - 104, inset + 104, info);
     if (opts.stickers.includes('banner') && opts.frame === 'none') drawBanner(ctx, `Hi from ${info.place}!`, 28, opts.stickers.includes('stamp') ? 40 : H - 86);
     if (opts.stickers.includes('stamp')) drawStamp(ctx, info.stamp, opts.frame);
     if (opts.frame !== 'none') drawFrame(ctx, opts.frame, info);
