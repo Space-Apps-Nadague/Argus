@@ -35,7 +35,9 @@ export function usePerCrewList<T>(storageKey: string, crewId: string, max = 50):
   }, [storageKey]);
 
   const [items, setItems] = useState<T[]>(() => read()[crewId] ?? []);
-  useEffect(() => setItems(read()[crewId] ?? []), [crewId, read]);
+  useEffect(() => {
+    setItems(read()[crewId] ?? []);
+  }, [crewId, read]);
 
   const update = useCallback(
     (fn: (prev: T[]) => T[]) => {

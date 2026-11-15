@@ -153,7 +153,9 @@ export const FlightSurgeonPanel: React.FC = () => {
   const micStreamRef = useRef<MediaStream | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const speechRecRef = useRef<{ stop: () => void } | null>(null);
+  const videoStreamIntervalRef = useRef<number | null>(null);
   const [voiceDraft, setVoiceDraft] = useState('');
+  const [cameraFramesSent, setCameraFramesSent] = useState(0);
 
   useEffect(() => {
     sessionRef.current?.updateContext(doctorContext, runtimeApiKey);
@@ -162,6 +164,11 @@ export const FlightSurgeonPanel: React.FC = () => {
   useEffect(() => {
     void sessionRef.current?.syncConnectivity();
     return () => {
+      if (videoStreamIntervalRef.current !== null) {
+        window.clearInterval(videoStreamIntervalRef.current);
+        videoStreamIntervalRef.current = null;
+      }
+      sessionRef.current?.stopVideoStream();
       sessionRef.current?.interrupt();
       sessionRef.current?.disconnectWebSocket();
       if (micStreamRef.current) {
@@ -311,18 +318,91 @@ export const FlightSurgeonPanel: React.FC = () => {
     );
   }, [voiceDraft, handleRunVoiceUtterance]);
 
-  const streamCurrentCameraFrameToSurgeon = useCallback(() => {
-    if (!videoRef.current || !sessionRef.current) return;
-    const video = videoRef.current;
+  const captureVideoFrameDataUrl = (video: HTMLVideoElement): string | null => {
+    if (!video.videoWidth || !video.videoHeight || video.readyState < 2) return null;
+    // Downscale to <=480px wide at 0.65 JPEG quality so frames encode and upload in ~15 KB.
+    const maxWidth = 480;
+    const scale = Math.min(1, maxWidth / video.videoWidth);
     const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
+    canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+    canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (!ctx) return null;
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.85);
-    sessionRef.current.sendVideoFrame(jpegDataUrl);
+    return canvas.toDataURL('image/jpeg', 0.65);
+  };
+
+  const stopCameraStreamToSurgeon = useCallback(() => {
+    if (videoStreamIntervalRef.current !== null) {
+      window.clearInterval(videoStreamIntervalRef.current);
+      videoStreamIntervalRef.current = null;
+    }
+    setCameraFramesSent(0);
+    sessionRef.current?.stopVideoStream();
   }, []);
+
+  const streamCurrentCameraFrameToSurgeon = useCallback(async () => {
+    if (!videoRef.current || !sessionRef.current) return;
+    if (doctorState.isCameraStreaming) {
+      stopCameraStreamToSurgeon();
+      return;
+    }
+
+    const jpegDataUrl = captureVideoFrameDataUrl(videoRef.current);
+    if (!jpegDataUrl) {
+      setCameraError('Camera feed is still initializing — try again in a moment.');
+      return;
+    }
+    setCameraError(null);
+
+    const sendFrameAndCount = (dataUrl: string) => {
+      sessionRef.current?.sendVideoFrame(dataUrl);
+      setCameraFramesSent((n) => n + 1);
+    };
+
+    const runFrameTriageTurn = async (dataUrl: string) => {
+      const s = sessionRef.current;
+      if (!s) return;
+      const st = s.getState().stage;
+      if (st === 'thinking_llm' || st === 'speaking_tts') return;
+      const cleanBase64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
+      await s.runVoiceTurn({
+        imageBase64: cleanBase64,
+        imageMimeType: 'image/jpeg',
+        fallbackTranscript: 'Inspect the live camera frame I am streaming for any visible health or ocular findings.',
+      });
+    };
+
+    sendFrameAndCount(jpegDataUrl);
+
+    if (videoStreamIntervalRef.current === null) {
+      let tick = 0;
+      videoStreamIntervalRef.current = window.setInterval(() => {
+        if (!videoRef.current || !sessionRef.current) return;
+        const frame = captureVideoFrameDataUrl(videoRef.current);
+        if (!frame) return;
+        tick += 1;
+        const state = sessionRef.current.getState();
+        if (state.mode === 'live-api') {
+          sendFrameAndCount(frame);
+        } else if (tick % 4 === 0 && state.stage === 'idle') {
+          // In on-ship-pipeline mode, send a fresh visual-triage turn every ~6s when idle.
+          sendFrameAndCount(frame);
+          void runFrameTriageTurn(frame);
+        }
+      }, 1500);
+    }
+
+    if (!doctorState.isConnected && !doctorState.manualOfflineOverride) {
+      await sessionRef.current.connectLiveWebSocket();
+      const latestFrame = videoRef.current ? captureVideoFrameDataUrl(videoRef.current) : null;
+      if (latestFrame && sessionRef.current.getState().mode === 'live-api') {
+        sendFrameAndCount(latestFrame);
+      }
+    }
+
+    await runFrameTriageTurn(jpegDataUrl);
+  }, [doctorState.isCameraStreaming, doctorState.isConnected, doctorState.manualOfflineOverride, stopCameraStreamToSurgeon]);
 
   // Symptom Q&A input state
   const [symptomInput, setSymptomInput] = useState(crewSymptoms);
@@ -379,6 +459,7 @@ export const FlightSurgeonPanel: React.FC = () => {
   }, [isCameraActive]);
 
   const stopCamera = () => {
+    stopCameraStreamToSurgeon();
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
@@ -653,14 +734,21 @@ export const FlightSurgeonPanel: React.FC = () => {
                 if (!isCameraActive) {
                   await startCamera();
                 } else {
-                  streamCurrentCameraFrameToSurgeon();
+                  await streamCurrentCameraFrameToSurgeon();
                 }
               }}
-              className="hud-btn text-xs"
-              title="Stream live camera frame to the Voice Flight Surgeon for visual triage"
+              aria-pressed={doctorState.isCameraStreaming}
+              className={`hud-btn text-xs ${
+                doctorState.isCameraStreaming ? 'border-hud-accent/70 bg-hud-accent/15 text-hud-accent' : ''
+              }`}
+              title="Stream live camera frames to the Voice Flight Surgeon for visual triage"
             >
               <Video className="h-3.5 w-3.5 text-hud-accent" aria-hidden="true" />
-              {isCameraActive ? 'Send Camera Frame' : 'Video Consult'}
+              {!isCameraActive
+                ? 'Video Consult'
+                : doctorState.isCameraStreaming
+                  ? 'Stop Video Stream'
+                  : 'Stream Camera'}
             </button>
 
             <span className="ml-auto flex items-center gap-1 font-mono text-[11px] text-hud-muted">
@@ -1007,22 +1095,69 @@ export const FlightSurgeonPanel: React.FC = () => {
                   className="h-full w-full object-cover"
                   aria-label="Live webcam viewfinder"
                 />
-                <div className="absolute top-2 left-2 flex items-center gap-1.5 rounded-full bg-slate-950/80 px-2 py-0.5 text-[10px] font-mono text-status-green">
-                  <span className="h-1.5 w-1.5 rounded-full bg-status-green animate-pulse" />
-                  LIVE OPTICAL FEED
+                <div className="absolute top-2 left-2 flex flex-wrap items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 rounded-full bg-slate-950/80 px-2 py-0.5 text-[10px] font-mono text-status-green">
+                    <span className="h-1.5 w-1.5 rounded-full bg-status-green animate-pulse" />
+                    LIVE OPTICAL FEED
+                  </div>
+                  {doctorState.isCameraStreaming && (
+                    <div
+                      role="status"
+                      className="flex items-center gap-1.5 rounded-full border border-hud-accent/60 bg-slate-950/85 px-2 py-0.5 text-[10px] font-mono text-hud-accent"
+                    >
+                      <span className="h-1.5 w-1.5 rounded-full bg-hud-accent animate-pulse" />
+                      {doctorState.stage === 'thinking_llm'
+                        ? 'SURGEON ANALYZING…'
+                        : doctorState.stage === 'speaking_tts'
+                          ? 'SURGEON SPEAKING'
+                          : `STREAMING (${cameraFramesSent} ${cameraFramesSent === 1 ? 'FRAME' : 'FRAMES'})`}
+                    </div>
+                  )}
                 </div>
               </div>
+              {doctorState.isCameraStreaming && (
+                <div
+                  role="status"
+                  className="rounded-md border border-hud-line bg-hud-panel/80 px-2.5 py-2 text-xs text-hud-text"
+                >
+                  <div className="flex items-center justify-between gap-2 font-mono text-[10px] text-hud-muted">
+                    <span>
+                      TRANSPORT: {doctorState.mode === 'live-api' ? 'GEMINI LIVE WS' : 'ON-SHIP PIPELINE'}
+                    </span>
+                    <span>
+                      {doctorState.stage === 'thinking_llm'
+                        ? 'Analyzing frame…'
+                        : doctorState.stage === 'speaking_tts'
+                          ? 'Speaking response…'
+                          : `${cameraFramesSent} frame${cameraFramesSent === 1 ? '' : 's'} sent`}
+                    </span>
+                  </div>
+                  {doctorState.lastReplyText && (
+                    <p className="mt-1 text-xs leading-relaxed text-hud-text">
+                      <span className="font-semibold text-hud-accent">Surgeon: </span>
+                      {doctorState.lastReplyText}
+                    </p>
+                  )}
+                </div>
+              )}
               <div className="flex flex-wrap items-center justify-end gap-2">
                 <button type="button" onClick={stopCamera} className="hud-btn">
                   Cancel
                 </button>
                 <button
                   type="button"
-                  onClick={streamCurrentCameraFrameToSurgeon}
-                  className="hud-btn text-hud-accent hover:text-white"
+                  onClick={() => {
+                    void streamCurrentCameraFrameToSurgeon();
+                  }}
+                  aria-pressed={doctorState.isCameraStreaming}
+                  className={`hud-btn ${
+                    doctorState.isCameraStreaming
+                      ? 'border-hud-accent/70 bg-hud-accent/15 text-hud-accent hover:text-white'
+                      : 'text-hud-accent hover:text-white'
+                  }`}
                 >
                   <Video className="h-3.5 w-3.5" aria-hidden="true" />
-                  Stream to Voice Surgeon
+                  {doctorState.isCameraStreaming ? 'Stop Streaming' : 'Stream to Voice Surgeon'}
                 </button>
                 <button type="button" onClick={captureSnapshot} className="hud-btn-primary">
                   <Camera className="h-3.5 w-3.5" aria-hidden="true" />

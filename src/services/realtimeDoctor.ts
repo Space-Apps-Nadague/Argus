@@ -1000,21 +1000,23 @@ export class RealtimeDoctorSession {
     });
 
     let transcript = input.fallbackTranscript?.trim() || '';
-    try {
-      const sttRes = await this.api.voiceStt(
-        {
-          ...this.context,
-          audioBase64: input.audioBase64,
-          mimeType: input.audioMimeType,
-          fallbackTranscript: transcript || undefined,
-          mode: activeMode,
-        },
-        this.runtimeApiKey
-      );
-      transcript = sttRes.result.transcript;
-    } catch {
-      if (!transcript) {
-        transcript = 'Check my current readiness and zone vitals.';
+    if (input.audioBase64 || !transcript) {
+      try {
+        const sttRes = await this.api.voiceStt(
+          {
+            ...this.context,
+            audioBase64: input.audioBase64,
+            mimeType: input.audioMimeType,
+            fallbackTranscript: transcript || undefined,
+            mode: activeMode,
+          },
+          this.runtimeApiKey
+        );
+        transcript = sttRes.result.transcript;
+      } catch {
+        if (!transcript) {
+          transcript = 'Check my current readiness and zone vitals.';
+        }
       }
     }
 

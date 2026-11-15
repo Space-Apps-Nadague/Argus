@@ -515,15 +515,6 @@ voiceRoutes.post('/live-token', async (c) => {
           uses: 1,
           expireTime,
           newSessionExpireTime,
-          liveConnectConstraints: {
-            model: `models/${liveModel}`,
-            config: {
-              sessionResumption: {},
-              responseModalities: ['AUDIO'],
-              inputAudioTranscription: { mode: 'smart' },
-              outputAudioTranscription: {},
-            },
-          },
         }),
         signal: AbortSignal.timeout(8000),
       });
@@ -561,6 +552,9 @@ voiceRoutes.post('/live-token', async (c) => {
           };
           return c.json(envelope);
         }
+      } else {
+        const errText = await res.text().catch(() => '');
+        console.warn(`[ARGUS Voice] Ephemeral token request failed (${res.status}) — routing to on-ship pipeline:`, errText);
       }
     } catch (err) {
       console.warn('[ARGUS Voice] Ephemeral token provisioning failed — routing to on-ship pipeline:', err);
