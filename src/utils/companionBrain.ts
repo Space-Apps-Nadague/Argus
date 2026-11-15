@@ -174,6 +174,22 @@ const METRIC_MATCH_DEFS: MetricMatchDef[] = [
     clinicalAction: 'Review dietary log, timing of post-exercise carbohydrate intake, and scheduled fingerstick glucometry.',
   },
   {
+    metricId: 'caloric_intake',
+    regex: /\b(calor(?:ic|ies)|nutrition|food\s*intake|energy\s*intake|diet|meal)\b/i,
+    label: 'Daily Caloric Intake',
+    nasaMechanism:
+      'In-flight underconsumption driven by flavor fatigue, workload, or hypercapnia compromises lean muscle mass, bone remodeling, and ARED exercise recovery.',
+    clinicalAction: 'Target 2200–3200 kcal/day (2400–3400 kcal/day on Lunar/Mars EVA days) and supplement with high-protein meal bars if below nominal.',
+  },
+  {
+    metricId: 'hydration_intake',
+    regex: /\b(hydrat(?:ion|ed)|water\s*intake|fluid\s*intake|dehydrat(?:ion|ed)|thirst)\b/i,
+    label: 'Daily Hydration Intake',
+    nasaMechanism:
+      'Microgravity fluid shifts blunt thirst perception while elevated urinary calcium from bone unloading increases renal stone risk if daily water drops below 2.5 L/day.',
+    clinicalAction: 'Maintain ≥ 2.5 L/day potable water & rehydration fluids (≥ 2.7 L/day on Lunar/Mars EVA days) via scheduled galley dispenser boluses.',
+  },
+  {
     metricId: 'rad_dose',
     regex: /\b(rad\s*dose|radiation\s*dose|dosimeter|daily\s*dose)\b/i,
     label: 'Daily Radiation Dose',

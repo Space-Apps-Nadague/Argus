@@ -5,7 +5,7 @@
  *               vector  = cosine over chunk embeddings cached in process
  *  memory mode: (no database, or the knowledge base is not ingested yet)
  *               keyword = BM25 over the committed corpus; vector = hash embeddings
- *  fusion:      Reciprocal Rank Fusion, k = 60 (Source: SRC-082)
+ *  fusion:      Reciprocal Rank Fusion, k = 60 (Source: SRC-088)
  *
  * Never throws for a bad embedder: vector scoring is skipped and keyword results are returned.
  */

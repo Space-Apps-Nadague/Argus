@@ -78,8 +78,8 @@ Columns:
 |---|---|---|---|---|
 | SRC-070 | [AHA: Understanding Blood Pressure Readings](https://www.heart.org/en/health-topics/high-blood-pressure/understanding-blood-pressure-readings) (2017 ACC/AHA categories) | standard | open | `src/utils/triageEngine.ts` (`bp_sys`, `bp_dia` bands), `specs/01-data-schema.md` §2 |
 | SRC-071 | [AHA: Low Blood Pressure](https://www.heart.org/en/health-topics/high-blood-pressure/the-facts-about-high-blood-pressure/low-blood-pressure-when-blood-pressure-is-too-low) (hypotension < 90/60) | standard | open | `src/utils/triageEngine.ts` (`bp_sys`, `bp_dia` lower bands) |
-| SRC-072 | [ADA Standards of Care 2023, §2 Classification and Diagnosis](https://diabetesjournals.org/care/article/46/Supplement_1/S19/148056/) (fasting glucose 100–125 / ≥126 mg/dL) | standard | open | `src/utils/triageEngine.ts` (`glucose` bands), `server/db/catalog.ts` |
-| SRC-073 | [ADA Standards of Care 2026, §16 Diabetes Care in the Hospital](https://diabetesjournals.org/care/article/49/Supplement_1/S339/163925/16-Diabetes-Care-in-the-Hospital-Standards-of-Care) (hypoglycemia level 1 54–69, level 2 < 54 mg/dL) | standard | open | `src/utils/triageEngine.ts` (`glucose` lower bands) |
+| SRC-072 | [ADA Standards of Care 2023, §2 Classification and Diagnosis](https://diabetesjournals.org/care/article/46/Supplement_1/S19/148056/) (fasting glucose 100–125 / ≥126 mg/dL) | standard | open | `src/utils/triageEngine.ts` (`glucose` bands), `server/db/catalog.ts`, `src/data/cgmMockData.ts`, `specs/01-data-schema.md` §3 |
+| SRC-073 | [ADA Standards of Care 2026, §16 Diabetes Care in the Hospital](https://diabetesjournals.org/care/article/49/Supplement_1/S339/163925/16-Diabetes-Care-in-the-Hospital-Standards-of-Care) (hypoglycemia level 1 54–69, level 2 < 54 mg/dL) | standard | open | `src/utils/triageEngine.ts` (`glucose` lower bands), `src/data/cgmMockData.ts`, `specs/01-data-schema.md` §3 |
 | SRC-074 | [Apple Watch User Guide: Track your vitals](https://support.apple.com/guide/watch/apd15aa7ed96/watchos) (overnight heart rate, breathing rate, wrist temperature vs baseline, SpO₂, sleep) | web | open | `server/db/catalog.ts`, `server/ingest/simulator.ts` (watch overnight vitals, `wrist_temp_dev`) |
 | SRC-075 | [Samsung: Recalibrating Galaxy Watch blood pressure](https://www.samsung.com/uk/support/apps-services/how-do-i-recalibrate-the-galaxy-watch/) (cuff calibration, recalibrate every 28 days) | web | open | `server/db/catalog.ts`, `server/ingest/simulator.ts` (watch blood pressure), `specs/05-data-platform.md` §4 |
 | SRC-076 | [FDA: Do not use smartwatches or smart rings to measure blood glucose](https://www.fda.gov/medical-devices/safety-communications/do-not-use-smartwatches-or-smart-rings-measure-blood-glucose-levels-fda-safety-communication) (2024) | standard | open | `specs/05-data-platform.md` §4 (why glucose is not from the watch) |
@@ -92,16 +92,18 @@ Columns:
 | ID | Source | Type | Access | Used in |
 |---|---|---|---|---|
 | SRC-080 | [US NRC: Backgrounder on Biological Effects of Radiation](https://www.nrc.gov/reading-rm/doc-collections/fact-sheets/bio-effects-radiation) (natural background ≈ 3.1 mSv/yr in the US) | standard | open | `server/ingest/simulator.ts` (Earth pre-flight `rad_dose`), `specs/05-data-platform.md` §5.2 |
+| SRC-081 | [NASA-STD-3001 Vol 2 Rev D: Human Factors, Habitability, and Environmental Health](https://standards.nasa.gov/standard/NASA/NASA-STD-3001-VOL-2) (EER caloric equations, +200 kcal/hr EVA, 2.5 L/day baseline potable water) | standard | open | `specs/01-data-schema.md` §2, `src/utils/triageEngine.ts` (`caloric_intake`, `hydration_intake`), `server/db/catalog.ts` |
+| SRC-082 | [NASA HRP Risk of Inadequate Food and Nutrition](https://humanresearchroadmap.nasa.gov/Risks/risk.aspx?i=93) (spaceflight energy balance, flavor fatigue, hypohydration & renal stone risk) | web | open | `specs/01-data-schema.md` §2, `src/utils/triageEngine.ts`, `src/data/telemetryScenarios.ts` |
 
 ## AI knowledge base (RAG)
 
 | ID | Source | Type | Access | Used in |
 |---|---|---|---|---|
-| SRC-081 | [Robertson & Zaragoza 2009, The Probabilistic Relevance Framework: BM25 and Beyond](https://doi.org/10.1561/1500000019) (k1 = 1.2, b = 0.75) | paper | open | `server/rag/memoryIndex.ts` (BM25), `specs/05-data-platform.md` §3.6 |
-| SRC-082 | [Cormack, Clarke & Büttcher 2009, Reciprocal Rank Fusion](https://doi.org/10.1145/1571941.1572114) (k = 60) | paper | open | `server/rag/retriever.ts` (fusion), `specs/05-data-platform.md` §3.6 |
 | SRC-083 | [Weinberger et al. 2009, Feature Hashing for Large Scale Multitask Learning](https://arxiv.org/abs/0902.2206) | paper | open | `server/rag/embeddings.ts` (offline `hash` embedder), `specs/05-data-platform.md` §3.6 |
 | SRC-084 | [PostgreSQL: Controlling Text Search (`ts_rank_cd`)](https://www.postgresql.org/docs/current/textsearch-controls.html) | standard | open | `server/db/schema.ts` (`rag_chunks.search_tsv`), `server/rag/retriever.ts`, `specs/05-data-platform.md` §3.6 |
 | SRC-085 | [Ollama OpenAI compatibility (`/v1/embeddings`)](https://docs.ollama.com/openai) (`nomic-embed-text`) | api | open | `server/rag/embeddings.ts` (`local` embedder), `specs/05-data-platform.md` §3.6 |
 | SRC-086 | [Gemini API: Embeddings (`gemini-embedding-001`)](https://ai.google.dev/gemini-api/docs/embeddings) | api | open | `server/rag/embeddings.ts` (`gemini` embedder), `specs/05-data-platform.md` §3.6 |
+| SRC-087 | [Robertson & Zaragoza 2009, The Probabilistic Relevance Framework: BM25 and Beyond](https://doi.org/10.1561/1500000019) (k1 = 1.2, b = 0.75) | paper | open | `server/rag/memoryIndex.ts` (BM25), `specs/05-data-platform.md` §3.6 |
+| SRC-088 | [Cormack, Clarke & Büttcher 2009, Reciprocal Rank Fusion](https://doi.org/10.1145/1571941.1572114) (k = 60) | paper | open | `server/rag/retriever.ts` (fusion), `specs/05-data-platform.md` §3.6 |
 
 

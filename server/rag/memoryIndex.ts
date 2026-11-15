@@ -7,7 +7,7 @@ import { cosine } from './embeddings';
 import { tokenize } from './text';
 import type { IndexedChunk } from './types';
 
-// Source: SRC-081 (Robertson & Zaragoza 2009, BM25 default parameters)
+// Source: SRC-087 (Robertson & Zaragoza 2009, BM25 default parameters)
 const K1 = 1.2;
 const B = 0.75;
 

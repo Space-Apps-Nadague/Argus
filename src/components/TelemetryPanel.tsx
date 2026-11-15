@@ -9,7 +9,7 @@
  * - Triggers Flight Surgeon guidance synthesis
  */
 
-import React, { useId, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Area,
   CartesianGrid,
@@ -22,30 +22,16 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import {
-  Activity,
-  AlertTriangle,
-  CheckCircle2,
-  ChevronDown,
-  ChevronUp,
-  LineChart,
-  PlusCircle,
-  Sparkles,
-} from 'lucide-react';
+import { LineChart } from 'lucide-react';
 import { useMission } from '../context/MissionContext';
-import { BodyZoneId, MetricId, TriageStatus, VitalSignReading } from '../types/argus';
 import { ZONE_ORDER } from '../data/telemetryScenarios';
 import { computeDrift, forecastMetric, formatSigma } from '../utils/driftAnalytics';
 import {
   evaluateMetricStatus,
-  formatFlightNormBadge,
   getMetricThreshold,
-  isMetricId,
-  METRIC_INPUT_RANGES,
   STATUS_COLORS,
 } from '../utils/triageEngine';
-import { validateCheckInValue } from '../utils/checkIns';
-import { InfoTip } from './InfoTip';
+import { VitalLoggerModal } from './VitalLoggerModal';
 import { Card } from './ui/Card';
 import { StatusIcon, STATUS_WORD } from './ui/StatusPill';
 import { ZoneIcon, ZONE_SHORT_NAME } from './ui/ZoneIcon';
@@ -80,11 +66,10 @@ export interface TelemetryPanelProps {
 
 export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
   className = '',
-  defaultLoggerOpen = true,
+  defaultLoggerOpen = false,
   showChart = true,
 }) => {
   const {
-    zones,
     zoneStatuses,
     selectedZone,
     setSelectedZone,
@@ -94,56 +79,14 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
     chartWindowDays,
     setChartWindowDays,
     environment,
-    activeCrewMember,
-    logVitalReading,
-    isSynthesizingAi,
-    latestDay,
   } = useMission();
 
-  const formId = useId();
   const [isLoggerOpen, setIsLoggerOpen] = useState(defaultLoggerOpen);
-  const [logZone, setLogZone] = useState<BodyZoneId>(selectedZone);
-  const [logMetricKey, setLogMetricKey] = useState<string>(selectedMetricId);
-  const [logValueStr, setLogValueStr] = useState<string>('');
-  const [logStatusMessage, setLogStatusMessage] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Sync logZone and logMetricKey when selectedZone / selectedMetricId change from outside
-  React.useEffect(() => {
-    setLogZone(selectedZone);
-  }, [selectedZone]);
-
-  React.useEffect(() => {
-    setLogMetricKey(selectedMetricId);
-  }, [selectedMetricId]);
-
-  const zoneReadingsForLog = zones[logZone] || currentZoneReadings;
 
   // Selected metric reading for display in chart
   const reading =
     currentZoneReadings.find((r) => r.metricId === selectedMetricId) ||
     currentZoneReadings[0];
-
-  const targetReadingForLog =
-    zoneReadingsForLog.find((r) => r.metricId === logMetricKey) ||
-    zoneReadingsForLog[0];
-
-  const logMetricId = (targetReadingForLog?.metricId ?? 'systolic_bp') as MetricId;
-  const logMetricUnit = targetReadingForLog?.unit ?? '';
-  const logThreshold = getMetricThreshold(logMetricId, environment);
-  const logInputRange = METRIC_INPUT_RANGES[logMetricId] ?? { min: 0, max: 999, how: 'Standard sensor measurement' };
-
-  // Validation of input
-  const validation = useMemo(
-    () => validateCheckInValue(logMetricId, logValueStr),
-    [logMetricId, logValueStr]
-  );
-
-  // Real-time preview of triage status for entered value
-  const previewStatus: TriageStatus | null = useMemo(() => {
-    if (validation.ok !== true) return null;
-    return evaluateMetricStatus(logMetricId, validation.value, environment);
-  }, [validation, logMetricId, environment]);
 
   const drift = computeDrift(reading.metricId, reading.history);
   const forecast = forecastMetric(reading.metricId, reading.history);
@@ -193,41 +136,6 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
 
   const f3 = forecast?.[forecast.length - 1];
 
-  // Quick preset helper
-  const applyPreset = (preset: 'nominal' | 'yellow' | 'red') => {
-    let val: number;
-    if (preset === 'nominal') {
-      val = Number(((logThreshold.nominalMin + logThreshold.nominalMax) / 2).toFixed(1));
-    } else if (preset === 'yellow') {
-      val = Number((logThreshold.yellowMax - 0.1).toFixed(1));
-    } else {
-      val = Number((logThreshold.yellowMax + (logThreshold.yellowMax - logThreshold.nominalMax) * 0.5 + 1).toFixed(1));
-    }
-    setLogValueStr(String(val));
-  };
-
-  const handleLogSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (validation.ok !== true) return;
-    setIsSubmitting(true);
-    setLogStatusMessage(null);
-
-    const val = validation.value;
-    try {
-      await logVitalReading(logZone, logMetricId, val);
-      const computedStatus = evaluateMetricStatus(logMetricId, val, environment);
-      setLogStatusMessage(
-        `Logged ${val} ${logMetricUnit} to MD-${latestDay || 30} for ${activeCrewMember.callsign} (${STATUS_WORD[computedStatus].toUpperCase()}). Bio-Twin & AI guidance updated.`
-      );
-      setLogValueStr('');
-    } catch (err) {
-      console.error('Failed to log vital reading:', err);
-      setLogStatusMessage('Error logging vital reading. Please retry.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   return (
     <div className={`space-y-4 ${className} min-w-0`}>
       {/* Zone + metric pickers */}
@@ -244,7 +152,6 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
               aria-pressed={z === selectedZone}
               onClick={() => {
                 setSelectedZone(z);
-                setLogZone(z);
               }}
               className={`hud-focus flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition-colors ${
                 z === selectedZone
@@ -275,7 +182,6 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
                   aria-pressed={sel}
                   onClick={() => {
                     setSelectedMetricId(r.metricId);
-                    setLogMetricKey(r.metricId);
                   }}
                   className={`hud-focus hud-tile flex items-center gap-2 px-3 py-2 text-left ${
                     sel ? 'hud-tile-selected' : ''
@@ -298,10 +204,23 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
             })}
           </div>
 
+          <button
+            type="button"
+            onClick={() => setIsLoggerOpen(true)}
+            className="hud-focus shrink-0 rounded-lg border border-hud-accent/40 bg-hud-accent/10 px-3 py-1.5 text-xs font-mono text-hud-accent hover:bg-hud-accent/20 transition-colors"
+            title="Log a manual vital reading"
+          >
+            + Log Vital
+          </button>
         </div>
       </div>
 
-      {/* Manual vital logging was removed: readings arrive from the watch, dosimeter, equipment, exams and the glucometer photo (specs/05-data-platform.md §4). */}
+      <VitalLoggerModal
+        isOpen={isLoggerOpen}
+        onClose={() => setIsLoggerOpen(false)}
+        initialZone={selectedZone}
+        initialMetricId={reading.metricId}
+      />
 
       {/* Main Longitudinal Trend Chart */}
       {showChart && (

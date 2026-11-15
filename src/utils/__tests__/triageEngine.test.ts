@@ -215,11 +215,11 @@ describe('ARGUS Deterministic Triage Engine (specs/01-data-schema.md)', () => {
       expect(evaluateMetricStatus('mood_index', 2.0, '0g_transit')).toBe('red');
     });
 
-    it('contains all 17 canonical metrics across scenarios with 30-day longitudinal series', () => {
+    it('contains all 19 canonical metrics across scenarios with 30-day longitudinal series', () => {
       const expectedMetrics = [
         'onsd', 'iop', 'cabin_co2',
-        'resting_hr', 'hrv_rmssd', 'spo2', 'systolic_bp',
-        'bmd_delta', 'ared_load', 'blood_glucose',
+        'resting_hr', 'hrv_rmssd', 'spo2', 'systolic_bp', 'hydration_intake',
+        'bmd_delta', 'ared_load', 'blood_glucose', 'caloric_intake',
         'rad_dose', 'wbc_lymph', 'core_temp',
         'sleep_eff', 'pvt_lapses', 'daily_sleep_hours', 'mood_index',
       ];
@@ -232,6 +232,64 @@ describe('ARGUS Deterministic Triage Engine (specs/01-data-schema.md)', () => {
           expect(scenarioMetricIds).toContain(expectedId);
         }
       }
+    });
+
+    it('evaluates caloric_intake (musculo) thresholds across environments (REQ-06)', () => {
+      // 0g_transit & iss_leo: Nominal 2200–3200, Yellow 1800–3600
+      expect(evaluateMetricStatus('caloric_intake', 2680, '0g_transit')).toBe('green');
+      expect(evaluateMetricStatus('caloric_intake', 2200, 'iss_leo')).toBe('green');
+      expect(evaluateMetricStatus('caloric_intake', 2050, '0g_transit')).toBe('yellow');
+      expect(evaluateMetricStatus('caloric_intake', 1750, '0g_transit')).toBe('red');
+      expect(evaluateMetricStatus('caloric_intake', 3700, '0g_transit')).toBe('red');
+
+      // lunar_base & mars_base (surface EVA +200 kcal/hr): Nominal 2400–3400, Yellow 2000–3800
+      expect(evaluateMetricStatus('caloric_intake', 2200, 'lunar_base')).toBe('yellow');
+      expect(evaluateMetricStatus('caloric_intake', 2600, 'mars_base')).toBe('green');
+      expect(evaluateMetricStatus('caloric_intake', 1950, 'mars_base')).toBe('red');
+
+      // earth_1g: Nominal 2000–3000, Yellow 1600–3400
+      expect(evaluateMetricStatus('caloric_intake', 2100, 'earth_1g')).toBe('green');
+      expect(evaluateMetricStatus('caloric_intake', 1750, 'earth_1g')).toBe('yellow');
+    });
+
+    it('evaluates hydration_intake (cardio) thresholds across environments (REQ-06)', () => {
+      // 0g_transit & iss_leo: Nominal 2.5–3.8, Yellow 2.0–4.5
+      expect(evaluateMetricStatus('hydration_intake', 2.9, '0g_transit')).toBe('green');
+      expect(evaluateMetricStatus('hydration_intake', 2.5, 'iss_leo')).toBe('green');
+      expect(evaluateMetricStatus('hydration_intake', 2.2, '0g_transit')).toBe('yellow');
+      expect(evaluateMetricStatus('hydration_intake', 1.8, '0g_transit')).toBe('red');
+      expect(evaluateMetricStatus('hydration_intake', 4.7, '0g_transit')).toBe('red');
+
+      // lunar_base & mars_base (surface EVA): Nominal 2.7–4.0, Yellow 2.2–4.8
+      expect(evaluateMetricStatus('hydration_intake', 2.5, 'lunar_base')).toBe('yellow');
+      expect(evaluateMetricStatus('hydration_intake', 3.1, 'mars_base')).toBe('green');
+      expect(evaluateMetricStatus('hydration_intake', 2.1, 'mars_base')).toBe('red');
+
+      // earth_1g: Nominal 2.2–3.5, Yellow 1.8–4.2
+      expect(evaluateMetricStatus('hydration_intake', 2.3, 'earth_1g')).toBe('green');
+      expect(evaluateMetricStatus('hydration_intake', 1.9, 'earth_1g')).toBe('yellow');
+    });
+
+    it('provides 30-day series and offline guidance steps for nutrition & hydration', () => {
+      const nominalCal = TELEMETRY_SCENARIOS.nominal.zones.musculo.find(
+        (r) => r.metricId === 'caloric_intake'
+      );
+      const nominalHyd = TELEMETRY_SCENARIOS.nominal.zones.cardio.find(
+        (r) => r.metricId === 'hydration_intake'
+      );
+      expect(nominalCal?.history).toHaveLength(30);
+      expect(nominalHyd?.history).toHaveLength(30);
+
+      const highCo2Cal = TELEMETRY_SCENARIOS.high_co2.zones.musculo.find(
+        (r) => r.metricId === 'caloric_intake'
+      );
+      expect(evaluateMetricStatus('caloric_intake', highCo2Cal!.currentValue, '0g_transit')).toBe('yellow');
+
+      const musculoGuidance = getOfflineFlightSurgeonGuidance('nominal', 'musculo', '0g_transit');
+      expect(musculoGuidance.guidedSteps.some((s) => /caloric/i.test(s.title))).toBe(true);
+
+      const cardioGuidance = getOfflineFlightSurgeonGuidance('nominal', 'cardio', '0g_transit');
+      expect(cardioGuidance.guidedSteps.some((s) => /hydration|water/i.test(s.title))).toBe(true);
     });
   });
 

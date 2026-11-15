@@ -40,6 +40,7 @@ export const deviceKind = pgEnum('device_kind', [
   'ring', // retired kit
   'core_temp_patch', // retired kit
   'dosimeter',
+  'cgm',
   'manual',
   'smartwatch',
   'habitat_sensor',
