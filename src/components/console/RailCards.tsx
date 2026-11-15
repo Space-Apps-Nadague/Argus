@@ -204,7 +204,7 @@ export const EmergencyCard: React.FC = () => {
         }
       >
         <p className="mb-2 text-xs text-red-100">
-          <strong>Act first.</strong> Say &ldquo;done&rdquo; after each step, or tick it. Earth is {tier.oneWaySec < 1 ? 'in real time' : `${Math.round(tier.oneWaySec)} s away`}.
+          <strong>Act first.</strong> Say &ldquo;done&rdquo; after each step, or tick it. Earth is {tier.oneWaySec < 1 ? 'in real time' : tier.oneWaySec >= 90 ? `${Math.round(tier.oneWaySec / 60)} min away` : `${Math.round(tier.oneWaySec)} s away`}, so you lead this.
         </p>
         <ol className="space-y-1">
           {emergency.steps.map((step, i) => {
@@ -386,7 +386,10 @@ export const WellbeingCard: React.FC = () => {
           </div>
         ))}
       </dl>
-      <p className="mt-2 text-sm text-hud-text">{assessment.summary}</p>
+      <p className="mt-2 text-sm text-hud-text">
+        <span className="text-[11px] uppercase tracking-wider text-hud-muted">Note for your doctors · </span>
+        {assessment.summary}
+      </p>
       {topCues.length > 0 && (
         <ul className="mt-2 flex flex-wrap gap-1">
           {topCues.map((id) => (

@@ -57,7 +57,8 @@ SAFETY
 
 ACTIONS
 - You can act in their console with tools: log a reading they tell you, start an emergency protocol, tick off a step they say they finished, lay out steps to follow, suggest a countermeasure card, ask for a closer camera look, and send a report to Earth.
-- Use a tool whenever it does what they asked or what they need, and say in a few words that you did it. Do not ask permission for things they just asked for.`;
+- Use a tool whenever it does what they asked or what they need, and say in a few words that you did it. Do not ask permission for things they just asked for.
+- Never say tool names, ids or internal labels (like protocol ids or packet urgency codes). Say it in plain words: "I've opened the medical emergency checklist", "I've sent an urgent report to the doctors on Earth".`;
 
 export interface AssistantPromptParts {
   tier: 'live' | 'relay' | 'autonomous';
@@ -108,7 +109,7 @@ export function buildAssistantPrompt(p: AssistantPromptParts): string {
     p.mentalState ? `HOW THEY SEEM TO BE DOING (screening, not a diagnosis)\n${p.mentalState}` : '',
     p.observation ? `WHAT THE CAMERA SHOWS (on-device estimates)\n${p.observation}` : '',
     p.guidedSteps ? `STEPS ON THEIR SCREEN\n${p.guidedSteps}` : '',
-    p.countermeasures ? `ALREADY SUGGESTED THIS SESSION\n${p.countermeasures}` : '',
+    p.countermeasures ? `THINGS TO TRY\n${p.countermeasures}` : '',
     `THEIR CHART\n${p.data}`,
   ]
     .filter(Boolean)

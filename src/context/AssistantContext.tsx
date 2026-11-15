@@ -399,9 +399,19 @@ export const AssistantProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [voices, setVoices] = useState<VoicesResponse | null>(null);
   useEffect(() => {
     let alive = true;
-    void assistantApi.voices(runtimeApiKey).then((v) => alive && setVoices(v));
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    // Retry until the server answers (it may be starting up or restarting).
+    const load = (delay: number) => {
+      void assistantApi.voices(runtimeApiKey).then((v) => {
+        if (!alive) return;
+        if (v) setVoices(v);
+        else timer = setTimeout(() => load(Math.min(delay * 2, 30_000)), delay);
+      });
+    };
+    load(2000);
     return () => {
       alive = false;
+      if (timer) clearTimeout(timer);
     };
   }, [runtimeApiKey]);
 
@@ -583,7 +593,7 @@ export const AssistantProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         kind,
         behavioralHealth: buildBehavioral(crewNote),
         visualObservation: observationRef.current,
-        crewNotes: [note, crewNote].filter(Boolean).join('\n\n'),
+        crewNotes: [...new Set([note, crewNote].filter(Boolean))].join('\n\n'),
       };
       const summary = note.slice(0, 1200);
       const t = tierRef.current;

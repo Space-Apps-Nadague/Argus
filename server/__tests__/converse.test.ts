@@ -214,3 +214,50 @@ describe('assistant prompt', () => {
     expect(buildAssistantPrompt({ ...base, tier: 'autonomous', earthRoundTrip: '25 minutes' })).toMatch(/only clinician.*|about 25 minutes/s);
   });
 });
+
+describe('live-tier endpoints (offline)', () => {
+  const postJson = async (path: string, body: Record<string, unknown>) => {
+    const res = await app.request(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scenarioId: 'nominal', crewMember, ...body }) });
+    return { status: res.status, body: (await res.json()) as Record<string, unknown> };
+  };
+
+  it('explains why no live session is available', async () => {
+    expect((await postJson('/api/ai/live-session', { locationId: 'mars_surface' })).body).toMatchObject({ available: false, tier: 'autonomous' });
+    expect((await postJson('/api/ai/live-session', { locationId: 'lunar_surface' })).body).toMatchObject({ available: false, tier: 'relay' });
+    const leo = (await postJson('/api/ai/live-session', { locationId: 'leo' })).body;
+    expect(leo).toMatchObject({ available: false, tier: 'live' });
+    expect(String(leo.reason)).toMatch(/key/i);
+  });
+
+  it('validates a live tool call into an action', async () => {
+    const r = await postJson('/api/ai/assistant-tool', { name: 'start_emergency_protocol', args: { protocolId: 'co2', reason: 'alarm' } });
+    expect(r.body.action).toMatchObject({ type: 'start_emergency_protocol', protocolId: 'co2' });
+    const bad = await postJson('/api/ai/assistant-tool', { name: 'mark_step_done', args: { stepNumber: 1 } });
+    expect(bad.body.action).toBeUndefined();
+  });
+
+  it('assesses a spoken live turn: fast path, assessment, report', async () => {
+    const r = await postJson('/api/ai/assess', {
+      modality: 'voice',
+      messages: [{ role: 'user', content: "I feel hopeless and so lonely up here" }],
+      assistantReply: 'I am here with you.',
+    });
+    expect(r.status).toBe(200);
+    expect(r.body.assessment).toMatchObject({ concernLevel: 'concern' });
+    const acts = r.body.actions as Array<{ type: string }>;
+    expect(acts.map((a) => a.type)).toEqual(expect.arrayContaining(['suggest_countermeasure', 'queue_earth_packet']));
+  });
+});
+
+describe('countermeasure card matches the reply', () => {
+  it('tells the model which card will appear and then shows exactly that card', async () => {
+    const res = await app.request('/api/ai/converse', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scenarioId: 'nominal', crewMember, modality: 'text', messages: [{ role: 'user', content: "I'm panicking and can't stop worrying" }] }),
+    });
+    const events = (await res.text()).split('\n').filter((l) => l.startsWith('data:')).map((l) => JSON.parse(l.slice(5)) as ConverseEvent);
+    const cards = events.flatMap((e) => (e.type === 'action' && e.action.type === 'suggest_countermeasure' ? [e.action.suggestion.id] : []));
+    expect(cards).toEqual(['box_breathing']);
+  });
+});

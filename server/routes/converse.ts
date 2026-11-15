@@ -235,6 +235,13 @@ converseRoutes.post('/converse', async (c) => {
   );
 
   const fast = fastPathActions(req, lastUser, snapshot);
+
+  // Pick the "try this now" card before the reply so what ARGUS says and what appears match.
+  const pendingCard = (req.countermeasureLog ?? []).some((cm) => cm.helped === undefined);
+  const readyCard =
+    preAssessment.concernLevel !== 'none' && !req.activeProtocol && !pendingCard
+      ? pickCountermeasure(preAssessment.cues, (req.countermeasureLog ?? []).map((cm) => cm.id))
+      : null;
   const startedProtocol = fast.find((a) => a.type === 'start_emergency_protocol');
 
   const useVision = Boolean(req.frame) && providerChainFor({ feature: 'chat', keyOverride, tier, vision: true }).length > 0;
@@ -251,9 +258,15 @@ converseRoutes.post('/converse', async (c) => {
       ? `${req.activeProtocol.title}\n${req.activeProtocol.steps.map((s, i) => `${i + 1}. [${req.activeProtocol!.completedSteps.includes(i + 1) ? 'x' : ' '}] ${s}`).join('\n')}`
       : undefined,
     guidedSteps: !req.activeProtocol && req.guidedSteps?.length ? req.guidedSteps.map((s, i) => `${i + 1}. ${s}`).join('\n') : undefined,
-    countermeasures: req.countermeasureLog?.length
-      ? req.countermeasureLog.map((cm) => `- ${cm.title}${cm.helped === undefined ? ' (ask whether it helped)' : cm.helped ? ' (helped)' : ' (did not help)'}`).join('\n')
-      : undefined,
+    countermeasures:
+      [
+        ...(req.countermeasureLog ?? []).map((cm) => `- ${cm.title}${cm.helped === undefined ? ' (ask whether it helped)' : cm.helped ? ' (helped)' : ' (did not help)'}`),
+        readyCard
+          ? `CARD READY: after your reply, a "${readyCard.title}" card (${readyCard.instruction}) appears on their screen. If you suggest something to try, suggest this one by name, unless you call suggest_countermeasure with a different one. Do not promise any other card.`
+          : '',
+      ]
+        .filter(Boolean)
+        .join('\n') || undefined,
     crisis: flags.crisis,
     redFlag: Boolean(startedProtocol),
     toolsAvailable,
@@ -384,7 +397,7 @@ converseRoutes.post('/converse', async (c) => {
     if (assessment.concernLevel !== 'none' && !emergency && !actions.some((a) => a.type === 'suggest_countermeasure')) {
       const already = req.countermeasureLog ?? [];
       const pending = already.some((cm) => cm.helped === undefined);
-      const pick = pending ? null : pickCountermeasure(assessment.cues, already.map((cm) => cm.id));
+      const pick = readyCard ?? (pending ? null : pickCountermeasure(assessment.cues, already.map((cm) => cm.id)));
       if (pick) await send({ type: 'action', action: { origin: 'fast_path', type: 'suggest_countermeasure', suggestion: pick } });
     }
     // Tell the doctors on Earth when the concern level calls for it.

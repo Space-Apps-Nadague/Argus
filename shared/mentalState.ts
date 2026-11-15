@@ -319,6 +319,8 @@ export function combineAssessment(input: CombineInput): MentalStateAssessment {
   // Floors that no score or model can undercut.
   if (cues.hopelessness >= 2) level = maxConcern(level, 'concern');
   if (cues.lowMood >= 3) level = maxConcern(level, 'concern');
+  // Any single strong signal is worth keeping an eye on, even if nothing else is off.
+  if (CUE_IDS.some((id) => cues[id] >= 3)) level = maxConcern(level, 'watch');
   if (input.selfReport) {
     if (input.selfReport.status === 'red') level = maxConcern(level, 'concern');
     else if (input.selfReport.status === 'yellow') level = maxConcern(level, 'watch');

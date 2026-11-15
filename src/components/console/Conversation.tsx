@@ -61,6 +61,13 @@ const TONE: Record<'red' | 'accent' | 'green' | 'muted', string> = {
   muted: 'border-hud-line text-hud-muted',
 };
 
+/** Plain text with **bold** only: models sometimes add emphasis even when asked not to. */
+export function renderLightMarkdown(text: string): React.ReactNode[] {
+  return text.split(/(\*\*[^*\n]+\*\*)/g).map((part, i) =>
+    part.startsWith('**') && part.endsWith('**') && part.length > 4 ? <strong key={i}>{part.slice(2, -2)}</strong> : part.replace(/^#{1,4}\s+/gm, '')
+  );
+}
+
 const time = (iso: string) => new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 
 const Bubble: React.FC<{ m: AssistantMessage }> = ({ m }) => {
@@ -92,7 +99,7 @@ const Bubble: React.FC<{ m: AssistantMessage }> = ({ m }) => {
           </p>
         )}
         <p className="whitespace-pre-wrap">
-          {m.content}
+          {renderLightMarkdown(m.content)}
           {m.streaming && <span className="ml-0.5 inline-block h-3.5 w-1.5 animate-pulse bg-hud-accent align-middle" aria-hidden="true" />}
           {m.streaming && !m.content && <span className="text-hud-muted">ARGUS is thinking…</span>}
         </p>
