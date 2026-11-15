@@ -1,31 +1,31 @@
 /**
  * ARGUS — Photobooth tab (specs/02-ui-dashboard.md §2.7)
- * A fun camera booth for the crew: space backgrounds, an astronaut helmet that follows the face,
- * zero-g stickers, colour filters and postcard frames. Close your hand (fist) → 3-second timer →
- * photo. Photos go home through the Earth downlink queue and arrive after the live light time.
- * Camera frames are processed on this device only.
+ * A camera booth for the crew: space backgrounds, a mission-camera data stamp, zero-g stickers,
+ * colour filters and postcard frames. Close your hand (fist) → 3-second timer → photo. Photos land
+ * in a strip under the camera (the camera keeps running) and go home through the Earth downlink
+ * queue, arriving after the live light time. Camera frames are processed on this device only.
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Camera, Download, Grab, Heart, Mail, RotateCcw, Send, Trash2, UserPlus, X } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Camera, Check, Download, Grab, Heart, Mail, Send, Trash2, UserPlus, X } from 'lucide-react';
 import { useMission } from '../context/MissionContext';
 import { commDelayAt, formatCommDelay, marsTime } from '../data/spaceLocations';
 import { Card } from './ui/Card';
 import {
   BACKGROUNDS,
   BoothRenderer,
-  faceToStage,
   FILTERS,
   FRAMES,
   placeName,
   STAGE_H,
   STAGE_W,
+  stampLines,
   STICKERS,
   type BoothInfo,
   type BoothOptions,
   type StickerId,
 } from '../features/photobooth/effects';
-import { analyseFrame, loadVision, type FaceBox, type PersonMask, type VisionModels } from '../features/photobooth/vision';
+import { analyseFrame, loadVision, type PersonMask, type VisionModels } from '../features/photobooth/vision';
 import { IDLE, startCountdown, stepShutter, type ShutterState } from '../features/photobooth/gesture';
 import {
   deliveryStatus,
@@ -40,6 +40,15 @@ import {
 } from '../features/photobooth/familyMail';
 
 type CameraState = 'starting' | 'ready' | 'error';
+
+interface Shot {
+  id: string;
+  image: string;
+  sentTo?: string[];
+}
+
+/** Photos kept in the strip for this session. */
+const MAX_SHOTS = 8;
 
 function shutterSound() {
   try {
@@ -83,6 +92,31 @@ const Chip: React.FC<{ active: boolean; onClick: () => void; children: React.Rea
   </button>
 );
 
+/** Small form to add a family member (used in the Family card and inside a photo's Send box). */
+const AddContactForm: React.FC<{ onAdd: (name: string, relation: string) => void; compact?: boolean }> = ({ onAdd, compact }) => {
+  const [name, setName] = useState('');
+  const [relation, setRelation] = useState('');
+  return (
+    <form
+      className="flex flex-wrap gap-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (!name.trim()) return;
+        onAdd(name.trim(), relation.trim());
+        setName('');
+        setRelation('');
+      }}
+    >
+      <input className="hud-input min-w-0 flex-1 text-xs" value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" aria-label="Family member name" />
+      <input className={`hud-input text-xs ${compact ? 'w-24' : 'w-28'}`} value={relation} onChange={(e) => setRelation(e.target.value)} placeholder="e.g. daughter" aria-label="Relation" />
+      <button type="submit" className="hud-btn text-xs" disabled={!name.trim()}>
+        <UserPlus className="h-3.5 w-3.5" aria-hidden="true" />
+        Add
+      </button>
+    </form>
+  );
+};
+
 export const PhotoboothTab: React.FC = () => {
   const { activeCrewMember, spaceLocation, latestDay } = useMission();
   const crewId = activeCrewMember.id;
@@ -96,50 +130,64 @@ export const PhotoboothTab: React.FC = () => {
   const [modelsError, setModelsError] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [flash, setFlash] = useState(false);
-  const [photo, setPhoto] = useState<string | null>(null);
 
-  const [opts, setOpts] = useState<BoothOptions>({ background: 'none', filter: 'none', frame: 'none', stickers: ['helmet', 'float'] });
+  const [opts, setOpts] = useState<BoothOptions>({ background: 'none', filter: 'none', frame: 'none', stickers: ['stamp', 'patch'] });
   const [message, setMessage] = useState('');
   const [contacts, setContacts] = useState<FamilyContact[]>(() => loadContacts(crewId));
-  const [selectedTo, setSelectedTo] = useState<string[]>([]);
   const [postcards, setPostcards] = useState<FamilyPostcard[]>(() => loadPostcards(crewId));
-  const [newName, setNewName] = useState('');
-  const [newRelation, setNewRelation] = useState('');
+  const [shots, setShots] = useState<Shot[]>([]);
+  const [sending, setSending] = useState<string | null>(null);
+  const [sendTo, setSendTo] = useState<string[]>([]);
+  const [viewing, setViewing] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
     setContacts(loadContacts(crewId));
     setPostcards(loadPostcards(crewId));
+    setShots([]);
   }, [crewId]);
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
+  useEffect(() => {
+    if (!viewing) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setViewing(null);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [viewing]);
 
+  const lightTime = formatCommDelay(spaceLocation, now);
   const info: BoothInfo = useMemo(() => {
-    const d = new Date();
-    const date = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-    const sol = spaceLocation.clock === 'mars' ? `Sol ${marsTime(d).sol} · ` : '';
-    return { place, callsign: activeCrewMember.callsign, missionDay: latestDay, dateLine: `${sol}${date}`, message };
-  }, [place, activeCrewMember.callsign, latestDay, message, spaceLocation.clock]);
+    const date = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    const sol = spaceLocation.clock === 'mars' ? marsTime(now).sol : undefined;
+    return {
+      place,
+      callsign: activeCrewMember.callsign,
+      missionDay: latestDay,
+      dateLine: `${sol !== undefined ? `Sol ${sol} · ` : ''}${date}`,
+      message,
+      stamp: stampLines({ now, callsign: activeCrewMember.callsign, missionDay: latestDay, sol, location: spaceLocation.label, lightTime }),
+    };
+  }, [place, activeCrewMember.callsign, latestDay, message, spaceLocation, now, lightTime]);
 
   // Latest values for the animation loop without restarting it.
   const live = useRef({ opts, info });
   live.current = { opts, info };
   const shutter = useRef<ShutterState>(IDLE);
-  const takePhotoRef = useRef<() => void>(() => undefined);
 
-  takePhotoRef.current = () => {
+  const takePhoto = useRef<() => void>(() => undefined);
+  takePhoto.current = () => {
     const c = canvasRef.current;
     if (!c) return;
     shutterSound();
     setFlash(true);
     setTimeout(() => setFlash(false), 180);
-    setPhoto(snapshot(c));
-    setSelectedTo(contacts.map((x) => x.name));
+    const shot: Shot = { id: `shot-${Date.now()}`, image: snapshot(c) };
+    setShots((s) => [shot, ...s].slice(0, MAX_SHOTS));
   };
 
-  // Camera.
+  // Camera + models.
   useEffect(() => {
     let stream: MediaStream | null = null;
     let cancelled = false;
@@ -172,7 +220,6 @@ export const PhotoboothTab: React.FC = () => {
     let raf = 0;
     let frame = 0;
     let mask: PersonMask | null = null;
-    let face: FaceBox | null = null;
     let fist = false;
     let lastTs = 0;
     const loop = (t: number) => {
@@ -186,27 +233,18 @@ export const PhotoboothTab: React.FC = () => {
         const ts = Math.max(lastTs + 1, Math.round(t));
         lastTs = ts;
         try {
-          const r = analyseFrame(models, v, ts, {
-            mask: o.background !== 'none',
-            gesture: frame % 3 === 0,
-            face: o.stickers.includes('helmet') && frame % 2 === 0,
-          });
+          const r = analyseFrame(models, v, ts, { mask: o.background !== 'none', gesture: frame % 3 === 0 });
           if (r.mask) mask = r.mask;
           if (r.fist !== undefined) fist = r.fist;
-          if (r.face !== undefined) {
-            const f = r.face ? faceToStage(r.face, v.videoWidth, v.videoHeight) : null;
-            // Smooth the helmet so it does not jitter.
-            face = f && face ? { x: face.x + (f.x - face.x) * 0.5, y: face.y + (f.y - face.y) * 0.5, width: face.width + (f.width - face.width) * 0.5, height: face.height + (f.height - face.height) * 0.5 } : f;
-          }
         } catch {
           /* skip this frame */
         }
       }
-      renderer.render(c.getContext('2d')!, v, o.background !== 'none' ? mask : null, face, o, inf, t);
+      renderer.render(c.getContext('2d')!, v, o.background !== 'none' ? mask : null, o, inf, t);
       const step = stepShutter(shutter.current, fist, t);
       shutter.current = step.state;
       setCountdown((prev) => (prev === step.secondsLeft ? prev : step.secondsLeft));
-      if (step.capture) takePhotoRef.current();
+      if (step.capture) takePhoto.current();
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
@@ -219,23 +257,11 @@ export const PhotoboothTab: React.FC = () => {
   const toggleSticker = (id: StickerId) =>
     setOpts((o) => ({ ...o, stickers: o.stickers.includes(id) ? o.stickers.filter((s) => s !== id) : [...o.stickers, id] }));
 
-  const delay = commDelayAt(spaceLocation, now).seconds;
-
-  const send = useCallback(() => {
-    if (!photo) return;
-    const card = newPostcard({ crewId, to: selectedTo, message, image: photo, delaySeconds: delay });
-    setPostcards(savePostcard(card));
-    setPhoto(null);
-  }, [photo, crewId, selectedTo, message, delay]);
-
-  const addContact = () => {
-    const name = newName.trim();
-    if (!name) return;
-    const next = [...contacts, { id: `fc-${Date.now()}`, name: name.slice(0, 40), relation: newRelation.trim().slice(0, 30) }];
+  const addContact = (name: string, relation: string, selectForSending = false) => {
+    const next = [...contacts, { id: `fc-${Date.now()}`, name: name.slice(0, 40), relation: relation.slice(0, 30) }];
     setContacts(next);
     saveContacts(crewId, next);
-    setNewName('');
-    setNewRelation('');
+    if (selectForSending) setSendTo((s) => [...s, name.slice(0, 40)]);
   };
   const removeContact = (id: string) => {
     const next = contacts.filter((c) => c.id !== id);
@@ -243,11 +269,23 @@ export const PhotoboothTab: React.FC = () => {
     saveContacts(crewId, next);
   };
 
+  const openSend = (id: string) => {
+    setSending((cur) => (cur === id ? null : id));
+    setSendTo(contacts.map((c) => c.name));
+  };
+  const send = (shot: Shot) => {
+    if (!sendTo.length) return;
+    const delay = commDelayAt(spaceLocation, new Date()).seconds;
+    setPostcards(savePostcard(newPostcard({ crewId, to: sendTo, message, image: shot.image, delaySeconds: delay })));
+    setShots((s) => s.map((x) => (x.id === shot.id ? { ...x, sentTo: sendTo } : x)));
+    setSending(null);
+  };
+
   return (
     <div className="space-y-3">
       <div className="grid gap-3 xl:grid-cols-[minmax(0,1.5fr)_minmax(320px,1fr)]">
         <Card title="Photobooth" icon={<Camera className="h-4 w-4" />}>
-          <div className="relative overflow-hidden rounded-xl border border-hud-line bg-black" style={{ aspectRatio: `${STAGE_W} / ${STAGE_H}` }}>
+          <div className="relative mx-auto max-h-[62vh] overflow-hidden rounded-xl border border-hud-line bg-black" style={{ aspectRatio: `${STAGE_W} / ${STAGE_H}` }}>
             <video ref={videoRef} muted playsInline className="hidden" />
             <canvas ref={canvasRef} width={STAGE_W} height={STAGE_H} className="h-full w-full" aria-label="Live photobooth preview" />
             {camera !== 'ready' && (
@@ -257,7 +295,7 @@ export const PhotoboothTab: React.FC = () => {
             )}
             {countdown !== null && (
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center" aria-live="assertive">
-                <span className="font-display text-[10rem] font-bold leading-none text-white drop-shadow-[0_0_30px_rgba(77,208,255,0.9)]">{countdown}</span>
+                <span className="font-display text-[9rem] font-bold leading-none text-white drop-shadow-[0_0_30px_rgba(77,208,255,0.9)]">{countdown}</span>
               </div>
             )}
             {flash && <div className="pointer-events-none absolute inset-0 bg-white" />}
@@ -273,9 +311,86 @@ export const PhotoboothTab: React.FC = () => {
                 ? 'Or close your hand into a fist: the 3-second timer starts by itself.'
                 : modelsError
                   ? 'Effects could not load; the plain camera still works.'
-                  : 'Loading hand, face and background effects…'}
+                  : 'Loading hand and background effects…'}
             </p>
           </div>
+
+          {/* Photo strip: the camera keeps running; each photo can be sent, downloaded or deleted. */}
+          <section aria-label="Photos taken" className="mt-4">
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-hud-muted">
+              Photos {shots.length ? `(${shots.length})` : ''}
+            </h3>
+            {shots.length === 0 ? (
+              <p className="text-xs text-hud-muted">Your photos appear here. Keep shooting as many as you like.</p>
+            ) : (
+              <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                {shots.map((shot) => (
+                  <li key={shot.id} className="overflow-hidden rounded-lg border border-hud-line bg-hud-panel/60">
+                    <button type="button" onClick={() => setViewing(shot.image)} className="hud-focus block w-full" aria-label="View photo larger">
+                      <img src={shot.image} alt="Photo taken in the photobooth" className="aspect-[4/3] w-full object-cover" />
+                    </button>
+                    <div className="flex items-center justify-between gap-1 p-1.5">
+                      {shot.sentTo ? (
+                        <span className="flex items-center gap-1 text-[11px] text-emerald-300">
+                          <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                          Sent
+                        </span>
+                      ) : (
+                        <button type="button" onClick={() => openSend(shot.id)} className="hud-btn !px-2 !py-1 text-[11px]" aria-expanded={sending === shot.id}>
+                          <Send className="h-3.5 w-3.5" aria-hidden="true" />
+                          Send
+                        </button>
+                      )}
+                      <span className="flex gap-1">
+                        <a href={shot.image} download={`argus-${activeCrewMember.callsign.toLowerCase()}-${shot.id}.jpg`} className="hud-focus rounded p-1 text-hud-muted hover:text-hud-text" aria-label="Download photo">
+                          <Download className="h-3.5 w-3.5" />
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => setShots((s) => s.filter((x) => x.id !== shot.id))}
+                          className="hud-focus rounded p-1 text-hud-muted hover:text-red-300"
+                          aria-label="Delete photo"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </span>
+                    </div>
+                    {sending === shot.id && (
+                      <div className="space-y-2 border-t border-hud-line p-2">
+                        <p className="text-[11px] text-hud-muted">Send to</p>
+                        {contacts.length > 0 && (
+                          <div className="flex flex-wrap gap-1">
+                            {contacts.map((c) => (
+                              <Chip
+                                key={c.id}
+                                active={sendTo.includes(c.name)}
+                                onClick={() => setSendTo((s) => (s.includes(c.name) ? s.filter((n) => n !== c.name) : [...s, c.name]))}
+                              >
+                                {c.name}
+                              </Chip>
+                            ))}
+                          </div>
+                        )}
+                        <AddContactForm compact onAdd={(n, r) => addContact(n, r, true)} />
+                        <p className="text-[11px] text-hud-muted">
+                          Arrives in <span className="font-mono text-amber-300">{lightTime}</span>
+                        </p>
+                        <div className="flex gap-1.5">
+                          <button type="button" onClick={() => send(shot)} disabled={!sendTo.length} className="hud-btn-primary flex-1 !py-1 text-xs">
+                            <Send className="h-3.5 w-3.5" aria-hidden="true" />
+                            Send
+                          </button>
+                          <button type="button" onClick={() => setSending(null)} className="hud-btn !py-1 text-xs">
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
         </Card>
 
         <Card title="Effects" bodyClassName="p-4 space-y-4">
@@ -290,7 +405,7 @@ export const PhotoboothTab: React.FC = () => {
             </div>
           </section>
           <section>
-            <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-hud-muted">Helmet &amp; stickers</h3>
+            <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-hud-muted">Overlays &amp; stickers</h3>
             <div className="flex flex-wrap gap-1.5">
               {STICKERS.map((s) => (
                 <Chip key={s.id} active={opts.stickers.includes(s.id)} onClick={() => toggleSticker(s.id)}>
@@ -319,68 +434,19 @@ export const PhotoboothTab: React.FC = () => {
               ))}
             </div>
             <label className="mt-2 block">
-              <span className="mb-1 block text-xs text-hud-muted">Message on the photo</span>
-              <input
-                className="hud-input"
-                value={message}
-                maxLength={80}
-                onChange={(e) => setMessage(e.target.value)}
-                placeholder="Miss you! Look at this view"
-              />
+              <span className="mb-1 block text-xs text-hud-muted">Message on the photo and for the family</span>
+              <input className="hud-input" value={message} maxLength={80} onChange={(e) => setMessage(e.target.value)} placeholder="Miss you! Look at this view" />
             </label>
           </section>
         </Card>
       </div>
 
-      {photo && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/75 p-4" role="dialog" aria-modal="true" aria-labelledby="photo-title">
-          <div className="hud-card w-full max-w-2xl space-y-3 p-4">
-            <div className="flex items-center justify-between">
-              <h2 id="photo-title" className="font-display text-sm font-bold tracking-wider">
-                YOUR PHOTO
-              </h2>
-              <button type="button" onClick={() => setPhoto(null)} className="hud-focus rounded p-1 text-hud-muted hover:text-hud-text" aria-label="Close">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <img src={photo} alt="Photo just taken in the photobooth" className="w-full rounded-lg border border-hud-line" />
-            <fieldset>
-              <legend className="mb-1 text-xs text-hud-muted">Send to</legend>
-              {contacts.length ? (
-                <div className="flex flex-wrap gap-1.5">
-                  {contacts.map((c) => (
-                    <Chip
-                      key={c.id}
-                      active={selectedTo.includes(c.name)}
-                      onClick={() => setSelectedTo((s) => (s.includes(c.name) ? s.filter((n) => n !== c.name) : [...s, c.name]))}
-                    >
-                      {c.name}
-                      {c.relation ? ` · ${c.relation}` : ''}
-                    </Chip>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-hud-muted">Add family members below to send photos home.</p>
-              )}
-            </fieldset>
-            <p className="text-xs text-hud-muted">
-              Arrives on Earth in <span className="font-mono text-amber-300">{formatCommDelay(spaceLocation, now)}</span> (one-way light time).
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={send} disabled={!selectedTo.length} className="hud-btn-primary">
-                <Send className="h-4 w-4" aria-hidden="true" />
-                Send to family
-              </button>
-              <a href={photo} download={`argus-${activeCrewMember.callsign.toLowerCase()}-${Date.now()}.jpg`} className="hud-btn">
-                <Download className="h-4 w-4" aria-hidden="true" />
-                Download
-              </a>
-              <button type="button" onClick={() => setPhoto(null)} className="hud-btn">
-                <RotateCcw className="h-4 w-4" aria-hidden="true" />
-                Retake
-              </button>
-            </div>
-          </div>
+      {viewing && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 p-4" role="dialog" aria-modal="true" aria-label="Photo" onClick={() => setViewing(null)}>
+          <img src={viewing} alt="Photo, larger" className="max-h-[85vh] max-w-full rounded-lg border border-hud-line object-contain" />
+          <button type="button" onClick={() => setViewing(null)} className="hud-btn absolute right-4 top-4" aria-label="Close photo">
+            <X className="h-4 w-4" />
+          </button>
         </div>
       )}
 
@@ -407,7 +473,7 @@ export const PhotoboothTab: React.FC = () => {
               })}
             </ul>
           ) : (
-            <p className="text-sm text-hud-muted">No photos sent yet. Take one and send it home.</p>
+            <p className="text-sm text-hud-muted">No photos sent yet. Take one and press Send.</p>
           )}
         </Card>
 
@@ -425,20 +491,9 @@ export const PhotoboothTab: React.FC = () => {
               </li>
             ))}
           </ul>
-          <form
-            className="mt-2 flex flex-wrap gap-2"
-            onSubmit={(e) => {
-              e.preventDefault();
-              addContact();
-            }}
-          >
-            <input className="hud-input min-w-0 flex-1" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Name" aria-label="Family member name" />
-            <input className="hud-input w-28" value={newRelation} onChange={(e) => setNewRelation(e.target.value)} placeholder="e.g. daughter" aria-label="Relation" />
-            <button type="submit" className="hud-btn" disabled={!newName.trim()}>
-              <UserPlus className="h-4 w-4" aria-hidden="true" />
-              Add
-            </button>
-          </form>
+          <div className="mt-2">
+            <AddContactForm onAdd={(n, r) => addContact(n, r)} />
+          </div>
           <p className="mt-2 text-[11px] text-hud-muted">Photos and family details stay on this device. Camera frames are never uploaded.</p>
         </Card>
       </div>

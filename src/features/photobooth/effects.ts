@@ -1,11 +1,11 @@
 /**
  * ARGUS — Photobooth effects (specs/02-ui-dashboard.md §2.7)
  * Everything is drawn on a canvas, procedurally (no image files): space backgrounds, colour
- * filters, a face-tracked astronaut helmet, zero-g stickers and postcard frames.
+ * filters, a mission-camera data stamp, zero-g stickers and postcard frames.
  */
 
 import type { SpaceLocationId } from '../../types/argus';
-import type { FaceBox, PersonMask } from './vision';
+import type { PersonMask } from './vision';
 
 export const STAGE_W = 960;
 export const STAGE_H = 720;
@@ -13,7 +13,7 @@ export const STAGE_H = 720;
 export type BackgroundId = 'none' | 'mars' | 'moon' | 'earth' | 'cupola';
 export type FilterId = 'none' | 'mars' | 'lunar' | 'night' | 'retro';
 export type FrameId = 'none' | 'postcard' | 'polaroid';
-export type StickerId = 'helmet' | 'patch' | 'float' | 'banner';
+export type StickerId = 'stamp' | 'patch' | 'float' | 'banner';
 
 export const BACKGROUNDS: { id: BackgroundId; label: string }[] = [
   { id: 'none', label: 'My room' },
@@ -38,7 +38,7 @@ export const FRAMES: { id: FrameId; label: string }[] = [
 ];
 
 export const STICKERS: { id: StickerId; label: string }[] = [
-  { id: 'helmet', label: 'Helmet' },
+  { id: 'stamp', label: 'Mission data stamp' },
   { id: 'patch', label: 'Mission patch' },
   { id: 'float', label: 'Zero-g floaties' },
   { id: 'banner', label: '"Hi from…" banner' },
@@ -58,6 +58,19 @@ export interface BoothInfo {
   /** e.g. "Sol 1043 · 15 Nov 2026". */
   dateLine: string;
   message: string;
+  /** Mission-camera data stamp lines, e.g. ["2026-11-15 08:41:07 UTC", "MISSION DAY 214 · SOL 1043", …]. */
+  stamp: string[];
+}
+
+/** Lines of the mission-camera data stamp (UTC time, mission day/sol, location, light time). */
+export function stampLines(p: { now: Date; callsign: string; missionDay: number; sol?: number; location: string; lightTime: string }): string[] {
+  const iso = p.now.toISOString();
+  return [
+    `ARGUS CAM · ${p.callsign.toUpperCase()}`,
+    `${iso.slice(0, 10)} ${iso.slice(11, 19)} UTC`,
+    `MISSION DAY ${p.missionDay}${p.sol !== undefined ? ` · SOL ${p.sol}` : ''}`,
+    `${p.location.toUpperCase()} · LIGHT TIME TO EARTH ${p.lightTime.toUpperCase()}`,
+  ];
 }
 
 /** Friendly place name for captions. */
@@ -312,25 +325,17 @@ export function coverFit(vw: number, vh: number, w = STAGE_W, h = STAGE_H) {
   return { s, ox: (w - vw * s) / 2, oy: (h - vh * s) / 2 };
 }
 
-/** Face box in stage coordinates (mirrored like the selfie preview). */
-export function faceToStage(face: FaceBox, vw: number, vh: number, w = STAGE_W, h = STAGE_H): FaceBox {
-  const { s, ox, oy } = coverFit(vw, vh, w, h);
-  const x = ox + face.x * s;
-  return { x: w - (x + face.width * s), y: oy + face.y * s, width: face.width * s, height: face.height * s };
-}
-
 export class BoothRenderer {
   private scene = makeCanvas(STAGE_W, STAGE_H);
   private person = makeCanvas(STAGE_W, STAGE_H);
   private maskCanvas = makeCanvas(1, 1);
   private maskImage: ImageData | null = null;
 
-  /** Draws one frame. `face` must already be in stage coordinates. */
+  /** Draws one frame. */
   render(
     ctx: CanvasRenderingContext2D,
     video: HTMLVideoElement,
     mask: PersonMask | null,
-    face: FaceBox | null,
     opts: BoothOptions,
     info: BoothInfo,
     t: number
@@ -392,9 +397,9 @@ export class BoothRenderer {
     ctx.restore();
 
     if (opts.stickers.includes('float')) drawFloaties(ctx, t);
-    if (opts.stickers.includes('helmet') && face) drawHelmet(ctx, face);
     if (opts.stickers.includes('patch')) drawPatch(ctx, W - 92, 92, info);
-    if (opts.stickers.includes('banner') && opts.frame === 'none') drawBanner(ctx, `Hi from ${info.place}!`, 28, H - 86);
+    if (opts.stickers.includes('banner') && opts.frame === 'none') drawBanner(ctx, `Hi from ${info.place}!`, 28, opts.stickers.includes('stamp') ? 40 : H - 86);
+    if (opts.stickers.includes('stamp')) drawStamp(ctx, info.stamp, opts.frame);
     if (opts.frame !== 'none') drawFrame(ctx, opts.frame, info);
   }
 
@@ -418,48 +423,50 @@ export class BoothRenderer {
 
 // ── stickers & frames ───────────────────────────────────────────────────────
 
-/** Astronaut helmet around the face: white shell, gold visor tint, reflection and neck ring. */
-export function drawHelmet(ctx: CanvasRenderingContext2D, face: FaceBox) {
-  const cx = face.x + face.width / 2;
-  const cy = face.y + face.height * 0.42;
-  const R = Math.max(face.width, face.height) * 1.0;
+/** Mission-camera look: viewfinder corner brackets and a monospace data block, like a real crew camera. */
+function drawStamp(ctx: CanvasRenderingContext2D, lines: string[], frame: FrameId) {
+  const W = STAGE_W;
+  // Keep the stamp inside the photo area of the frame.
+  const bottom = frame === 'postcard' ? STAGE_H - 118 : frame === 'polaroid' ? STAGE_H - 128 : STAGE_H;
+  const inset = frame === 'none' ? 0 : frame === 'postcard' ? 22 : 30;
+  const left = inset + 26;
+  const right = W - inset - 26;
+  const top = inset + 26;
+  const low = bottom - 26;
   ctx.save();
-  // Visor tint over the face.
-  const visor = ctx.createRadialGradient(cx - R * 0.3, cy - R * 0.4, R * 0.1, cx, cy, R * 0.92);
-  visor.addColorStop(0, 'rgba(255,230,160,0.08)');
-  visor.addColorStop(1, 'rgba(200,150,46,0.28)');
-  ctx.fillStyle = visor;
-  ctx.beginPath();
-  ctx.arc(cx, cy, R * 0.92, 0, Math.PI * 2);
-  ctx.fill();
-  // Reflection.
-  ctx.strokeStyle = 'rgba(255,255,255,0.55)';
-  ctx.lineWidth = R * 0.06;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.arc(cx, cy, R * 0.74, Math.PI * 1.08, Math.PI * 1.38);
-  ctx.stroke();
-  // Shell.
-  ctx.lineWidth = R * 0.2;
-  const shell = ctx.createLinearGradient(cx - R, cy - R, cx + R, cy + R);
-  shell.addColorStop(0, '#ffffff');
-  shell.addColorStop(1, '#b9c2cc');
-  ctx.strokeStyle = shell;
-  ctx.beginPath();
-  ctx.arc(cx, cy, R * 1.02, 0, Math.PI * 2);
-  ctx.stroke();
-  // Side lights.
-  [-1, 1].forEach((side) => {
-    ctx.fillStyle = '#4dd0ff';
+  ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+  ctx.lineWidth = 3;
+  const arm = 34;
+  ([[left, top, 1, 1], [right, top, -1, 1], [left, low, 1, -1], [right, low, -1, -1]] as const).forEach(([x, y, dx, dy]) => {
     ctx.beginPath();
-    ctx.arc(cx + side * R * 1.02, cy - R * 0.1, R * 0.07, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.moveTo(x, y + dy * arm);
+    ctx.lineTo(x, y);
+    ctx.lineTo(x + dx * arm, y);
+    ctx.stroke();
   });
-  // Neck ring.
-  ctx.fillStyle = '#2f6fdf';
-  ctx.beginPath();
-  ctx.ellipse(cx, cy + R * 1.08, R * 0.75, R * 0.16, 0, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.font = '600 15px "JetBrains Mono", ui-monospace, monospace';
+  ctx.textBaseline = 'top';
+  const lh = 21;
+  const boxW = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 24;
+  const boxH = lines.length * lh + 16;
+  const bx = left + 10;
+  const by = low - 10 - boxH;
+  ctx.fillStyle = 'rgba(4,10,20,0.55)';
+  ctx.fillRect(bx, by, boxW, boxH);
+  ctx.fillStyle = '#e8f6ff';
+  lines.forEach((l, i) => {
+    if (i === 0) {
+      ctx.fillStyle = '#ff4d5e';
+      ctx.beginPath();
+      ctx.arc(bx + 14, by + 8 + lh / 2, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#4dd0ff';
+      ctx.fillText(l, bx + 24, by + 8);
+      ctx.fillStyle = '#e8f6ff';
+    } else {
+      ctx.fillText(l, bx + 12, by + 8 + i * lh);
+    }
+  });
   ctx.restore();
 }
 
