@@ -50,6 +50,8 @@ function clientFor(cfg: ProviderConfig): OpenAI {
   return client;
 }
 
+export const GEMINI_QUOTA_FALLBACK_MODEL = 'gemini-3.5-flash-lite';
+
 export function providerChainFor(options: LlmOptions): Array<{ cfg: ProviderConfig; model: string }> {
   if (currentPrivacy().offlineOnly) return []; // astronaut withdrew AI consent (spec 05 §6)
   const chain = resolveProviderChain(options.env ?? process.env, {
@@ -57,9 +59,16 @@ export function providerChainFor(options: LlmOptions): Array<{ cfg: ProviderConf
     keyOverride: options.keyOverride,
     tier: options.tier,
   });
-  return chain
-    .map((cfg) => ({ cfg, model: options.vision ? cfg.visionModel ?? '' : cfg.model }))
-    .filter((entry) => entry.model);
+  const out: Array<{ cfg: ProviderConfig; model: string }> = [];
+  for (const cfg of chain) {
+    const model = options.vision ? cfg.visionModel ?? '' : cfg.model;
+    if (!model) continue;
+    out.push({ cfg, model });
+    if (cfg.id === 'gemini' && model !== GEMINI_QUOTA_FALLBACK_MODEL) {
+      out.push({ cfg, model: GEMINI_QUOTA_FALLBACK_MODEL });
+    }
+  }
+  return out;
 }
 
 function extraParams(cfg: ProviderConfig): Record<string, unknown> {

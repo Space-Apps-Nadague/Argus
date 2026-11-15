@@ -43,7 +43,7 @@ Env vars are **server-only** (never `VITE_`). See `.env.example`.
 - `AI_PROVIDERS` — ordered chain, e.g. `local`, `local,openrouter`, `openrouter,gemini`. Default `auto` = every configured cloud provider, then `local`.
 - `AI_ROUTE_<FEATURE>` — per-feature chain override (`AI_ROUTE_CHAT=local`, `AI_ROUTE_DIAGNOSTICS=openrouter,local`).
 - `X-AI-Key` request header — a key typed into the HUD; its provider is detected by prefix and tried first for that request only.
-- A provider that errors, times out (`AI_TIMEOUT_MS`, `AI_LOCAL_TIMEOUT_MS`) or returns invalid JSON twice is skipped; the next one is tried; then the offline result is returned.
+- A provider that errors, times out (`AI_TIMEOUT_MS`, `AI_LOCAL_TIMEOUT_MS`) or returns invalid JSON twice is skipped; the next one is tried; then the offline result is returned. For `gemini`, if the primary model (`gemini-3.8-flash`) errors or hits quota, the chain automatically falls back to `gemini-3.5-flash-lite` before moving to the next provider.
 - Vision requests use `<PROVIDER>_VISION_MODEL` (OpenRouter defaults to `openrouter/free`, Gemini to its chat model); providers without a vision model are skipped.
 
 ## 4. Endpoints
