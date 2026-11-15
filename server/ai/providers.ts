@@ -38,14 +38,6 @@ export const PROVIDER_DEFAULTS: Record<Exclude<AiProviderId, 'custom'>, Provider
     baseUrl: 'http://localhost:11434/v1',
     model: '',
   },
-  openrouter: {
-    label: 'OpenRouter (free models)',
-    baseUrl: 'https://openrouter.ai/api/v1',
-    model: 'openrouter/free',
-    visionModel: 'openrouter/free',
-    keyEnv: 'OPENROUTER_API_KEY',
-    prefix: 'sk-or-',
-  },
   gemini: {
     label: 'Google Gemini (free tier)',
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai/',
@@ -65,24 +57,23 @@ export const PROVIDER_DEFAULTS: Record<Exclude<AiProviderId, 'custom'>, Provider
 
 const ENV_PREFIX: Record<AiProviderId, string> = {
   local: 'AI_LOCAL',
-  openrouter: 'OPENROUTER',
   gemini: 'GEMINI',
   groq: 'GROQ',
   custom: 'AI',
 };
 
-const CLOUD_ORDER: AiProviderId[] = ['custom', 'openrouter', 'gemini', 'groq'];
-const KNOWN_IDS: AiProviderId[] = ['local', 'openrouter', 'gemini', 'groq', 'custom'];
+const CLOUD_ORDER: AiProviderId[] = ['custom', 'gemini', 'groq'];
+const KNOWN_IDS: AiProviderId[] = ['local', 'gemini', 'groq', 'custom'];
 
 const trimmed = (v: string | undefined): string | undefined => {
   const t = v?.trim();
   return t ? t : undefined;
 };
 
-/** Detects the provider a key belongs to from its prefix (`sk-or-`, `AIza`, `gsk_`). */
+/** Detects the provider a key belongs to from its prefix (`AIza`, `gsk_`). */
 export function detectProviderFromKey(key: string): AiProviderId {
   const k = key.trim();
-  for (const id of ['openrouter', 'gemini', 'groq'] as const) {
+  for (const id of ['gemini', 'groq'] as const) {
     const prefix = PROVIDER_DEFAULTS[id].prefix;
     if (prefix && k.startsWith(prefix)) return id;
   }

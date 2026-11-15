@@ -22,7 +22,7 @@ import { seedDatabase } from '../db/seed';
 import { ingestKnowledge } from '../rag/ingest';
 import { parseSpokenVitalLogCommand, synthesizeOfflineCueWavBase64 } from '../routes/voice';
 
-const AI_ENV_PREFIXES = ['AI_', 'OPENROUTER_', 'GEMINI_', 'GROQ_'];
+const AI_ENV_PREFIXES = ['AI_', 'GEMINI_', 'GROQ_'];
 
 const app = createApp();
 const crewMember = DEFAULT_CREW_ROSTER[0];

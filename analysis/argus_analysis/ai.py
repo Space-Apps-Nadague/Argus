@@ -27,8 +27,8 @@ def summarize(title: str, table_markdown: str, timeout: int = 180) -> dict | Non
     candidates = []
     if os.environ.get("AI_LOCAL_MODEL"):
         candidates.append((os.environ.get("AI_LOCAL_BASE_URL", "http://localhost:11434/v1"), os.environ["AI_LOCAL_MODEL"], None))
-    if os.environ.get("OPENROUTER_API_KEY"):
-        candidates.append(("https://openrouter.ai/api/v1", os.environ.get("OPENROUTER_MODEL", "openrouter/free"), os.environ["OPENROUTER_API_KEY"]))
+    if os.environ.get("GEMINI_API_KEY"):
+        candidates.append(("https://generativelanguage.googleapis.com/v1beta/openai", os.environ.get("GEMINI_MODEL", "gemini-3.8-flash"), os.environ["GEMINI_API_KEY"]))
     for base, model, key in candidates:
         try:
             r = requests.post(

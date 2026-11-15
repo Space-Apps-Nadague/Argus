@@ -3,7 +3,7 @@
 ## 1. Purpose
 A small Node/TypeScript server (`server/`) hosts every AI feature so that:
 - **No API key ever ships to the browser** (replaces the old `VITE_AI_API_KEY` browser call).
-- **Nothing costs money**: any OpenAI-compatible endpoint works — a local model (Ollama / LM Studio), OpenRouter free models, the Gemini free tier, Groq's free tier, or a custom/hosted agent endpoint.
+- **Nothing costs money**: any OpenAI-compatible endpoint works — a local model (Ollama / LM Studio), the Gemini free tier, Groq's free tier, or a custom/hosted agent endpoint.
 - **Deterministic first**: triage status, trend models, wellbeing risk and crisis detection are plain TypeScript. The LLM only explains, ranks, personalizes and converses (AGENTS.md §2.4).
 - **Always works offline**: every endpoint returns a deterministic `offline_verified_cache` result when no provider answers.
 - **Data-backed** (`specs/05-data-platform.md`): when `DATABASE_URL` is set, AI routes require a session, check the user may read `crewId`, build the crew snapshot from the database (real observations and check-ins), and `/api/ai/chat` stores every message with the provider, model and context snapshot (§3.5). Prompts are pseudonymized: legal name and medical notes go only to the `local` provider.
@@ -35,16 +35,15 @@ Env vars are **server-only** (never `VITE_`). See `.env.example`.
 | Provider id | Selected when | Base URL default | Model default |
 |---|---|---|---|
 | `local` | `AI_LOCAL_MODEL` set | `http://localhost:11434/v1` (Ollama) | — (required) |
-| `openrouter` | `OPENROUTER_API_KEY` or a key starting `sk-or-` | `https://openrouter.ai/api/v1` | `openrouter/free` |
 | `gemini` | `GEMINI_API_KEY` or a key starting `AIza` | `https://generativelanguage.googleapis.com/v1beta/openai/` | `gemini-3.8-flash` |
 | `groq` | `GROQ_API_KEY` or a key starting `gsk_` | `https://api.groq.com/openai/v1` | — (`GROQ_MODEL` required) |
 | `custom` | `AI_API_KEY`/`AI_BASE_URL` with no known prefix (LM Studio, vLLM, hosted agent gateway) | `AI_BASE_URL` | `AI_MODEL` |
 
-- `AI_PROVIDERS` — ordered chain, e.g. `local`, `local,openrouter`, `openrouter,gemini`. Default `auto` = every configured cloud provider, then `local`.
-- `AI_ROUTE_<FEATURE>` — per-feature chain override (`AI_ROUTE_CHAT=local`, `AI_ROUTE_DIAGNOSTICS=openrouter,local`).
+- `AI_PROVIDERS` — ordered chain, e.g. `local`, `gemini,local`, `gemini`. Default `auto` = every configured cloud provider, then `local`.
+- `AI_ROUTE_<FEATURE>` — per-feature chain override (`AI_ROUTE_CHAT=local`, `AI_ROUTE_DIAGNOSTICS=gemini,local`).
 - `X-AI-Key` request header — a key typed into the HUD; its provider is detected by prefix and tried first for that request only.
 - A provider that errors, times out (`AI_TIMEOUT_MS`, `AI_LOCAL_TIMEOUT_MS`) or returns invalid JSON twice is skipped; the next one is tried; then the offline result is returned.
-- Vision requests use `<PROVIDER>_VISION_MODEL` (OpenRouter defaults to `openrouter/free`, Gemini to its chat model); providers without a vision model are skipped.
+- Vision requests use `<PROVIDER>_VISION_MODEL` (Gemini defaults to its chat model); providers without a vision model are skipped.
 
 ## 4. Endpoints
 Every request may include `locationId` (`SpaceLocationId`, spec 01 §8) and `telemetryCheckIns` (`CheckInEntry[]`, spec 01 §6); the server adds the mission location (gravity, comm delay) to prompts and runs `applyCheckIns` before triage, readiness, and trend models.

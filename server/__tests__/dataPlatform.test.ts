@@ -13,7 +13,7 @@ import { seedDatabase } from '../db/seed';
 
 const ADMIN_PW = 'admin-password-123';
 const DEMO_PW = 'demo-password-123';
-const AI_ENV_PREFIXES = ['AI_', 'OPENROUTER_', 'GEMINI_', 'GROQ_'];
+const AI_ENV_PREFIXES = ['AI_', 'GEMINI_', 'GROQ_'];
 
 let h: DbHandle;
 const app = createApp();

@@ -3,7 +3,6 @@ import { describeProvider, detectProviderFromKey, resolveProviderChain } from '.
 
 describe('detectProviderFromKey', () => {
   it('detects providers by key prefix', () => {
-    expect(detectProviderFromKey('sk-or-v1-abc')).toBe('openrouter');
     expect(detectProviderFromKey('AIzaSyXYZ')).toBe('gemini');
     expect(detectProviderFromKey('gsk_123')).toBe('groq');
     expect(detectProviderFromKey('something-else')).toBe('custom');
@@ -17,13 +16,13 @@ describe('resolveProviderChain', () => {
 
   it('builds a local-first chain with cloud fallback', () => {
     const chain = resolveProviderChain({
-      AI_PROVIDERS: 'local,openrouter',
+      AI_PROVIDERS: 'local,gemini',
       AI_LOCAL_MODEL: 'qwen3:8b',
-      OPENROUTER_API_KEY: 'sk-or-test',
+      GEMINI_API_KEY: 'AIza-test',
     });
-    expect(chain.map((c) => c.id)).toEqual(['local', 'openrouter']);
+    expect(chain.map((c) => c.id)).toEqual(['local', 'gemini']);
     expect(chain[0]).toMatchObject({ baseUrl: 'http://localhost:11434/v1', model: 'qwen3:8b', isLocal: true });
-    expect(chain[1]).toMatchObject({ model: 'openrouter/free', visionModel: 'openrouter/free' });
+    expect(chain[1]).toMatchObject({ model: 'gemini-3.8-flash', visionModel: 'gemini-3.8-flash' });
   });
 
   it('auto mode lists configured cloud providers then local', () => {
@@ -35,14 +34,14 @@ describe('resolveProviderChain', () => {
   });
 
   it('skips providers that are missing a key or required model', () => {
-    const chain = resolveProviderChain({ AI_PROVIDERS: 'groq,openrouter,local', GROQ_API_KEY: 'gsk_x' });
-    expect(chain).toEqual([]); // groq needs GROQ_MODEL, openrouter needs a key, local needs a model
+    const chain = resolveProviderChain({ AI_PROVIDERS: 'groq,gemini,local', GROQ_API_KEY: 'gsk_x' });
+    expect(chain).toEqual([]); // groq needs GROQ_MODEL, gemini needs a key, local needs a model
   });
 
   it('routes a generic AI_API_KEY to its provider by prefix', () => {
-    const chain = resolveProviderChain({ AI_API_KEY: 'sk-or-generic', AI_MODEL: 'meta/some-model:free' });
+    const chain = resolveProviderChain({ AI_API_KEY: 'AIza-generic', AI_MODEL: 'gemini-3.8-flash-lite' });
     expect(chain).toHaveLength(1);
-    expect(chain[0]).toMatchObject({ id: 'openrouter', model: 'meta/some-model:free', apiKey: 'sk-or-generic' });
+    expect(chain[0]).toMatchObject({ id: 'gemini', model: 'gemini-3.8-flash-lite', apiKey: 'AIza-generic' });
   });
 
   it('supports a custom OpenAI-compatible endpoint (e.g. a hosted agent gateway)', () => {
@@ -57,13 +56,13 @@ describe('resolveProviderChain', () => {
 
   it('honours per-feature routes', () => {
     const env = {
-      AI_PROVIDERS: 'openrouter,local',
+      AI_PROVIDERS: 'gemini,local',
       AI_ROUTE_CHAT: 'local',
       AI_LOCAL_MODEL: 'qwen3:8b',
-      OPENROUTER_API_KEY: 'sk-or-x',
+      GEMINI_API_KEY: 'AIza-x',
     };
     expect(resolveProviderChain(env, { feature: 'chat' }).map((c) => c.id)).toEqual(['local']);
-    expect(resolveProviderChain(env, { feature: 'diagnostics' }).map((c) => c.id)).toEqual(['openrouter', 'local']);
+    expect(resolveProviderChain(env, { feature: 'diagnostics' }).map((c) => c.id)).toEqual(['gemini', 'local']);
   });
 
   it('puts a HUD-supplied key first for that request', () => {
@@ -75,9 +74,9 @@ describe('resolveProviderChain', () => {
   });
 
   it('never exposes keys in the public description', () => {
-    const [cfg] = resolveProviderChain({ OPENROUTER_API_KEY: 'sk-or-secret' });
+    const [cfg] = resolveProviderChain({ GEMINI_API_KEY: 'AIza-secret' });
     const info = describeProvider(cfg);
-    expect(JSON.stringify(info)).not.toContain('sk-or-secret');
+    expect(JSON.stringify(info)).not.toContain('AIza-secret');
     expect(info.hasKey).toBe(true);
   });
 });

@@ -50,7 +50,7 @@ npm run ai:local       # optional: verify Ollama and local model readiness
 npm run dev:all        # start Vite frontend + AI backend together
 ```
 
-Supported providers: local **Ollama / LM Studio** (`npm run dev:local` to force local), **OpenRouter** free models, **Gemini** free tier, **Groq**, or any OpenAI-compatible endpoint. See [`specs/04-ai-backend.md`](./specs/04-ai-backend.md).
+Supported providers: local **Ollama / LM Studio** (`npm run dev:local` to force local), **Gemini** free tier, **Groq**, or any OpenAI-compatible endpoint. See [`specs/04-ai-backend.md`](./specs/04-ai-backend.md).
 
 ### Verify Tests & Build
 ```bash

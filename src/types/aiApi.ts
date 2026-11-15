@@ -22,7 +22,7 @@ import type {
 
 // ── Providers ────────────────────────────────────────────────────────────────
 
-export type AiProviderId = 'local' | 'openrouter' | 'gemini' | 'groq' | 'custom';
+export type AiProviderId = 'local' | 'gemini' | 'groq' | 'custom';
 
 export type AiFeature =
   | 'guidance'

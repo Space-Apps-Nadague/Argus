@@ -18,7 +18,7 @@ import { METRIC_IDS } from '../../src/utils/triageEngine';
 import { createApp } from '../app';
 import { demoCheckIns } from '../models/wellbeingModel';
 
-const AI_ENV_PREFIXES = ['AI_', 'OPENROUTER_', 'GEMINI_', 'GROQ_'];
+const AI_ENV_PREFIXES = ['AI_', 'GEMINI_', 'GROQ_'];
 
 beforeAll(() => {
   for (const key of Object.keys(process.env)) {

@@ -43,7 +43,6 @@ function clientFor(cfg: ProviderConfig): OpenAI {
       baseURL: cfg.baseUrl,
       timeout: cfg.timeoutMs,
       maxRetries: 0, // the provider chain is our retry strategy
-      defaultHeaders: cfg.id === 'openrouter' ? { 'X-Title': 'ARGUS Crew Bio-Twin' } : undefined,
     });
     clients.set(cacheKey, client);
   }

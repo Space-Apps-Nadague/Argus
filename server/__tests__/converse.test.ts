@@ -14,7 +14,7 @@ import { tierForRequest } from '../routes/converse';
 
 beforeAll(() => {
   for (const key of Object.keys(process.env)) {
-    if (['AI_', 'OPENROUTER_', 'GEMINI_', 'GROQ_'].some((p) => key.startsWith(p))) delete process.env[key];
+    if (['AI_', 'GEMINI_', 'GROQ_'].some((p) => key.startsWith(p))) delete process.env[key];
   }
 });
 

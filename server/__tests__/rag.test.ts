@@ -20,7 +20,7 @@ import { orTsQuery, searchKnowledge } from '../rag/retriever';
 import { formatKnowledgeForPrompt, LOOKUP_MEDICAL_PROTOCOL_TOOL, lookupMedicalProtocol } from '../rag/tool';
 
 const DEMO_PW = 'demo-password-123';
-const AI_ENV_PREFIXES = ['AI_', 'OPENROUTER_', 'GEMINI_', 'GROQ_'];
+const AI_ENV_PREFIXES = ['AI_', 'GEMINI_', 'GROQ_'];
 
 describe('clinical-unit chunker', () => {
   it('never splits a list, even when it is larger than the chunk budget', () => {
