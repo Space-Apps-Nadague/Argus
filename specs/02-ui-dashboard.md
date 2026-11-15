@@ -66,6 +66,7 @@
 - **Main chart (Recharts `ComposedChart`):** history line/area (14d / 30d toggle) · shaded nominal band (`ReferenceArea`) · dashed yellow limit lines · dotted **personal baseline** band (mean ± 1 SD) · dashed **forecast** line for `MD+1..+3` with shaded 90% interval · check-in and logged points drawn as larger dots. A legend with 4 swatches replaces explanatory text.
 - **Drift card:** big `↑ 1.8σ` with level word (`Steady` / `Watch` / `Drifting`), one line "vs your first-week baseline (mean ± SD)". Forecast summary: `MD+3 ≈ value (lo–hi)`.
 - **"Why" card:** up to 5 `MetricLink` rows: `Sleep eff ↓ → HRV ↓ · next day`, a strength bar for `|r|`, the mechanism in an ⓘ tooltip. Footer: "Association, not cause." Empty state: "No strong links yet".
+- **CGM 24h Curve & Time-in-Range (`CgmPanel.tsx`, shown when `blood_glucose` is selected):** displays the active crew member's 5-minute interstitial glucose stream (`getCrewCgmMockData`), latest glucose + trend arrow (`double_up`..`double_down`), Time-in-Range (70–140 mg/dL %), Mean, CV%, Low/High %, and a 24h Recharts `AreaChart` with the 70–140 mg/dL target band shaded.
 
 ### 2.3 Forecast (`ForecastTab.tsx`)
 Readable 3-day outlook built only from deterministic models (`forecastMetric`, `computeDrift`, `calculateCrewReadinessScore`):
