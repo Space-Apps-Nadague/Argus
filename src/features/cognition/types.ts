@@ -80,6 +80,6 @@ export interface CareDecision {
   onboardSteps: string[];
   /** True when the Flight Surgeon on Earth should get a packet now. */
   notifyEarth: boolean;
-  /** Suggest opening the Emergency tab's medical protocol. */
+  /** Neuro zone is red: the crew should start the medical emergency procedure now. */
   openMedicalProtocol: boolean;
 }

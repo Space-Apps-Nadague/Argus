@@ -72,7 +72,6 @@ export type HudTabId =
   | 'forecast'
   | 'eyes'
   | 'ai'
-  | 'emergency'
   | 'cognition'
   | 'crew'
   | 'users'
@@ -111,24 +110,6 @@ export interface UserAccount {
   crewId?: string;
   createdAtIso: string;
   disabled?: boolean;
-}
-
-/** Emergency protocols (specs/01-data-schema.md §10) */
-export type EmergencyProtocolId = 'fire' | 'depress' | 'toxic' | 'medical' | 'radiation' | 'co2';
-
-export interface EmergencyProtocol {
-  id: EmergencyProtocolId;
-  title: string;
-  icon: string;
-  trigger: string;
-  steps: string[];
-}
-
-export interface EmergencyRun {
-  protocolId: EmergencyProtocolId;
-  crewId: string;
-  startedAtIso: string;
-  completed: Record<number, string>;
 }
 
 export type BloodType = 'O+' | 'O-' | 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-';

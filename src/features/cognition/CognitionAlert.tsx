@@ -3,7 +3,7 @@
  * Layout follows the team's alert reference: assess the urgency · follow the instructions · stay informed · be prepared.
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { AlertTriangle, CheckSquare, Square, Siren, RotateCcw, Satellite, Stethoscope } from 'lucide-react';
+import { AlertTriangle, CheckSquare, Square, RotateCcw, Satellite, Stethoscope } from 'lucide-react';
 import type { CareDecision } from './types';
 
 interface Props {
@@ -11,11 +11,10 @@ interface Props {
   gameTitle: string;
   earthPacket: { id: string; delay: string } | null;
   onRetest: () => void;
-  onOpenEmergency: () => void;
   onClose: () => void;
 }
 
-export const CognitionAlert: React.FC<Props> = ({ decision, gameTitle, earthPacket, onRetest, onOpenEmergency, onClose }) => {
+export const CognitionAlert: React.FC<Props> = ({ decision, gameTitle, earthPacket, onRetest, onClose }) => {
   const [done, setDone] = useState<Record<number, boolean>>({});
   const ref = useRef<HTMLDivElement>(null);
   const red = decision.severity === 'red';
@@ -111,11 +110,6 @@ export const CognitionAlert: React.FC<Props> = ({ decision, gameTitle, earthPack
               <button type="button" className="hud-btn" onClick={onRetest}>
                 <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" /> Retest after rest
               </button>
-              {(decision.openMedicalProtocol || red) && (
-                <button type="button" className="hud-btn border-status-red/60 text-status-red" onClick={onOpenEmergency}>
-                  <Siren className="h-3.5 w-3.5" aria-hidden="true" /> Open medical emergency protocol
-                </button>
-              )}
               <button type="button" className="hud-btn-primary ml-auto" onClick={onClose}>
                 Acknowledge
               </button>

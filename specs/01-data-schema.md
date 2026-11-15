@@ -497,34 +497,9 @@ export interface UserAccount {
 - Passwords: argon2id on the server, at least 10 characters. The first run creates the admin (`POST /api/auth/setup`, or `npm run db:seed`).
 - Archiving a crew member keeps their accounts and history; an admin purge deletes both.
 
-## 10. Emergency Protocols (`EmergencyProtocol`, `src/data/emergencyProtocols.ts`)
+## 10. Emergency Protocols (removed)
 
-```typescript
-export interface EmergencyProtocol {
-  id: 'fire' | 'depress' | 'toxic' | 'medical' | 'radiation' | 'co2';
-  title: string;
-  icon: string;                // lucide icon name
-  trigger: string;             // when to use it, one line
-  steps: string[];
-}
-
-export interface EmergencyRun {
-  protocolId: EmergencyProtocol['id'];
-  crewId: string;
-  startedAtIso: string;
-  completed: Record<number, string>; // step index → ISO time
-}
-```
-Runs are kept in memory for the session and included in the Earth packet notes when the crew taps `Notify Earth`.
-
-
-- **Offline Brain First:** Deterministic pure rule engine (`src/utils/companionBrain.ts`) answering questions on crew readiness, zone statuses, vitals vs personal baseline, drift & forecast, NASA HRP metric links, cumulative radiation, and spaceflight countermeasures with 0 network dependencies.
-- **Live Clinical AI Second:** Streams replies via `streamCrewChat` (`POST /api/ai/chat`) grounded in the crew snapshot when the ARGUS backend / AI provider is reachable; seamlessly falls back to the offline brain on network error or timeout.
-- **Voice I/O:** Optional text-to-speech with natural English voice synthesis (`window.speechSynthesis`) and voice dictation via Web Speech API (`SpeechRecognition`).
-- **Red-Flag Safety Guardrail:** Critical emergency phrases (chest pain, acute dyspnea, loss of consciousness, self-harm/crisis) immediately return an emergency action protocol advising the astronaut to stop activity, alert crewmates, and downlink an emergency packet to the Flight Surgeon. The companion NEVER mutates triage status or lowers urgency.
-- **Persistence:** Local conversation history is preserved per crew member in `localStorage` under `argus_companion_chat_<crewId>`.
-
----
+The Emergency tab, its protocol checklists (`EmergencyProtocol`, `EmergencyRun`, `src/data/emergencyProtocols.ts`) and the SOS shortcut were removed from the HUD.
 
 ## 11. Scheduled Mission Routine & Gamification Milestones (`REQ-08`, `REQ-09`)
 
@@ -620,7 +595,7 @@ The ISS Crew Medical Officer is usually not a physician and acts as an extender 
 | `green` / `calibrating` | none | — |
 | single `yellow`, previous game not in decline, neuro zone not red | **onboard** | CMO screen: sleep, SpO₂ + cabin ppCO₂, hydration/food, medication, rest 20 min and retest |
 | `red`, **or** previous game also declined, **or** neuro zone `red` | **earth** | Pause safety-critical tasks, onboard checks, Earth packet queued via `queueEarthPacket` with the decline details |
-| neuro zone `red` | earth + | Neuro red-flag check; offer the Emergency → Crew medical emergency protocol |
+| neuro zone `red` | earth + | Neuro red-flag check; start the crew medical emergency procedure |
 
 ### 12.5 Storage (`store.ts`)
 

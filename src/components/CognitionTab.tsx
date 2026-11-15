@@ -308,10 +308,6 @@ export const CognitionTab: React.FC = () => {
             setAlertOpen(false);
             setPlaying({ gameId: last.session.gameId, retest: true });
           }}
-          onOpenEmergency={() => {
-            setAlertOpen(false);
-            setActiveTab('emergency');
-          }}
           onClose={() => setAlertOpen(false)}
         />
       )}
