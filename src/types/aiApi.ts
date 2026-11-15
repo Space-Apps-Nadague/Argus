@@ -412,3 +412,56 @@ export interface VoiceTurnResponse {
 }
 
 export type VoiceTurnEnvelope = AiEnvelope<VoiceTurnResponse>;
+
+// ── AI knowledge base (RAG) — specs/04-ai-backend.md §4.2, specs/05-data-platform.md §3.6 ──
+export type RagDocKind = 'emergency_checklist' | 'countermeasure' | 'clinical_reference' | 'medication';
+export type RagRetrievalMode = 'db' | 'memory';
+export type RagCitationMode = 'search' | 'chat' | 'live-api' | 'on-ship-pipeline';
+
+export interface RagSearchRequest {
+  query: string;
+  zoneId?: BodyZoneId;
+  /** 1–10, default 5. */
+  limit?: number;
+  mode?: RagCitationMode;
+  /** `messages.id` the retrieval belongs to, for the citation log. */
+  messageId?: string;
+  crewMember?: { id: string };
+}
+
+export interface RagHit {
+  /** `rag_chunks.id`; null when served from the in-memory corpus. */
+  chunkId: string | null;
+  documentId: string;
+  /** `SRC-xxx`; null for in-repo content without a registered source. */
+  sourceId: string | null;
+  title: string;
+  kind: RagDocKind;
+  origin: string;
+  zoneIds: string[];
+  heading: string;
+  content: string;
+  rank: number;
+  score: number;
+  keywordRank: number | null;
+  vectorRank: number | null;
+}
+
+export interface RagSearchResponse {
+  hits: RagHit[];
+  retrieval: RagRetrievalMode;
+  embeddingModel: string | null;
+  latencyMs: number;
+}
+
+export interface RagStatus {
+  retrieval: RagRetrievalMode;
+  documents: number;
+  chunks: number;
+  embeddedChunks: number;
+  embeddingModel: string;
+}
+
+export type RagSearchEnvelope = AiEnvelope<RagSearchResponse>;
+export type RagStatusEnvelope = AiEnvelope<RagStatus>;
+

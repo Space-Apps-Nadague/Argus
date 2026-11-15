@@ -24,7 +24,7 @@ Columns:
 | SRC-001 | [5 Hazards of Human Spaceflight](https://www.nasa.gov/hrp/hazards/) (NASA HRP) | web | open | `specs/01-data-schema.md` §1 (zones and hazards), `src/data/telemetryScenarios.ts` (`BODY_ZONES`) |
 | SRC-002 | [Risks of Human Spaceflight](https://www.nasa.gov/hrp/risks/) (NASA HRP) | web | open | `server/models/diagnosticsRules.ts` (HRP risk candidates) |
 | SRC-003 | [Ongoing HRP Research in Space](https://www.nasa.gov/hrp/ongoing-hrp-research/) | web | open | `specs/05-data-platform.md` §4 (sensor kit context) |
-| SRC-004 | [Exploration Medical Condition List, NTRS 20110008645](https://ntrs.nasa.gov/api/citations/20110008645/downloads/20110008645.pdf) (Watkins, Barr & Kerstman, 2011) | paper | open | `src/data/emergencyProtocols.ts`, `server/models/diagnosticsRules.ts` |
+| SRC-004 | [Exploration Medical Condition List, NTRS 20110008645](https://ntrs.nasa.gov/api/citations/20110008645/downloads/20110008645.pdf) (Watkins, Barr & Kerstman, 2011) | paper | open | `src/data/emergencyProtocols.ts`, `server/models/diagnosticsRules.ts`, `server/rag/corpus.ts` (`rag_documents` `emergency/*`) |
 | SRC-005 | [NASA Life Sciences Portal: Experiments Explorer](https://nlsp.nasa.gov/explore?dataType=EXPERIMENTS) (NLSP / LSDA) | dataset | request | `specs/05-data-platform.md` §7 (why per-astronaut data must be simulated) |
 | SRC-006 | [Lifetime Surveillance of Astronaut Health (LSAH)](https://nlsp.nasa.gov/resources/lsah) | dataset | restricted | `specs/01-data-schema.md` §1–§2, `specs/05-data-platform.md` §7, `src/utils/triageEngine.ts` |
 | SRC-007 | [NASA-STD-3001 Vol 1 Rev C: Crew Health](https://standards.nasa.gov/sites/default/files/standards/NASA/C//nasa-std-3001-vol-1-rev-c-signature.pdf) (2023) | standard | open | `specs/05-data-platform.md` §7 (source for further limits; each must be checked against the PDF before it is added to `data/reference/thresholds.csv`) |
@@ -93,3 +93,13 @@ Columns:
 |---|---|---|---|---|
 | SRC-080 | [US NRC: Backgrounder on Biological Effects of Radiation](https://www.nrc.gov/reading-rm/doc-collections/fact-sheets/bio-effects-radiation) (natural background ≈ 3.1 mSv/yr in the US) | standard | open | `server/ingest/simulator.ts` (Earth pre-flight `rad_dose`), `specs/05-data-platform.md` §5.2 |
 
+## AI knowledge base (RAG)
+
+| ID | Source | Type | Access | Used in |
+|---|---|---|---|---|
+| SRC-081 | [Robertson & Zaragoza 2009, The Probabilistic Relevance Framework: BM25 and Beyond](https://doi.org/10.1561/1500000019) (k1 = 1.2, b = 0.75) | paper | open | `server/rag/memoryIndex.ts` (BM25), `specs/05-data-platform.md` §3.6 |
+| SRC-082 | [Cormack, Clarke & Büttcher 2009, Reciprocal Rank Fusion](https://doi.org/10.1145/1571941.1572114) (k = 60) | paper | open | `server/rag/retriever.ts` (fusion), `specs/05-data-platform.md` §3.6 |
+| SRC-083 | [Weinberger et al. 2009, Feature Hashing for Large Scale Multitask Learning](https://arxiv.org/abs/0902.2206) | paper | open | `server/rag/embeddings.ts` (offline `hash` embedder), `specs/05-data-platform.md` §3.6 |
+| SRC-084 | [PostgreSQL: Controlling Text Search (`ts_rank_cd`)](https://www.postgresql.org/docs/current/textsearch-controls.html) | standard | open | `server/rag/retriever.ts` (keyword search), `rag_chunks.search_tsv`, `specs/05-data-platform.md` §3.6 |
+| SRC-085 | [Ollama OpenAI compatibility (`/v1/embeddings`)](https://github.com/ollama/ollama/blob/main/docs/openai.md) | api | open | `server/rag/embeddings.ts` (`local`), `specs/05-data-platform.md` §3.6 |
+| SRC-086 | [Gemini API OpenAI compatibility (embeddings)](https://ai.google.dev/gemini-api/docs/openai) | api | open | `server/rag/embeddings.ts` (`gemini`), `specs/05-data-platform.md` §3.6 |
