@@ -48,6 +48,9 @@ interface AuthContextValue {
   canViewHealth: boolean;
   setupAdmin: (username: string, password: string) => Promise<void>;
   login: (username: string, password: string) => Promise<void>;
+  /** Server offers guest sign-in (no username or password). */
+  guestAvailable: boolean;
+  loginAsGuest: () => Promise<void>;
   /** Face ID enrollments stored on this device (any user). */
   faceEnrollments: FaceEnrollment[];
   /** The signed-in user has Face ID on this device. */
@@ -114,6 +117,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode; storage?: Accou
   const [serverUsers, setServerUsers] = useState<UserAccount[]>([]);
   const [setupNeeded, setSetupNeeded] = useState(false);
   const [serverMinPw, setServerMinPw] = useState(10);
+  const [serverGuest, setServerGuest] = useState(false);
 
   useEffect(() => {
     if (forceMode === 'local') return;
@@ -128,6 +132,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode; storage?: Accou
         setServerUser(me.user);
         setSetupNeeded(me.setupNeeded);
         setServerMinPw(me.minPasswordLength);
+        setServerGuest(Boolean(me.guestLogin));
         setMode('server');
       })
       .catch(() => !cancelled && setMode('local'));
@@ -177,6 +182,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode; storage?: Accou
     },
     [mode, localUsers]
   );
+
+  const loginAsGuest = useCallback(async () => {
+    if (mode !== 'server') throw new AuthError('Guest sign-in needs the ARGUS server.');
+    const { user } = await asAuthError(() => authApi.guest());
+    setServerUser(user);
+  }, [mode]);
 
   // ── Face ID (device-local templates; specs/02-ui-dashboard.md §6) ──
   const [faceEnrollments, setFaceEnrollments] = useState<FaceEnrollment[]>(() => loadEnrollments());
@@ -304,6 +315,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode; storage?: Accou
     canViewHealth: !(mode === 'server' && isAdmin && !currentUser?.crewId),
     setupAdmin,
     login,
+    guestAvailable: mode === 'server' && serverGuest && !setupNeeded,
+    loginAsGuest,
     faceEnrollments,
     hasFaceId: Boolean(currentUser && faceEnrollments.some((e) => e.userId === currentUser.id)),
     enrollFace,

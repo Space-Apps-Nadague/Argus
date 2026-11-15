@@ -34,13 +34,21 @@ export function toAccount(u: typeof users.$inferSelect): UserAccount {
 
 export const authRoutes = new Hono<AppEnv>();
 
+// ── Guest sign-in (spec 05 §6): one shared read-all `flight_surgeon` account, no password ──
+export const GUEST_USERNAME = 'guest';
+/** On unless ARGUS_GUEST_LOGIN is `off`, `false` or `0`. */
+export function guestLoginEnabled(): boolean {
+  const v = process.env.ARGUS_GUEST_LOGIN?.trim().toLowerCase();
+  return !(v === 'off' || v === 'false' || v === '0');
+}
+
 authRoutes.get('/auth/me', async (c) => {
   const db = c.get('db');
   if (!db) return c.json({ mode: 'stateless', error: 'Database not configured' }, 503);
   const user = c.get('user');
   const [{ n }] = await db.select({ n: count() }).from(users);
   const full = user ? (await db.select().from(users).where(eq(users.id, user.id)).limit(1))[0] : null;
-  return c.json({ mode: 'server', user: full ? toAccount(full) : null, setupNeeded: n === 0, minPasswordLength: MIN_PASSWORD_LENGTH });
+  return c.json({ mode: 'server', user: full ? toAccount(full) : null, setupNeeded: n === 0, minPasswordLength: MIN_PASSWORD_LENGTH, guestLogin: guestLoginEnabled() });
 });
 
 authRoutes.post('/auth/setup', async (c) => {
@@ -93,6 +101,28 @@ authRoutes.post('/auth/login', async (c) => {
   await createSession(c, db, user.id);
   await audit(c, { action: 'login', targetType: 'user', targetId: user.id, actorUserId: user.id });
   return c.json({ user: toAccount(user) });
+});
+
+authRoutes.post('/auth/guest', async (c) => {
+  const db = c.get('db');
+  if (!db) return c.json({ error: 'Database not configured' }, 503);
+  if (!guestLoginEnabled()) return c.json({ error: 'Guest sign-in is turned off.' }, 403);
+  if (!loginLimiter.take(clientIp(c) ?? 'local')) {
+    return c.json({ error: 'Too many sign-in attempts. Wait a minute and try again.' }, 429);
+  }
+  let guest = (await db.select().from(users).where(eq(users.username, GUEST_USERNAME)).limit(1))[0];
+  if (!guest) {
+    // Random password nobody knows: the account can only be entered through this endpoint.
+    const passwordHash = await hashPassword(randomBytes(32).toString('base64url'));
+    await db.insert(users).values({ username: GUEST_USERNAME, role: 'flight_surgeon', passwordHash }).onConflictDoNothing();
+    guest = (await db.select().from(users).where(eq(users.username, GUEST_USERNAME)).limit(1))[0];
+  }
+  if (!guest || guest.role !== 'flight_surgeon' || guest.disabledAt) {
+    return c.json({ error: 'Guest sign-in is not available.' }, 409);
+  }
+  await createSession(c, db, guest.id);
+  await audit(c, { action: 'login', targetType: 'user', targetId: guest.id, detail: { method: 'guest' }, actorUserId: guest.id });
+  return c.json({ user: toAccount(guest) });
 });
 
 authRoutes.post('/auth/logout', async (c) => {
