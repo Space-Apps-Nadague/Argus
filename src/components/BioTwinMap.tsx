@@ -63,8 +63,8 @@ const CAMERA_PRESETS: Record<
 > = {
   full_body: {
     label: 'Full Body',
-    position: [0, 0.05, 4.35],
-    target: [0, -0.05, 0],
+    position: [0, 0.05, 6.0],
+    target: [0, -0.02, 0],
   },
   cranial_sans: {
     label: 'Cranial / SANS',
@@ -395,7 +395,7 @@ export const BioTwinMap: React.FC = () => {
 
         <WebGLErrorBoundary fallback={fallback2DBioMap}>
           <Canvas
-            camera={{ position: [0, 0.05, 4.35], fov: 42 }}
+            camera={{ position: CAMERA_PRESETS.full_body.position, fov: 42 }}
             gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
             // Cap the pixel ratio: on 2x/3x screens the transparent, double-sided body was being
             // shaded at up to 9x the pixels. Drop further while the user drags (AdaptiveDpr).
@@ -451,7 +451,7 @@ export const BioTwinMap: React.FC = () => {
               regress
               enablePan={false}
               minDistance={1.5}
-              maxDistance={6.2}
+              maxDistance={8.5}
               minPolarAngle={Math.PI / 6}
               maxPolarAngle={(5 * Math.PI) / 6}
             />
