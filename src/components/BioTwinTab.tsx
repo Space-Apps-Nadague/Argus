@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { Stethoscope } from 'lucide-react';
+import { CheckCircle2, Circle, Send, Stethoscope } from 'lucide-react';
 import { useMission } from '../context/MissionContext';
 import { BODY_ZONES } from '../data/telemetryScenarios';
 import { computeDrift } from '../utils/driftAnalytics';
@@ -27,6 +27,10 @@ export const BioTwinTab: React.FC = () => {
     environment,
     setActiveTab,
     guidance,
+    completedStepIds,
+    toggleStepCompleted,
+    queueEarthPacket,
+    queuedPackets,
   } = useMission();
   const [isLoggerOpen, setIsLoggerOpen] = useState(false);
   const zone = BODY_ZONES[selectedZone];
@@ -91,15 +95,64 @@ export const BioTwinTab: React.FC = () => {
         </Card>
 
         {zoneStatus !== 'green' && (
-          <Card bodyClassName="p-4 flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-hud-text truncate">{guidance.headline}</p>
-              <p className="text-xs text-hud-muted">{guidance.guidedSteps.length} guided steps</p>
+          <Card
+            title="Flight Surgeon Countermeasures"
+            icon={<Stethoscope className="h-4 w-4" />}
+            bodyClassName="p-4 space-y-3"
+          >
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-hud-text">{guidance.headline}</p>
+              <p className="text-xs text-hud-muted">{guidance.plainLanguageExplanation}</p>
             </div>
-            <button type="button" className="hud-btn shrink-0" onClick={() => setActiveTab('console')}>
-              <Stethoscope className="h-4 w-4" aria-hidden="true" />
-              Open
-            </button>
+
+            <ul className="space-y-2">
+              {guidance.guidedSteps.map((step) => {
+                const done = completedStepIds.includes(step.id);
+                return (
+                  <li key={step.id}>
+                    <button
+                      type="button"
+                      onClick={() => toggleStepCompleted(step.id)}
+                      aria-pressed={done}
+                      className={`hud-focus flex w-full items-start gap-2.5 rounded-lg border p-2.5 text-left transition-colors ${
+                        done
+                          ? 'border-emerald-500/50 bg-emerald-950/25 text-hud-muted'
+                          : 'border-hud-line bg-hud-panel/60 text-hud-text hover:border-hud-accent/60'
+                      }`}
+                    >
+                      {done ? (
+                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" aria-hidden="true" />
+                      ) : (
+                        <Circle className="mt-0.5 h-4 w-4 shrink-0 text-hud-accent" aria-hidden="true" />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-baseline justify-between gap-2">
+                          <span className={`text-xs font-semibold ${done ? 'line-through' : ''}`}>{step.title}</span>
+                          <span className="font-mono text-[10px] text-hud-accent">{step.estimatedMinutes} min</span>
+                        </div>
+                        <p className="mt-0.5 text-[11px] text-hud-muted">{step.plainInstruction}</p>
+                        <p className="mt-0.5 font-mono text-[10px] text-hud-muted/80">{step.hardwareRequired}</p>
+                      </div>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+              <button
+                type="button"
+                className="hud-btn text-xs"
+                onClick={() => queueEarthPacket(guidance.headline)}
+              >
+                <Send className="h-3.5 w-3.5" aria-hidden="true" />
+                Queue Earth Packet{queuedPackets.length > 0 ? ` (${queuedPackets.length})` : ''}
+              </button>
+              <button type="button" className="hud-btn text-xs" onClick={() => setActiveTab('console')}>
+                <Stethoscope className="h-3.5 w-3.5" aria-hidden="true" />
+                Open ARGUS
+              </button>
+            </div>
           </Card>
         )}
       </div>
