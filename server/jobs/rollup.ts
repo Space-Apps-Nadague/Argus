@@ -30,6 +30,8 @@ export const LAST_OF_DAY_METRICS = [
   'core_temp',
   'daily_sleep_hours',
   'mood_index',
+  'hydration_intake',
+  'caloric_intake',
 ];
 
 /** Metrics whose daily value is the mean of the day's spot readings (watch blood pressure). */

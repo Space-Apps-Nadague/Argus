@@ -40,12 +40,12 @@ ARGUS supports 5 canonical mission location / habitat presets grounded in NASA H
 - `'solar_storm'` — **SPE Radiation Storm Alert**: Acute solar particle event raising cumulative dose rate (`immune` red, lymphocyte drop `1.05 k/µL`, skin erythema risk) and stress response (`cardio` / `behavioral` yellow).
 
 ### Metric Identifiers (`MetricId`)
-The 17 canonical metric IDs tracked across the 5 zones (see §2 catalog):
+The 19 canonical metric IDs tracked across the 5 zones (see §2 catalog):
 ```typescript
 export type MetricId =
   | 'onsd' | 'iop' | 'cabin_co2'
-  | 'resting_hr' | 'hrv_rmssd' | 'spo2' | 'systolic_bp'
-  | 'bmd_delta' | 'ared_load' | 'blood_glucose'
+  | 'resting_hr' | 'hrv_rmssd' | 'spo2' | 'systolic_bp' | 'hydration_intake'
+  | 'bmd_delta' | 'ared_load' | 'blood_glucose' | 'caloric_intake'
   | 'rad_dose' | 'wbc_lymph' | 'core_temp'
   | 'sleep_eff' | 'pvt_lapses' | 'daily_sleep_hours' | 'mood_index';
 ```
@@ -119,9 +119,11 @@ export interface ThresholdRange {
 | `cardio` | `hrv_rmssd` | Heart Rate Variability | `ms` | `42–85` (`30–95`) | `42–85` (`30–95`) | `42–85` (`30–95`) | `42–85` (`30–95`) | `42–85` (`30–95`) |
 | `cardio` | `spo2` | Arterial $\text{SpO}_2$ | `%` | `96–100` (`93–100`) | `96–100` (`93–100`) | `96–100` (`93–100`) | `96–100` (`93–100`) | `96–100` (`93–100`) |
 | `cardio` | `systolic_bp` | Systolic Blood Pressure | `mmHg` | `100–130` (`90–140`) | `100–130` (`90–140`) | `105–135` (`95–145`) | `110–135` (`95–145`) | `100–130` (`90–140`) |
+| `cardio` | `hydration_intake` | Daily Hydration Intake | `L/day` | `2.5–3.8` (`2.0–4.5`) | `2.5–3.8` (`2.0–4.5`) | `2.7–4.0` (`2.2–4.8`) | `2.7–4.0` (`2.2–4.8`) | `2.2–3.5` (`1.8–4.2`) |
 | `musculo` | `bmd_delta` | Femoral BMD Monthly $\Delta$ | `%` | `-0.8–0.2` (`-1.3–0.5`) | `-0.8–0.2` (`-1.3–0.5`) | `-0.6–0.2` (`-1.0–0.5`) | `-0.4–0.3` (`-0.8–0.6`) | `-0.2–0.2` (`-0.5–0.5`) |
 | `musculo` | `ared_load` | Daily ARED Resistance Load | `kN·reps` | `18–30` (`12–35`) | `18–30` (`12–35`) | `14–26` (`10–30`) | `12–24` (`8–28`) | `0–16` (`0–24`) |
 | `musculo` | `blood_glucose` | Blood Glucose | `mg/dL` | `70–110` (`60–140`) | `70–110` (`60–140`) | `70–110` (`60–140`) | `70–110` (`60–140`) | `70–110` (`60–140`) |
+| `musculo` | `caloric_intake` | Daily Caloric Intake | `kcal/day` | `2200–3200` (`1800–3600`) | `2200–3200` (`1800–3600`) | `2400–3400` (`2000–3800`) | `2400–3400` (`2000–3800`) | `2000–3000` (`1600–3400`) |
 | `immune` | `rad_dose` | 24h Radiation Dose Rate | `mSv/d` | `0.4–1.2` (`0.0–2.5`) | `0.2–0.6` (`0.0–1.2`) | `0.3–0.9` (`0.0–2.0`) | `0.3–0.8` (`0.0–1.8`) | `0.0–0.05` (`0.0–0.1`) |
 | `immune` | `wbc_lymph` | Lymphocyte Count | `k/µL` | `1.5–3.5` (`1.2–4.0`) | `1.5–3.5` (`1.2–4.0`) | `1.5–3.5` (`1.2–4.0`) | `1.5–3.5` (`1.2–4.0`) | `1.5–3.5` (`1.2–4.0`) |
 | `immune` | `core_temp` | Core Body Temperature | `°C` | `36.5–37.5` (`36.0–38.0`) | `36.5–37.5` (`36.0–38.0`) | `36.5–37.5` (`36.0–38.0`) | `36.5–37.5` (`36.0–38.0`) | `36.5–37.5` (`36.0–38.0`) |
@@ -152,9 +154,11 @@ Both tables live in `src/utils/triageEngine.ts` next to `METRIC_THRESHOLDS`. Nei
 | `hrv_rmssd` | `6` | `5` | `250` | Overnight RMSSD from your wearable. |
 | `spo2` | `0.7` | `70` | `100` | Finger oximeter, warm hand, still for 30 s. |
 | `systolic_bp` | `4` | `60` | `240` | Automatic: watch spot readings, seated (watch cuff-calibrated every 28 days). |
+| `hydration_intake` | `0.25` | `0.3` | `8.0` | Cumulative potable water & rehydration fluid dispenser log (L/day) [SRC-081]. |
 | `bmd_delta` | `0.15` | `-5` | `3` | Monthly QCT/DXA-equivalent scan result vs previous scan (%). |
 | `ared_load` | `2.5` | `0` | `60` | Total from the ARED/resistance device log for today. |
 | `blood_glucose` | `5` | `40` | `400` | Weekly fasting finger-prick, then a photo of the meter screen. |
+| `caloric_intake` | `180` | `500` | `6000` | Total daily food & beverage energy from the crew nutrition log (kcal/day) [SRC-081]. |
 | `rad_dose` | `0.15` | `0` | `50` | Personal dosimeter: last 24 h reading. |
 | `wbc_lymph` | `0.2` | `0.1` | `10` | Point-of-care blood analyzer, finger-prick sample. |
 | `core_temp` | `0.15` | `34.0` | `42.0` | Automatic: estimated from overnight watch wrist temperature. |

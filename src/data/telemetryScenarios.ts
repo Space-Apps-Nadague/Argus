@@ -261,6 +261,17 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
             'Brachial systolic blood pressure. Reflects arterial compliance and cephalad vascular tone.',
           history: build30DaySeries(120, 118, 0, 1.2),
         },
+        {
+          metricId: 'hydration_intake',
+          label: 'Daily Hydration Intake',
+          unit: 'L/day',
+          currentValue: 2.9,
+          deltaFromBaseline: 'Fluid Balance Nominal',
+          flightNormLabel: '0g Norm: 2.5–3.8 L/day',
+          plainDescription:
+            'Cumulative potable water and rehydration fluid intake. Prevents hypohydration, orthostatic intolerance, and renal stones.',
+          history: build30DaySeries(2.8, 2.9, 1, 0.15),
+        },
       ],
       musculo: [
         {
@@ -295,6 +306,17 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
           plainDescription:
             'Fasting blood glucose concentration. Tracks metabolic insulin sensitivity in unloaded muscle.',
           history: build30DaySeries(89, 92, 0, 1.5),
+        },
+        {
+          metricId: 'caloric_intake',
+          label: 'Daily Caloric Intake',
+          unit: 'kcal/day',
+          currentValue: 2680,
+          deltaFromBaseline: '100% EER Target Met',
+          flightNormLabel: '0g Norm: 2200–3200 kcal/day',
+          plainDescription:
+            'Total daily dietary energy intake. Sustains lean muscle mass and offsets ARED exercise expenditure.',
+          history: build30DaySeries(2620, 2680, 0, 80),
         },
       ],
       immune: [
@@ -468,6 +490,17 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
             'Elevated brachial systolic pressure associated with cephalad fluid redistribution and jugular engorgement.',
           history: build30DaySeries(120, 134, 0, 1.2, 19),
         },
+        {
+          metricId: 'hydration_intake',
+          label: 'Daily Hydration Intake',
+          unit: 'L/day',
+          currentValue: 2.6,
+          deltaFromBaseline: '-0.2 L/day Fluid Shift',
+          flightNormLabel: '0g Norm: 2.5–3.8 L/day',
+          plainDescription:
+            'Fluid intake remains within nominal bounds despite cephalad fluid shift.',
+          history: build30DaySeries(2.8, 2.6, 1, 0.15),
+        },
       ],
       musculo: [
         {
@@ -500,6 +533,17 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
           plainDescription:
             'Metabolic glucose levels within spaceflight expectations.',
           history: build30DaySeries(90, 96, 0, 1.4),
+        },
+        {
+          metricId: 'caloric_intake',
+          label: 'Daily Caloric Intake',
+          unit: 'kcal/day',
+          currentValue: 2450,
+          deltaFromBaseline: '-150 kcal/day Mild Appetite Dip',
+          flightNormLabel: '0g Norm: 2200–3200 kcal/day',
+          plainDescription:
+            'Caloric intake adequate; monitor for cranial-discomfort-related appetite suppression.',
+          history: build30DaySeries(2600, 2450, 0, 75),
         },
       ],
       immune: [
@@ -667,6 +711,17 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
             'Hypercapnia-driven sympathetic vasoconstriction and elevated systemic blood pressure.',
           history: build30DaySeries(122, 138, 0, 1.5, 21),
         },
+        {
+          metricId: 'hydration_intake',
+          label: 'Daily Hydration Intake',
+          unit: 'L/day',
+          currentValue: 2.2,
+          deltaFromBaseline: '-0.6 L/day Hypercapnic Deficit',
+          flightNormLabel: '0g Norm: 2.5–3.8 L/day',
+          plainDescription:
+            'Reduced fluid intake during CO₂-induced headache and malaise; increases renal stone and orthostatic risk.',
+          history: build30DaySeries(2.8, 2.2, 1, 0.12, 22),
+        },
       ],
       musculo: [
         {
@@ -699,6 +754,17 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
           plainDescription:
             'Slight elevation in fasting glucose secondary to systemic hypercapnic stress response.',
           history: build30DaySeries(90, 104, 0, 1.3, 22),
+        },
+        {
+          metricId: 'caloric_intake',
+          label: 'Daily Caloric Intake',
+          unit: 'kcal/day',
+          currentValue: 2050,
+          deltaFromBaseline: '-600 kcal/day CO₂ Anorexia',
+          flightNormLabel: '0g Norm: 2200–3200 kcal/day',
+          plainDescription:
+            'Sub-target caloric intake caused by hypercapnic nausea and fatigue; risks lean mass catabolism.',
+          history: build30DaySeries(2650, 2050, 0, 85, 22),
         },
       ],
       immune: [
@@ -902,6 +968,17 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
             'Transient sympathetic elevation during radiation storm shelter lockdown.',
           history: build30DaySeries(120, 132, 0, 1.2, 24),
         },
+        {
+          metricId: 'hydration_intake',
+          label: 'Daily Hydration Intake',
+          unit: 'L/day',
+          currentValue: 2.3,
+          deltaFromBaseline: '-0.5 L/day Shelter Rationing',
+          flightNormLabel: '0g Norm: 2.5–3.8 L/day',
+          plainDescription:
+            'Mild hypohydration during storm shelter confinement; maintain minimum 2.5 L/day to protect renal clearance.',
+          history: build30DaySeries(2.8, 2.3, 1, 0.12, 24),
+        },
       ],
       musculo: [
         {
@@ -936,6 +1013,17 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
           plainDescription:
             'Mild metabolic counter-regulatory hormone release during emergency shelter protocol.',
           history: build30DaySeries(91, 102, 0, 1.2, 24),
+        },
+        {
+          metricId: 'caloric_intake',
+          label: 'Daily Caloric Intake',
+          unit: 'kcal/day',
+          currentValue: 2100,
+          deltaFromBaseline: '-540 kcal/day Shelter Deficit',
+          flightNormLabel: '0g Norm: 2200–3200 kcal/day',
+          plainDescription:
+            'Reduced caloric intake in radiation storm shelter; supplement with compact high-protein meal bars.',
+          history: build30DaySeries(2640, 2100, 0, 80, 24),
         },
       ],
       behavioral: [
@@ -1280,9 +1368,18 @@ export function getOfflineFlightSurgeonGuidance(
           stepNumber: 2,
           title: 'Isotonic Hydration & Electrolyte Bolus Check',
           plainInstruction:
-            'Consume 450 mL electrolyte solution to maintain intravascular plasma volume and support HRV recovery.',
+            'Consume 450 mL electrolyte solution to maintain intravascular plasma volume, support HRV recovery, and meet the 2.5 L/day NASA-STD-3001 hydration baseline.',
           hardwareRequired: 'Galley Hydration Dispenser',
           estimatedMinutes: 5,
+        },
+        {
+          id: 'cardio-def-3',
+          stepNumber: 3,
+          title: 'Log Potable Water & Rehydration Fluid Intake',
+          plainInstruction:
+            'Check your daily dispenser total. If below 2.5 L/day (or 2.7 L/day on Lunar/Mars EVA), drink 250 mL/hour over the next 2 hours to prevent hypohydration and kidney stones.',
+          hardwareRequired: 'Galley Water Dispenser + ARGUS Log',
+          estimatedMinutes: 3,
         },
       ],
     },
@@ -1293,7 +1390,7 @@ export function getOfflineFlightSurgeonGuidance(
           : 'Reduced Skeletal Loading — Resume Resistive Countermeasures',
       hazardContextSummary: `${envContextMap[environment]} Without Earth-normal axial loading, femoral neck and lumbar spine lose bone mineral density unless countered by high-force resistive exercise.`,
       plainLanguageExplanation:
-        'Your bones and postural muscles need daily heavy resistance loading so they do not weaken in reduced gravity. Keep your ARED squat and deadlift impulse inside the target zone.',
+        'Your bones and postural muscles need daily heavy resistance loading and adequate caloric intake so they do not weaken in reduced gravity. Keep your ARED squat impulse and daily nutrition inside the target zone.',
       earthConsultUrgency: triageStatus === 'green' ? 'routine_downlink' : 'priority_packet',
       guidedSteps: [
         {
@@ -1313,6 +1410,15 @@ export function getOfflineFlightSurgeonGuidance(
             'Confirm daily Vitamin D3 intake and ensure urinary calcium excretion strip remains below hypercalciuria threshold.',
           hardwareRequired: 'Nutritional Pack + Urine Test Strip',
           estimatedMinutes: 5,
+        },
+        {
+          id: 'musc-def-3',
+          stepNumber: 3,
+          title: 'Caloric & Protein Energy-Balance Supplement',
+          plainInstruction:
+            'If daily caloric intake drops below 2200 kcal/day (2400 kcal/day on EVA days), add a high-protein spaceflight meal bar and rehydrated entrée to prevent muscle catabolism.',
+          hardwareRequired: 'Galley Food Warmer + Crew Nutrition Log',
+          estimatedMinutes: 10,
         },
       ],
     },
