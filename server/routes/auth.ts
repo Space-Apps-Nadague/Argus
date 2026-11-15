@@ -2,16 +2,17 @@
  * /api/auth — server-side sign-in (specs/05-data-platform.md §6, §8)
  */
 
-import { count, eq } from 'drizzle-orm';
+import { randomBytes } from 'node:crypto';
+import { and, count, eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import type { UserAccount } from '../../src/types/argus';
 import { audit, clientIp } from '../auth/audit';
 import { getDummyHash, hashPassword, MIN_PASSWORD_LENGTH, validatePassword, validateUsername, verifyPassword } from '../auth/passwords';
 import { RateLimiter } from '../auth/rateLimit';
-import { createSession, destroySession } from '../auth/session';
+import { createSession, destroySession, hashToken, requireAuth } from '../auth/session';
 import type { AppEnv } from '../auth/types';
-import { users } from '../db/schema';
+import { faceLogins, users } from '../db/schema';
 import { parseBody } from './util';
 
 export const LOCKOUT_THRESHOLD = 5;
@@ -100,5 +101,59 @@ authRoutes.post('/auth/logout', async (c) => {
   const user = c.get('user');
   await destroySession(c, db);
   if (user) await audit(c, { action: 'logout', targetType: 'user', targetId: user.id });
+  return c.json({ ok: true });
+});
+
+// ── Face ID (spec 05 §6): the browser matches the face on-device, then presents this device token ──
+const faceLimiter = new RateLimiter(20, 60_000);
+const FaceTokenSchema = z.object({ token: z.string().min(20).max(200) });
+
+authRoutes.post('/auth/face/enroll', requireAuth(), async (c) => {
+  const db = c.get('db');
+  const user = c.get('user');
+  if (!db || !user) return c.json({ error: 'Database not configured' }, 503);
+  const token = randomBytes(32).toString('base64url');
+  await db.insert(faceLogins).values({ userId: user.id, tokenHash: hashToken(token), userAgent: c.req.header('user-agent')?.slice(0, 300) });
+  await audit(c, { action: 'face_enroll', targetType: 'user', targetId: user.id });
+  return c.json({ token }, 201);
+});
+
+authRoutes.post('/auth/face/login', async (c) => {
+  const db = c.get('db');
+  if (!db) return c.json({ error: 'Database not configured' }, 503);
+  if (!faceLimiter.take(clientIp(c) ?? 'local')) {
+    return c.json({ error: 'Too many sign-in attempts. Wait a minute and try again.' }, 429);
+  }
+  const body = await parseBody(c, FaceTokenSchema);
+  if (!body.ok) return body.response;
+  const row = (
+    await db
+      .select({ faceId: faceLogins.id, user: users })
+      .from(faceLogins)
+      .innerJoin(users, eq(users.id, faceLogins.userId))
+      .where(eq(faceLogins.tokenHash, hashToken(body.data.token)))
+      .limit(1)
+  )[0];
+  if (!row || row.user.disabledAt) {
+    await audit(c, { action: 'login_failed', targetType: 'user', targetId: row?.user.id, detail: { method: 'face_id' }, actorUserId: null });
+    return c.json({ error: 'Face ID is no longer valid on this device. Sign in with your password.' }, 401);
+  }
+  if (row.user.lockedUntil && row.user.lockedUntil > new Date()) {
+    return c.json({ error: 'Too many failed attempts. This account is locked for 15 minutes.' }, 423);
+  }
+  await db.update(faceLogins).set({ lastUsedAt: new Date() }).where(eq(faceLogins.id, row.faceId));
+  await createSession(c, db, row.user.id);
+  await audit(c, { action: 'login', targetType: 'user', targetId: row.user.id, detail: { method: 'face_id' }, actorUserId: row.user.id });
+  return c.json({ user: toAccount(row.user) });
+});
+
+authRoutes.post('/auth/face/remove', requireAuth(), async (c) => {
+  const db = c.get('db');
+  const user = c.get('user');
+  if (!db || !user) return c.json({ ok: true });
+  const body = await parseBody(c, FaceTokenSchema);
+  if (!body.ok) return body.response;
+  await db.delete(faceLogins).where(and(eq(faceLogins.tokenHash, hashToken(body.data.token)), eq(faceLogins.userId, user.id)));
+  await audit(c, { action: 'face_remove', targetType: 'user', targetId: user.id });
   return c.json({ ok: true });
 });
