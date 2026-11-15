@@ -23,7 +23,14 @@ export type AnatomicalLayer = 'all' | 'dermal' | 'skeletal' | 'organs';
 
 export type TriageStatus = 'green' | 'yellow' | 'red';
 
-export type ScenarioId = 'nominal' | 'sans_alert' | 'high_co2' | 'solar_storm';
+export type ScenarioId =
+  | 'nominal'
+  | 'sans_alert'
+  | 'high_co2'
+  | 'solar_storm'
+  | 'dehydration'
+  | 'sleep_loss'
+  | 'deconditioning';
 
 export type MetricId =
   | 'onsd'
@@ -44,7 +51,19 @@ export type MetricId =
   | 'sleep_eff'
   | 'pvt_lapses'
   | 'daily_sleep_hours'
-  | 'mood_index';
+  | 'mood_index'
+  | 'diastolic_bp'
+  | 'sleep_resp_rate'
+  | 'vo2_max'
+  | 'hemoglobin'
+  | 'urine_sg'
+  | 'grip_strength'
+  | 'body_mass_delta'
+  | 'crp'
+  | 'cortisol'
+  | 'reaction_time'
+  | 'headache_severity'
+  | 'hyperopic_shift';
 
 export type HudTabId =
   | 'biotwin'

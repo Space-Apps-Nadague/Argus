@@ -12,11 +12,12 @@ import {
   GravityEnvironment,
   ScenarioDefinition,
   ScenarioId,
-  TelemetryHistoryPoint,
   TriageStatus,
   VitalSignReading,
   VisualExamSample,
 } from '../types/argus';
+import { build30DaySeries } from './seriesBuilder';
+import { extendScenarios } from './scenarioExtensions';
 import { commDelayForEnvironment } from './spaceLocations';
 import { evaluateZoneStatus } from '../utils/triageEngine';
 import { matchOfflineSymptomGuidance } from '../utils/symptomFallback';
@@ -148,40 +149,7 @@ export const ZONE_ORDER: BodyZoneId[] = [
   'behavioral',
 ];
 
-/**
- * Deterministic helper to generate a 30-day longitudinal series with smooth progression
- * and realistic physiological micro-variability.
- */
-function build30DaySeries(
-  startVal: number,
-  endVal: number,
-  precision: number = 1,
-  waveAmp: number = 0.08,
-  lateSpikeStartDay: number = 18
-): TelemetryHistoryPoint[] {
-  const points: TelemetryHistoryPoint[] = [];
-  for (let day = 1; day <= 30; day++) {
-    let t = (day - 1) / 29;
-    // Allow steeper drift after day 18 for crisis scenarios
-    if (Math.abs(endVal - startVal) > 0.5 && day >= lateSpikeStartDay) {
-      const lateT = (day - lateSpikeStartDay) / (30 - lateSpikeStartDay);
-      t = 0.35 + 0.65 * Math.pow(lateT, 1.25);
-    } else if (Math.abs(endVal - startVal) > 0.5) {
-      t = 0.35 * ((day - 1) / Math.max(1, lateSpikeStartDay - 1));
-    }
-    const wave = Math.sin(day * 1.15) * waveAmp + Math.cos(day * 0.6) * (waveAmp * 0.5);
-    const raw = day === 30 ? endVal : startVal + (endVal - startVal) * t + wave;
-    const factor = Math.pow(10, precision);
-    points.push({
-      missionDay: day,
-      dateLabel: `MD-${day}`,
-      value: Math.round(raw * factor) / factor,
-    });
-  }
-  return points;
-}
-
-export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
+const BASE_SCENARIOS: Record<'nominal' | 'sans_alert' | 'high_co2' | 'solar_storm', ScenarioDefinition> = {
   nominal: {
     id: 'nominal',
     label: 'Nominal Deep-Space Cruise',
@@ -1090,6 +1058,9 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
     },
   },
 };
+
+/** All scenarios: the four original templates, extended with the 12-metric panel plus three more scenarios. */
+export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = extendScenarios(BASE_SCENARIOS);
 
 /**
  * Deterministically adjusts a scenario's 5-zone telemetry readings to reflect

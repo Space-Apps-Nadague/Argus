@@ -39,16 +39,25 @@ ARGUS supports 5 canonical mission location / habitat presets grounded in NASA H
 - `'sans_alert'` — **SANS Optic Disc Edema Alert**: Elevated Optic Nerve Sheath Diameter (ONSD `6.4 mm`) and intraocular pressure (`23 mmHg`) in `neuro`.
 - `'high_co2'` — **Habitat $\text{CO}_2$ Scrubber Degradation**: Elevated cabin $\text{ppCO}_2$ (`5.8 mmHg`) driving cerebral vasodilation (`neuro` yellow/red), tachycardia (`cardio` yellow), and cognitive fatigue (`behavioral` yellow).
 - `'solar_storm'` — **SPE Radiation Storm Alert**: Acute solar particle event raising cumulative dose rate (`immune` red, lymphocyte drop `1.05 k/µL`, skin erythema risk) and stress response (`cardio` / `behavioral` yellow).
+- `'dehydration'` — **Dehydration & Fluid-Balance Deficit**: intake `1.5 L/day`, urine SG `1.032`, resting HR `88 bpm`, diastolic BP `58 mmHg`, body mass `-5.6 %` (`cardio` / `metabolic` red).
+- `'sleep_loss'` — **Circadian Disruption & Sleep Debt**: sleep `4.6 h` at `64 %` efficiency, `8` PVT lapses, reaction time `395 ms`, cortisol `24.8 µg/dL` (`behavioral` red).
+- `'deconditioning'` — **Musculoskeletal Deconditioning**: ARED load `9 kN·reps`, BMD `-1.6 %`, grip strength `26 kg`, VO₂max `31 mL/kg/min` (`musculo` / `cardio` red).
+
+Every scenario carries the same 31 metrics (`src/data/scenarioExtensions.ts` adds the 12 extended metrics to the four originals and derives the three extra scenarios from `nominal`). The original four keep their zone-level triage story; the extended metrics only add detail.
 
 ### Metric Identifiers (`MetricId`)
-The 19 canonical metric IDs tracked across the 6 zones (see §2 catalog):
+The 31 canonical metric IDs tracked across the 6 zones (see §2 catalog). The last 12 form the extended panel (§2 "Extended panel"):
 ```typescript
 export type MetricId =
   | 'onsd' | 'iop' | 'cabin_co2'
   | 'resting_hr' | 'hrv_rmssd' | 'spo2' | 'systolic_bp' | 'hydration_intake'
   | 'bmd_delta' | 'ared_load' | 'blood_glucose' | 'caloric_intake'
   | 'rad_dose' | 'wbc_lymph' | 'core_temp'
-  | 'sleep_eff' | 'pvt_lapses' | 'daily_sleep_hours' | 'mood_index';
+  | 'sleep_eff' | 'pvt_lapses' | 'daily_sleep_hours' | 'mood_index'
+  // extended panel
+  | 'diastolic_bp' | 'sleep_resp_rate' | 'vo2_max' | 'hemoglobin' | 'urine_sg'
+  | 'grip_strength' | 'body_mass_delta' | 'crp' | 'cortisol' | 'reaction_time'
+  | 'headache_severity' | 'hyperopic_shift';
 ```
 `VitalSignReading.metricId` stays typed as `string` for backward compatibility; new code uses `MetricId`.
 
@@ -133,6 +142,24 @@ export interface ThresholdRange {
 | `behavioral` | `daily_sleep_hours` | Daily Sleep Duration | `hours` | `7.0–9.0` (`6.0–10.0`) | `7.0–9.0` (`6.0–10.0`) | `7.0–9.0` (`6.0–10.0`) | `7.0–9.0` (`6.0–10.0`) | `7.0–9.0` (`6.0–10.0`) |
 | `behavioral` | `mood_index` | Behavioral Mood Index | `/10` | `7.0–10.0` (`5.0–10.0`) | `7.0–10.0` (`5.0–10.0`) | `7.0–10.0` (`5.0–10.0`) | `7.0–10.0` (`5.0–10.0`) | `7.0–10.0` (`5.0–10.0`) |
 
+### Extended panel (12 more daily parameters)
+Thresholds are identical in every environment (`METRIC_THRESHOLDS_0G`). Readings per scenario: `src/data/scenarioExtensions.ts` (`EXTRA_METRICS`).
+
+| Zone | Metric ID | Label | Unit | Nominal (`yellow`) | Collected by |
+|---|---|---|---|---|---|
+| `neuro` | `headache_severity` | Headache Severity | `/10` | `0–2` (`0–4`) | watch tap-survey, daily |
+| `neuro` | `hyperopic_shift` | Near-Vision Hyperopic Shift | `D` | `-0.25–0.5` (`-0.5–1.0`) | digital near-vision check, weekly |
+| `cardio` | `diastolic_bp` | Diastolic Blood Pressure | `mmHg` | `60–85` (`55–90`) | watch spot readings (daily mean) |
+| `cardio` | `sleep_resp_rate` | Sleeping Respiration Rate | `br/min` | `12–18` (`10–22`) | watch, nightly |
+| `cardio` | `vo2_max` | Aerobic Capacity (VO₂max) | `mL/kg/min` | `38–60` (`32–70`) | cycle ergometer test, every 3 days |
+| `cardio` | `hemoglobin` | Hemoglobin | `g/dL` | `12.5–17.0` (`11.5–18.0`) | blood analyzer, every 3 days |
+| `cardio` | `urine_sg` | Urine Specific Gravity | `SG` | `1.005–1.025` (`1.002–1.030`) | urine refractometer, daily |
+| `musculo` | `grip_strength` | Grip Strength | `kg` | `35–60` (`28–68`) | hand dynamometer, every 3 days |
+| `metabolic` | `body_mass_delta` | Body Mass Change vs pre-flight | `%` | `-3.0–1.0` (`-5.0–2.0`) | mass device, daily |
+| `immune` | `crp` | C-Reactive Protein | `mg/L` | `0–3` (`0–10`) | blood analyzer, every 3 days |
+| `behavioral` | `cortisol` | Morning Cortisol | `µg/dL` | `6–18` (`3–23`) | salivary strip, every 3 days |
+| `behavioral` | `reaction_time` | Mean Reaction Time | `ms` | `200–300` (`180–360`) | watch PVT, daily |
+
 ### Passive Wearable Metrics (non-triage) and how each indicator is collected
 With the two-device kit (`specs/05-data-platform.md` §4) nothing needs typing:
 - **From the watch:** `systolic_bp` (cuff-calibrated every 28 days [SRC-075]), `daily_sleep_hours`, `core_temp`, `mood_index` and `pvt_lapses`. Body temperature is *estimated* from overnight wrist temperature against the personal baseline [SRC-074]; a watch does not measure true core temperature. Mood is one tap a day.
@@ -197,6 +224,7 @@ Calculated deterministically in `src/utils/triageEngine.ts`:
 - Base score: `98%`
 - Each metric in `'yellow'` status deducts `3%`
 - Each metric in `'red'` status deducts `8%`
+- When a panel has more than 19 readings, both deductions are scaled by `19 / n` so the 31-metric panel scores like the original 19-metric one.
 - Completed countermeasure checklist items in the active session add `+3%` each (capped at `100%`, minimum `15%`).
 
 ### Continuous Glucose Monitor (CGM) Crew Mock Stream (`src/data/cgmMockData.ts`)

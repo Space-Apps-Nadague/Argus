@@ -12,14 +12,14 @@ import { astronauts, dailyMetrics, devices, missions, observations } from '../db
 import { runAnalytics } from '../jobs/analytics';
 import { evaluateTriage, rollupDays } from '../jobs/rollup';
 import { ingestReadings } from './service';
-import { simulate } from './simulator';
+import { DEFAULT_SECONDARY_EVERY_MIN, simulate } from './simulator';
 
 const DAY_MS = 86_400_000;
 const DEVICE_SOURCE: Partial<Record<DeviceKind, string>> = Object.fromEntries(SENSOR_KIT.map((k) => [k.kind, k.sourceId]));
 
 export interface BackfillOptions {
   days?: number;
-  /** Days of Earth pre-flight data before mission start (default 14; 0 = none). */
+  /** Days of Earth pre-flight data before mission start (default 30; 0 = none). */
   preflightDays?: number;
   seed?: number;
   crewIds?: string[];
@@ -75,7 +75,7 @@ export async function backfillSimulated(db: Db, opts: BackfillOptions = {}): Pro
     const templateStart = missionStart ?? new Date(now.getTime() - 29 * DAY_MS);
     let from = new Date(Math.max(templateStart.getTime(), now.getTime() - (opts.days ?? 30) * DAY_MS));
     // Include the Earth pre-flight period when the window reaches back to launch (spec 05 §5.2).
-    const preflightDays = opts.preflightDays ?? 14;
+    const preflightDays = opts.preflightDays ?? 30;
     if (preflightDays > 0 && from.getTime() <= templateStart.getTime()) {
       from = new Date(templateStart.getTime() - preflightDays * DAY_MS);
     }
@@ -114,7 +114,7 @@ export async function backfillSimulated(db: Db, opts: BackfillOptions = {}): Pro
       to: now,
       templateStart,
       seed: opts.seed ?? 42,
-      secondaryEveryMin: opts.secondaryEveryMin ?? 5,
+      secondaryEveryMin: opts.secondaryEveryMin ?? DEFAULT_SECONDARY_EVERY_MIN,
     });
     const devs = await deviceMap(db, id);
     let total = 0;
