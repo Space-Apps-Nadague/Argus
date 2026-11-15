@@ -194,10 +194,13 @@ export function regression(x: number[], y: number[], minN: number): { r: number;
   return b && c ? { r: a / Math.sqrt(b * c), slope: a / b, n } : null;
 }
 
-/** Statistically found links (|r| >= 0.6, n >= 7), strongest 8. */
+/** At most this many of the 8 links may touch a research sensor, so they can't crowd out core links. */
+export const MAX_RESEARCH_LINKS = 4;
+
+/** Statistically found links (|r| >= 0.6, n >= 7), strongest 8. Includes the sensor ring. */
 export function findLinks(p: Person): Link[] {
   const g = dayValues(p.checkIns);
-  const keys = INDICATORS.filter((i) => i.flag !== 'X').map((i) => i.key);
+  const keys = ALL_INDICATORS.filter((i) => i.flag !== 'X').map((i) => i.key);
   const out: Link[] = [];
   keys.forEach((a) =>
     keys.forEach((b) => {
@@ -210,13 +213,23 @@ export function findLinks(p: Person): Link[] {
       });
     })
   );
-  return out.sort((p1, q) => Math.abs(q.r) - Math.abs(p1.r)).slice(0, 8);
+  let research = 0;
+  return out
+    .sort((p1, q) => Math.abs(q.r) - Math.abs(p1.r))
+    .filter((l) => !isResearchLink(l) || ++research <= MAX_RESEARCH_LINKS)
+    .slice(0, 8);
 }
 
 export function linkText(l: Link): string {
   const A = INDICATOR_BY_KEY[l.a].label;
   const B = INDICATOR_BY_KEY[l.b].label;
-  return `${A} ${l.lagDays ? '→ next-day' : '↔ same-day'} ${B}: r=${fmt(l.r, 2)}, n=${l.n}`;
+  const research = isResearchLink(l) ? ' (research sensor: correlation only)' : '';
+  return `${A} ${l.lagDays ? '→ next-day' : '↔ same-day'} ${B}: r=${fmt(l.r, 2)}, n=${l.n}${research}`;
+}
+
+/** True when either end of the link is a research-grade sensor (drawn dashed). */
+export function isResearchLink(l: Link): boolean {
+  return [l.a, l.b].some((k) => INDICATOR_BY_KEY[k]?.sensor?.readiness === 'research');
 }
 
 /** One-line advice to bring an abnormal indicator back. */

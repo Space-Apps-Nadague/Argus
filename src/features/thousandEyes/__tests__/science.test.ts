@@ -8,6 +8,8 @@ import {
   deviationIndex,
   findLinks,
   indicatorStatus,
+  isResearchLink,
+  linkText,
   phaseAt,
   readiness,
   sdv,
@@ -194,6 +196,34 @@ describe('sensor ring', () => {
     expect(s.status).toBe(1);
     expect(s.red).toBe(false);
     expect(Number.isNaN(deviationIndex([s]))).toBe(true);
-    expect(findLinks(p).every((l) => l.a !== 'cort' && l.b !== 'cort')).toBe(true);
+  });
+
+  it('links a sensor eye to a related core metric, marked as research', () => {
+    const stress = [1, 2, 3, 2, 4, 5, 3, 1, 2, 4];
+    const checkIns: CheckIn[] = stress.map((v, i) => ({
+      t: NOW - (stress.length - i) * DAY + 1,
+      phase: 'mis',
+      env: 'mtr',
+      values: { stress: v, cort: 30 + 15 * v + (i % 2) },
+    }));
+    const p: Person = { checkIns, env: 'mtr', created: NOW - 20 * DAY, launch: NOW - 11 * DAY };
+    const link = findLinks(p).find((l) => [l.a, l.b].includes('cort') && [l.a, l.b].includes('stress') && l.lagDays === 0);
+    expect(link).toBeDefined();
+    expect(link!.r).toBeGreaterThan(0.9);
+    expect(isResearchLink(link!)).toBe(true);
+    expect(linkText(link!)).toContain('correlation only');
+  });
+
+  it('keeps at most 4 research-sensor links so core links are not crowded out', () => {
+    const days = [1, 2, 3, 2, 4, 5, 3, 1, 2, 4, 5, 3];
+    const checkIns: CheckIn[] = days.map((v, i) => ({
+      t: NOW - (days.length - i) * DAY + 1,
+      phase: 'mis',
+      env: 'mtr',
+      values: { stress: v, mood: 6 - v + (i % 2) * 0.2, cort: 30 + 15 * v, eda: 2 + v, lac: 1 + v / 2, swr: 0.5 + v / 5 },
+    }));
+    const links = findLinks({ checkIns, env: 'mtr', created: NOW - 20 * DAY, launch: NOW - 13 * DAY });
+    expect(links.filter(isResearchLink).length).toBeLessThanOrEqual(4);
+    expect(links.some((l) => !isResearchLink(l))).toBe(true);
   });
 });

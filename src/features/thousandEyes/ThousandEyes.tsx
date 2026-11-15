@@ -9,7 +9,7 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { RING_ORDER, SENSOR_RING_ORDER, SYSTEM_COLORS } from './indicators';
 import { LOCATION_LABEL } from './locationShift';
-import { allStatuses, deviationIndex, findLinks, fmt, indicatorStatus, linkText, readiness } from './science';
+import { allStatuses, deviationIndex, findLinks, fmt, indicatorStatus, isResearchLink, linkText, readiness } from './science';
 import { readinessColor, statusStyle } from './statusColors';
 import type { Indicator, IndicatorStatus, Person } from './types';
 import { EyePopover } from './EyePopover';
@@ -122,6 +122,7 @@ export const ThousandEyes: React.FC<ThousandEyesProps> = ({ person, now, locatio
               fill="none"
               stroke="#9b7bff"
               strokeWidth={1 + 3 * Math.abs(l.r)}
+              strokeDasharray={isResearchLink(l) ? '6 4' : undefined}
               opacity={0.5}
               pointerEvents="none"
             >
@@ -200,13 +201,13 @@ export const ThousandEyes: React.FC<ThousandEyesProps> = ({ person, now, locatio
           );
         })}
 
-        <text x={C} y={C - 6} textAnchor="middle" fontSize={56} fontWeight={800} fill={readinessColor(score)} style={{ fontFamily: 'Orbitron, sans-serif' }}>
+        <text x={C} y={C - 6} textAnchor="middle" fontSize={56} stroke="#0A0E14" strokeWidth={6} paintOrder="stroke" fontWeight={800} fill={readinessColor(score)} style={{ fontFamily: 'Orbitron, sans-serif' }}>
           {score == null ? '–' : score}
         </text>
-        <text x={C} y={C + 18} textAnchor="middle" fontSize={10.5} fill="#7d8fa3" letterSpacing={1}>
+        <text x={C} y={C + 18} textAnchor="middle" fontSize={10.5} stroke="#0A0E14" strokeWidth={4} paintOrder="stroke" fill="#7d8fa3" letterSpacing={1}>
           PERSONAL READINESS
         </text>
-        <text x={C} y={C + 36} textAnchor="middle" fontSize={10.5} fill="#7d8fa3">
+        <text x={C} y={C + 36} textAnchor="middle" fontSize={10.5} stroke="#0A0E14" strokeWidth={4} paintOrder="stroke" fill="#7d8fa3">
           deviation index {fmt(pdi, 2)} σ
         </text>
       </svg>
