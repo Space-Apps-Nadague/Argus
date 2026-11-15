@@ -191,7 +191,8 @@ export const BioTwinMap: React.FC = () => {
     },
     []
   );
-  // Organ status = worst of its Thousand Eyes indicators vs. the personal baseline.
+  // Organ status = worst of its Thousand Eyes indicators vs. the personal baseline and its zone's triage
+  // status, so a zone that is red on the fixed thresholds is red on the body too.
   const organNow = useMemo(() => Date.now(), [zones, spaceLocationId]);
   const organs = useMemo(() => {
     const person = buildPerson({
@@ -199,8 +200,8 @@ export const BioTwinMap: React.FC = () => {
       metrics: ZONE_ORDER.flatMap((z) => zones[z]),
       now: organNow,
     });
-    return organStates(person, organNow);
-  }, [zones, spaceLocationId, organNow]);
+    return organStates(person, organNow, zoneStatuses);
+  }, [zones, spaceLocationId, organNow, zoneStatuses]);
   const organStatus = useMemo(
     () => Object.fromEntries(Object.entries(organs).map(([id, o]) => [id, o.status])) as Record<OrganId, Status | undefined>,
     [organs]
@@ -220,7 +221,7 @@ export const BioTwinMap: React.FC = () => {
   const [autoRotate, setAutoRotate] = useState<boolean>(
     () => !(typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)
   );
-  const [showScannerBeam, setShowScannerBeam] = useState<boolean>(true);
+  const [showScannerBeam, setShowScannerBeam] = useState<boolean>(false);
   const [cameraPreset, setCameraPreset] = useState<CameraPresetId>('full_body');
   const [isInteracting, setIsInteracting] = useState<boolean>(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -277,7 +278,7 @@ export const BioTwinMap: React.FC = () => {
   return (
     <section
       aria-label="3D Holographic Human Bio-Twin Central Stage"
-      className="hud-card flex h-full flex-col overflow-hidden min-w-0"
+      className="hud-card flex flex-col overflow-hidden min-w-0"
     >
       {/* Stage toolbar: anatomy · scanner · rotate · reset (labels in tooltips) */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-hud-line px-4 py-2.5 min-w-0">
@@ -380,7 +381,7 @@ export const BioTwinMap: React.FC = () => {
           CENTRAL EXPANSIVE 3D HOLOGRAPHIC VIEWPORT (STAR OF THE DASHBOARD)
          ============================================================ */}
       <div
-        className="relative flex-1 min-h-[320px] sm:min-h-[380px] md:min-h-[440px] lg:min-h-[480px] xl:min-h-[520px] w-full bg-[radial-gradient(ellipse_at_center,_rgba(8,51,68,0.42)_0%,_rgba(2,6,23,0.96)_72%)]"
+        className="relative h-[clamp(320px,calc(100vh-290px),680px)] w-full bg-[radial-gradient(ellipse_at_center,_rgba(8,51,68,0.42)_0%,_rgba(2,6,23,0.96)_72%)]"
         onMouseEnter={() => setIsInteracting(true)}
         onMouseLeave={() => {
           setIsInteracting(false);

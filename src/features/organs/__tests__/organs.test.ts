@@ -47,4 +47,26 @@ describe('organStates', () => {
     expect(s.heart.status).toBe(0);
     expect(s.kidneys.status).toBeUndefined();
   });
+
+  it('shows the worse of the zone triage status and the ring status, so a red zone is red on the body', () => {
+    const checkIns = [60, 61, 60, 60].map((v, i) => ({
+      t: NOW - (4 - i) * DAY,
+      phase: (i < 3 ? 'pre' : 'mis') as 'pre' | 'mis',
+      env: 'earth' as const,
+      values: { rhr: v, spo2: 98 },
+    }));
+    const p: Person = { checkIns, env: 'earth', created: NOW - 5 * DAY, launch: NOW - 1.5 * DAY };
+    const s = organStates(p, NOW, { cardio: 'red', neuro: 'yellow', immune: 'green' });
+    // Heart and lungs are on baseline on the ring but their zone is red on the fixed thresholds.
+    expect(s.heart.ringStatus).toBe(0);
+    expect(s.heart.zoneStatus).toBe(2);
+    expect(s.heart.status).toBe(2);
+    expect(s.lungs.status).toBe(2);
+    // Brain has no ring data: the zone alone decides.
+    expect(s.brain.ringStatus).toBeUndefined();
+    expect(s.brain.status).toBe(1);
+    // A green zone with no ring data shows green; without zone data the ring alone decides.
+    expect(s.spleen.status).toBe(0);
+    expect(organStates(p, NOW).heart.status).toBe(0);
+  });
 });

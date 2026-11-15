@@ -91,7 +91,6 @@ const OrganTwinModelImpl: React.FC<OrganTwinModelProps> = ({
 }) => {
   const isFemale = sex === 'female';
   const pulseGroupRef = useRef<THREE.Group>(null);
-  const haloRef = useRef<THREE.Group>(null);
   const heartRef = useRef<THREE.Group>(null);
   const lungsRef = useRef<THREE.Group>(null);
   const scanRingRef = useRef<THREE.Group>(null);
@@ -138,10 +137,6 @@ const OrganTwinModelImpl: React.FC<OrganTwinModelProps> = ({
 
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime();
-    if (haloRef.current) {
-      haloRef.current.rotation.z = t * 0.55;
-      haloRef.current.rotation.x = Math.sin(t * 0.65) * 0.22;
-    }
     if (pulseGroupRef.current) pulseGroupRef.current.position.y = -0.02 + Math.sin(t * 1.8) * 0.015;
     if (heartRef.current) {
       const beat = (t * 1.15) % 1;
@@ -193,16 +188,16 @@ const OrganTwinModelImpl: React.FC<OrganTwinModelProps> = ({
     metalness: 0.2,
   });
   const boneMat = (o: number) => organMat('bones', boneOpacity(o), bonesActive);
+  // The skin stays a neutral hologram so coloured organs show through it; the muscles' status is on
+  // their own marker (tinting the whole skin hid every organ behind one colour).
   const skinMat = (core = false) => {
-    const st = organStatus.muscles;
-    const alert = st != null && st > 0;
     const sel = selectedOrgan === 'muscles' || hoveredOrgan === 'muscles';
     return {
-      color: alert ? hexFor(st) : sel ? '#38bdf8' : isFemale ? '#22d3ee' : '#38bdf8',
-      emissive: alert ? hexFor(st) : '#0284c7',
-      emissiveIntensity: alert ? 0.5 : sel ? 0.38 : 0.22,
+      color: sel ? '#38bdf8' : isFemale ? '#22d3ee' : '#38bdf8',
+      emissive: '#0284c7',
+      emissiveIntensity: sel ? 0.38 : 0.18,
       transparent: true,
-      opacity: alert ? 0.52 : sel ? 0.5 : core ? 0.42 : 0.42,
+      opacity: sel ? 0.34 : core ? 0.22 : 0.2,
       roughness: 0.22,
       metalness: 0.18,
       clearcoat: 0.9,
@@ -294,20 +289,6 @@ const OrganTwinModelImpl: React.FC<OrganTwinModelProps> = ({
               <meshBasicMaterial color="#38bdf8" wireframe transparent opacity={i === 1 ? 0.055 : 0.04} depthWrite={false} />
             </mesh>
           ))}
-        </group>
-      )}
-
-      {/* Behavioural halo (decorative) */}
-      {peel !== 'skeleton' && (
-        <group ref={haloRef} position={[0, 1.72, 0]}>
-          <mesh rotation={[Math.PI / 2.3, 0, 0]}>
-            <torusGeometry args={[0.36, 0.014, 16, 64]} />
-            <meshStandardMaterial {...neutralMat(0.6)} />
-          </mesh>
-          <mesh rotation={[-Math.PI / 3.1, 0.42, 0]}>
-            <torusGeometry args={[0.42, 0.01, 16, 64]} />
-            <meshStandardMaterial {...neutralMat(0.45)} />
-          </mesh>
         </group>
       )}
 
