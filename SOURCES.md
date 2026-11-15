@@ -92,4 +92,6 @@ Columns:
 | ID | Source | Type | Access | Used in |
 |---|---|---|---|---|
 | SRC-080 | [US NRC: Backgrounder on Biological Effects of Radiation](https://www.nrc.gov/reading-rm/doc-collections/fact-sheets/bio-effects-radiation) (natural background ≈ 3.1 mSv/yr in the US) | standard | open | `server/ingest/simulator.ts` (Earth pre-flight `rad_dose`), `specs/05-data-platform.md` §5.2 |
+| SRC-081 | [NASA-STD-3001 Vol 2 Rev D: Human Factors, Habitability, and Environmental Health](https://standards.nasa.gov/standard/NASA/NASA-STD-3001-VOL-2) (EER caloric equations, +200 kcal/hr EVA, 2.5 L/day baseline potable water) | standard | open | `specs/01-data-schema.md` §2, `src/utils/triageEngine.ts` (`caloric_intake`, `hydration_intake`), `server/db/catalog.ts` |
+| SRC-082 | [NASA HRP Risk of Inadequate Food and Nutrition](https://humanresearchroadmap.nasa.gov/Risks/risk.aspx?i=93) (spaceflight energy balance, flavor fatigue, hypohydration & renal stone risk) | web | open | `specs/01-data-schema.md` §2, `src/utils/triageEngine.ts`, `src/data/telemetryScenarios.ts` |
 

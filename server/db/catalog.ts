@@ -70,6 +70,8 @@ export const TRIAGE_METRICS: MetricDef[] = [
   triage('core_temp', 'Body Temperature (watch estimate)', '°C', 'immune', 'derived', 'SRC-074'),
   triage('daily_sleep_hours', 'Daily Sleep Duration', 'hours', 'behavioral', 'passive', 'SRC-074'),
   triage('mood_index', 'Mood Index (watch tap)', '/10', 'behavioral', 'self_report', 'SRC-009'),
+  triage('hydration_intake', 'Daily Hydration Intake', 'L/day', 'cardio', 'self_report', 'SRC-081'),
+  triage('caloric_intake', 'Daily Caloric Intake', 'kcal/day', 'musculo', 'self_report', 'SRC-081'),
 ];
 
 /** Minute-level passive streams from the assumed sensor kit (spec 05 §4.2). */

@@ -108,10 +108,14 @@ export const METRIC_THRESHOLDS_0G: Record<string, ThresholdRange> = {
   spo2: { nominalMin: 96, nominalMax: 100, yellowMin: 93, yellowMax: 100 },
   // Team bands (PR #20). Clinical reference: AHA categories and hypotension <90/60 (Source: SRC-070, SRC-071).
   systolic_bp: { nominalMin: 100, nominalMax: 130, yellowMin: 90, yellowMax: 140 },
+  // NASA-STD-3001 Vol 2 Rev D baseline 2.5 L/day potable water & rehydration (Source: SRC-081, SRC-082).
+  hydration_intake: { nominalMin: 2.5, nominalMax: 3.8, yellowMin: 2.0, yellowMax: 4.5 },
   bmd_delta: { nominalMin: -0.8, nominalMax: 0.2, yellowMin: -1.3, yellowMax: 0.5 },
   ared_load: { nominalMin: 18, nominalMax: 30, yellowMin: 12, yellowMax: 35 },
   // Team bands (PR #20). Clinical reference: ADA fasting ranges and hypoglycemia levels (Source: SRC-072, SRC-073).
   blood_glucose: { nominalMin: 70, nominalMax: 110, yellowMin: 60, yellowMax: 140 },
+  // NASA-STD-3001 Vol 2 Rev D EER caloric intake with ARED countermeasures (Source: SRC-081, SRC-082).
+  caloric_intake: { nominalMin: 2200, nominalMax: 3200, yellowMin: 1800, yellowMax: 3600 },
   rad_dose: { nominalMin: 0.4, nominalMax: 1.2, yellowMin: 0.0, yellowMax: 2.5 },
   wbc_lymph: { nominalMin: 1.5, nominalMax: 3.5, yellowMin: 1.2, yellowMax: 4.0 },
   // Body temperature. With the watch-only kit it is estimated from overnight wrist temperature (Source: SRC-074).
@@ -146,6 +150,9 @@ export const ENVIRONMENT_METRIC_THRESHOLDS: Record<
     systolic_bp: { nominalMin: 105, nominalMax: 135, yellowMin: 95, yellowMax: 145 },
     bmd_delta: { nominalMin: -0.6, nominalMax: 0.2, yellowMin: -1.0, yellowMax: 0.5 },
     ared_load: { nominalMin: 14, nominalMax: 26, yellowMin: 10, yellowMax: 30 },
+    // Surface EVA ops (+200 kcal/hr, 0.24 L/hr) increase caloric and hydration requirements (Source: SRC-081).
+    caloric_intake: { nominalMin: 2400, nominalMax: 3400, yellowMin: 2000, yellowMax: 3800 },
+    hydration_intake: { nominalMin: 2.7, nominalMax: 4.0, yellowMin: 2.2, yellowMax: 4.8 },
     rad_dose: { nominalMin: 0.3, nominalMax: 0.9, yellowMin: 0.0, yellowMax: 2.0 },
   },
   'mars_base': {
@@ -157,6 +164,8 @@ export const ENVIRONMENT_METRIC_THRESHOLDS: Record<
     systolic_bp: { nominalMin: 110, nominalMax: 135, yellowMin: 95, yellowMax: 145 },
     bmd_delta: { nominalMin: -0.4, nominalMax: 0.3, yellowMin: -0.8, yellowMax: 0.6 },
     ared_load: { nominalMin: 12, nominalMax: 24, yellowMin: 8, yellowMax: 28 },
+    caloric_intake: { nominalMin: 2400, nominalMax: 3400, yellowMin: 2000, yellowMax: 3800 },
+    hydration_intake: { nominalMin: 2.7, nominalMax: 4.0, yellowMin: 2.2, yellowMax: 4.8 },
     rad_dose: { nominalMin: 0.3, nominalMax: 0.8, yellowMin: 0.0, yellowMax: 1.8 },
   },
   // Grounding: NASA LSAH (Source: SRC-006) and Spaceflight Standard Measures (Source: SRC-009) terrestrial clinical baseline.
@@ -168,6 +177,8 @@ export const ENVIRONMENT_METRIC_THRESHOLDS: Record<
     resting_hr: { nominalMin: 55, nominalMax: 80, yellowMin: 50, yellowMax: 90 },
     bmd_delta: { nominalMin: -0.2, nominalMax: 0.2, yellowMin: -0.5, yellowMax: 0.5 },
     ared_load: { nominalMin: 0, nominalMax: 16, yellowMin: 0, yellowMax: 24 },
+    caloric_intake: { nominalMin: 2000, nominalMax: 3000, yellowMin: 1600, yellowMax: 3400 },
+    hydration_intake: { nominalMin: 2.2, nominalMax: 3.5, yellowMin: 1.8, yellowMax: 4.2 },
     rad_dose: { nominalMin: 0.0, nominalMax: 0.05, yellowMin: 0.0, yellowMax: 0.1 },
   },
 };
@@ -184,9 +195,11 @@ export const METRIC_TYPICAL_SD: Record<MetricId, number> = {
   hrv_rmssd: 6,
   spo2: 0.7,
   systolic_bp: 4,
+  hydration_intake: 0.25,
   bmd_delta: 0.15,
   ared_load: 2.5,
   blood_glucose: 5,
+  caloric_intake: 180,
   rad_dose: 0.15,
   wbc_lymph: 0.2,
   core_temp: 0.15,
@@ -214,9 +227,11 @@ export const METRIC_INPUT_RANGES: Record<MetricId, MetricInputRange> = {
   hrv_rmssd: { min: 5, max: 250, how: 'Overnight RMSSD from your wearable.' },
   spo2: { min: 70, max: 100, how: 'Finger oximeter, warm hand, still for 30 s.' },
   systolic_bp: { min: 60, max: 240, how: 'Automatic: watch blood-pressure spot readings, seated (watch calibrated with a cuff every 28 days).' },
+  hydration_intake: { min: 0.3, max: 8.0, how: 'Cumulative potable water & rehydration fluid dispenser log (L/day).' },
   bmd_delta: { min: -5, max: 3, how: 'Monthly QCT/DXA-equivalent scan result vs previous scan (%).' },
   ared_load: { min: 0, max: 60, how: 'Total from the ARED/resistance device log for today.' },
   blood_glucose: { min: 40, max: 400, how: 'Weekly fasting finger-prick on the glucometer, then a photo of the meter screen.' },
+  caloric_intake: { min: 500, max: 6000, how: 'Total daily food & beverage energy from the crew nutrition log (kcal/day).' },
   rad_dose: { min: 0, max: 50, how: 'Personal dosimeter: last 24 h reading.' },
   wbc_lymph: { min: 0.1, max: 10, how: 'Point-of-care blood analyzer, finger-prick sample.' },
   core_temp: { min: 34.0, max: 42.0, how: 'Automatic: estimated from overnight watch wrist temperature vs your baseline.' },
