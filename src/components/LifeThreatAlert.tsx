@@ -3,14 +3,15 @@
  *
  * When the active crew member's latest reading is possible but immediately dangerous
  * (`LIFE_THREAT_LIMITS`, e.g. 42 °C body temperature), an EMERGENCY ALERT card pops up over
- * whatever tab is open. One alarm sound plays when it appears. It stays until the crew presses
+ * whatever tab is open. One alarm beep plays when it appears, then a voice says what is wrong and
+ * what to do ("Emergency alert. Body temperature 42 degrees Celsius. Stop all work…"). It stays until the crew presses
  * OK. A new value for the same metric raises a new alert. Settings → "Test emergency alert"
  * shows a clearly labelled test alert (`triggerTestAlert`).
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useMission } from '../context/MissionContext';
-import { playAlarmTone, primeAlarmAudio } from '../utils/alarmTone';
+import { alertSpeech, playAlarmTone, primeAlarmAudio, speakAlert } from '../utils/alarmTone';
 import type { LifeThreat } from '../utils/vitalLimits';
 
 const ACK_STORAGE_KEY = 'argus_life_threat_ack_v1';
@@ -57,6 +58,7 @@ export const LifeThreatAlert: React.FC = () => {
   const [acks, setAcks] = useState<Set<string>>(loadAcks);
   const [tests, setTests] = useState<LifeThreat[]>([]);
   const played = useRef<Set<string>>(new Set());
+  const stopSpeech = useRef<() => void>(() => undefined);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => primeAlarmAudio(), []);
@@ -75,6 +77,8 @@ export const LifeThreatAlert: React.FC = () => {
     if (!fresh.length) return;
     fresh.forEach((t) => played.current.add(t.key));
     playAlarmTone();
+    stopSpeech.current();
+    stopSpeech.current = speakAlert(alertSpeech(pending, activeCrewMember.callsign));
     buttonRef.current?.focus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signature]);
@@ -82,6 +86,7 @@ export const LifeThreatAlert: React.FC = () => {
   if (!pending.length) return null;
 
   const acknowledge = () => {
+    stopSpeech.current();
     const next = new Set(acks);
     pending.filter((t) => !t.key.startsWith('test|')).forEach((t) => next.add(t.key));
     saveAcks(next);
