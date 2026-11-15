@@ -3,7 +3,8 @@
  * ARGUS changes the ship's (simulated) systems and explains it out loud.
  */
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Satellite, Settings, Siren } from 'lucide-react';
 import { triggerTestAlert } from './LifeThreatAlert';
 import { triggerSpacecraftEvent } from './SpacecraftAlert';
@@ -12,11 +13,31 @@ import { SPACECRAFT_EVENT_IDS, SPACECRAFT_EVENTS } from '../features/spacecraft/
 export const SettingsMenu: React.FC = () => {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+
+  // The menu is drawn in a portal above everything: the top bar's own layer would otherwise let
+  // the page content cover the lower part of the list.
+  useLayoutEffect(() => {
+    if (!open) return;
+    const place = () => {
+      const r = ref.current?.getBoundingClientRect();
+      if (r) setPos({ top: r.bottom + 4, right: Math.max(8, window.innerWidth - r.right) });
+    };
+    place();
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    return () => {
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      if (!ref.current?.contains(t) && !menuRef.current?.contains(t)) setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
     document.addEventListener('mousedown', onDown);
@@ -40,8 +61,15 @@ export const SettingsMenu: React.FC = () => {
       >
         <Settings className="h-4 w-4" aria-hidden="true" />
       </button>
-      {open && (
-        <div role="menu" className="hud-card absolute right-0 top-full z-50 mt-1 w-72 p-2">
+      {open &&
+        pos &&
+        createPortal(
+        <div
+          ref={menuRef}
+          role="menu"
+          className="hud-card fixed z-[150] max-h-[calc(100vh-5rem)] w-72 overflow-y-auto p-2"
+          style={{ top: pos.top, right: pos.right }}
+        >
           <p className="px-2 pb-1 pt-0.5 text-[10px] font-semibold uppercase tracking-widest text-hud-muted">Settings</p>
           <button
             type="button"
@@ -84,8 +112,9 @@ export const SettingsMenu: React.FC = () => {
               </button>
             );
           })}
-        </div>
-      )}
+        </div>,
+          document.body
+        )}
     </div>
   );
 };
