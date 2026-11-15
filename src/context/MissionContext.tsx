@@ -147,7 +147,7 @@ export function resolveLiveGuidance(
   return escalateStaleGuidance(guidance, liveStatus);
 }
 const TAB_STORAGE_KEY = 'argus_active_tab_v1';
-const HUD_TABS: HudTabId[] = ['biotwin', 'trends', 'forecast', 'eyes', 'console', 'cognition', 'crew', 'users', 'photobooth'];
+const HUD_TABS: HudTabId[] = ['biotwin', 'trends', 'forecast', 'eyes', 'console', 'cognition', 'crew', 'users', 'photobooth', 'recovery'];
 const LOCATIONS_STORAGE_KEY = 'argus_locations_v1';
 
 function loadInitialLocations(): Record<string, SpaceLocationId> {

@@ -76,7 +76,8 @@ export type HudTabId =
   | 'cognition'
   | 'crew'
   | 'users'
-  | 'photobooth';
+  | 'photobooth'
+  | 'recovery';
 
 /** Mission location (specs/01-data-schema.md §8) */
 export type SpaceLocationId =

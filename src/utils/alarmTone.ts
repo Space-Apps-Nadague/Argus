@@ -158,8 +158,18 @@ export type AlertStep = { kind: 'beep' } | { kind: 'say'; text: string };
 export function alertSteps(message: string, repeats = 1, intro = 'Alert!'): AlertStep[] {
   const steps: AlertStep[] = [];
   for (let i = 0; i < repeats; i++) steps.push({ kind: 'beep' }, { kind: 'say', text: intro });
-  if (message) steps.push({ kind: 'say', text: message });
+  // One utterance per sentence: Chrome's online voices stop a long utterance after ~15 s and then
+  // stay stuck, so nothing else is spoken until the page reloads.
+  for (const s of splitSentences(message)) steps.push({ kind: 'say', text: s });
   return steps;
+}
+
+/** Splits text into sentences (keeps "38.5" and similar together). */
+export function splitSentences(text: string): string[] {
+  return text
+    .split(/(?<=[.!?])\s+(?=[A-Z0-9"'“])/)
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 /**
@@ -173,9 +183,23 @@ export function runAlertSequence(message: string, repeats = 1, opts: { intro?: s
   const steps = alertSteps(message, repeats, opts.intro).filter((s) => s.kind === 'beep' || synth);
   let cancelled = false;
   let timer = 0;
+  // Chrome workaround: pausing and resuming every few seconds keeps a long utterance from stalling.
+  const keepAlive = synth
+    ? window.setInterval(() => {
+        try {
+          if (synth.speaking && !synth.paused) {
+            synth.pause();
+            synth.resume();
+          }
+        } catch {
+          /* ignore */
+        }
+      }, 5000)
+    : 0;
   const next = (i: number) => {
     if (cancelled) return;
     if (i >= steps.length) {
+      window.clearInterval(keepAlive);
       opts.onDone?.();
       return;
     }
@@ -210,9 +234,10 @@ export function runAlertSequence(message: string, repeats = 1, opts: { intro?: s
       next(i + 1);
     }
   };
-  // Chrome drops a speak() issued right after cancel(), so clear old speech and wait a moment.
+  // Always clear old speech first (it may be stuck), then wait a moment: Chrome drops a speak()
+  // issued right after cancel().
   try {
-    if (synth && (synth.speaking || synth.pending)) synth.cancel();
+    synth?.cancel();
   } catch {
     /* ignore */
   }
@@ -225,6 +250,7 @@ export function runAlertSequence(message: string, repeats = 1, opts: { intro?: s
   return () => {
     cancelled = true;
     window.clearTimeout(timer);
+    window.clearInterval(keepAlive);
     try {
       if (synth && (synth.speaking || synth.pending)) synth.cancel();
     } catch {

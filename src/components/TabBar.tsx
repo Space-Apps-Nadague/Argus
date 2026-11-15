@@ -5,7 +5,7 @@
  */
 
 import React, { useRef } from 'react';
-import { Activity, Bot, Brain, Camera, Eye, LineChart, Telescope, UserCog, Users } from 'lucide-react';
+import { Activity, Bot, Brain, Camera, Eye, Globe, LineChart, Telescope, UserCog, Users } from 'lucide-react';
 import { HudTabId } from '../types/argus';
 import { useMission } from '../context/MissionContext';
 
@@ -30,6 +30,7 @@ export const HUD_TAB_DEFS: HudTabDef[] = [
   { id: 'eyes', label: 'Eyes', icon: <Eye className="w-4 h-4" /> },
   { id: 'console', label: 'ARGUS', icon: <Bot className="w-4 h-4" /> },
   { id: 'cognition', label: 'Cognition', icon: <Brain className="w-4 h-4" /> },
+  { id: 'recovery', label: 'Return to Earth', icon: <Globe className="w-4 h-4" /> },
   { id: 'crew', label: 'Crew', icon: <Users className="w-4 h-4" />, needs: 'roster' },
   { id: 'users', label: 'Users', icon: <UserCog className="w-4 h-4" />, needs: 'users' },
   { id: 'photobooth', label: 'Photobooth', icon: <Camera className="w-4 h-4" /> },
