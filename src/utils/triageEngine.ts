@@ -135,6 +135,21 @@ export const METRIC_THRESHOLDS_0G: Record<string, ThresholdRange> = {
   pvt_lapses: { nominalMin: 0, nominalMax: 2, yellowMin: 0, yellowMax: 4 },
   daily_sleep_hours: { nominalMin: 7.0, nominalMax: 9.0, yellowMin: 6.0, yellowMax: 10.0 },
   mood_index: { nominalMin: 7.0, nominalMax: 10.0, yellowMin: 5.0, yellowMax: 10.0 },
+  // Extended panel (mock-data expansion). Clinical references: AHA diastolic categories, normal adult respiratory
+  // rate, ACSM VO2max norms, WHO hemoglobin cut-offs, urine specific gravity hydration bands, NASA "space anemia"
+  // (Source: SRC-009, SRC-029, SRC-081).
+  diastolic_bp: { nominalMin: 60, nominalMax: 85, yellowMin: 55, yellowMax: 90 },
+  sleep_resp_rate: { nominalMin: 12, nominalMax: 18, yellowMin: 10, yellowMax: 22 },
+  vo2_max: { nominalMin: 38, nominalMax: 60, yellowMin: 32, yellowMax: 70 },
+  hemoglobin: { nominalMin: 12.5, nominalMax: 17.0, yellowMin: 11.5, yellowMax: 18.0 },
+  urine_sg: { nominalMin: 1.005, nominalMax: 1.025, yellowMin: 1.002, yellowMax: 1.030 },
+  grip_strength: { nominalMin: 35, nominalMax: 60, yellowMin: 28, yellowMax: 68 },
+  body_mass_delta: { nominalMin: -3.0, nominalMax: 1.0, yellowMin: -5.0, yellowMax: 2.0 },
+  crp: { nominalMin: 0, nominalMax: 3, yellowMin: 0, yellowMax: 10 },
+  cortisol: { nominalMin: 6, nominalMax: 18, yellowMin: 3, yellowMax: 23 },
+  reaction_time: { nominalMin: 200, nominalMax: 300, yellowMin: 180, yellowMax: 360 },
+  headache_severity: { nominalMin: 0, nominalMax: 2, yellowMin: 0, yellowMax: 4 },
+  hyperopic_shift: { nominalMin: -0.25, nominalMax: 0.5, yellowMin: -0.5, yellowMax: 1.0 },
 };
 
 export const METRIC_THRESHOLDS = METRIC_THRESHOLDS_0G;
@@ -218,6 +233,18 @@ export const METRIC_TYPICAL_SD: Record<MetricId, number> = {
   pvt_lapses: 0.8,
   daily_sleep_hours: 0.5,
   mood_index: 0.5,
+  diastolic_bp: 3,
+  sleep_resp_rate: 0.8,
+  vo2_max: 1.5,
+  hemoglobin: 0.4,
+  urine_sg: 0.003,
+  grip_strength: 2,
+  body_mass_delta: 0.4,
+  crp: 0.8,
+  cortisol: 2,
+  reaction_time: 15,
+  headache_severity: 0.7,
+  hyperopic_shift: 0.1,
 };
 
 export interface MetricInputRange {
@@ -250,6 +277,18 @@ export const METRIC_INPUT_RANGES: Record<MetricId, MetricInputRange> = {
   pvt_lapses: { min: 0, max: 50, how: '3-minute Psychomotor Vigilance Test on the watch.' },
   daily_sleep_hours: { min: 0, max: 24, how: 'Automatic: sleep duration from the watch.' },
   mood_index: { min: 1, max: 10, how: 'One tap on the watch each evening (1 = lowest, 10 = optimal).' },
+  diastolic_bp: { min: 30, max: 150, how: 'Automatic: watch blood-pressure spot readings, seated (diastolic).' },
+  sleep_resp_rate: { min: 4, max: 40, how: 'Automatic: average breathing rate during last night\'s sleep from the watch.' },
+  vo2_max: { min: 15, max: 90, how: 'Estimated from the cycle ergometer sub-maximal test (mL/kg/min).' },
+  hemoglobin: { min: 6, max: 22, how: 'Point-of-care blood analyzer, finger-prick sample (g/dL).' },
+  urine_sg: { min: 1.0, max: 1.05, how: 'Urine refractometer / test strip, first void of the day.' },
+  grip_strength: { min: 5, max: 100, how: 'Hand dynamometer, dominant hand, best of 3 (kg).' },
+  body_mass_delta: { min: -15, max: 10, how: 'Calibrated body-mass device reading vs pre-flight mass (%).' },
+  crp: { min: 0, max: 100, how: 'High-sensitivity C-reactive protein on the blood analyzer (mg/L).' },
+  cortisol: { min: 0.5, max: 60, how: 'Morning salivary cortisol strip, within 30 min of waking (µg/dL).' },
+  reaction_time: { min: 100, max: 1000, how: 'Mean reaction time from the 3-minute Psychomotor Vigilance Test on the watch (ms).' },
+  headache_severity: { min: 0, max: 10, how: 'One tap on the watch each evening (0 = none, 10 = worst).' },
+  hyperopic_shift: { min: -3, max: 4, how: 'Digital near-vision acuity check vs pre-flight prescription (diopters).' },
 };
 
 export const METRIC_IDS = Object.keys(METRIC_TYPICAL_SD) as MetricId[];
@@ -351,6 +390,9 @@ export function evaluateAllZones(
  * - Each metric in 'red' deducts 8%
  * - Each completed countermeasure step adds +3% (capped at 100%, min 15%)
  */
+/** Number of triage metrics the readiness penalties were originally calibrated for. */
+const READINESS_REFERENCE_PANEL = 19;
+
 export function calculateCrewReadinessScore(
   zones: Record<BodyZoneId, VitalSignReading[]>,
   environment: GravityEnvironment,
@@ -358,6 +400,9 @@ export function calculateCrewReadinessScore(
 ): number {
   let score = 98;
   const allReadings = Object.values(zones).flat();
+  // Penalties are scaled so a larger telemetry panel (31 metrics) cannot push the score lower than the
+  // original 19-metric panel would for the same share of out-of-band metrics.
+  const weight = allReadings.length > READINESS_REFERENCE_PANEL ? READINESS_REFERENCE_PANEL / allReadings.length : 1;
 
   for (const reading of allReadings) {
     const status = evaluateMetricStatus(
@@ -366,9 +411,9 @@ export function calculateCrewReadinessScore(
       environment
     );
     if (status === 'yellow') {
-      score -= 3;
+      score -= 3 * weight;
     } else if (status === 'red') {
-      score -= 8;
+      score -= 8 * weight;
     }
   }
 
