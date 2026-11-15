@@ -130,7 +130,7 @@ export const VoiceTtsRequestSchema = z.object({
 });
 
 export const VoiceToolCallRequestSchema = CrewContextSchema.extend({
-  toolName: z.enum(['get_crew_snapshot', 'log_checkin_reading']),
+  toolName: z.enum(['get_crew_snapshot', 'log_checkin_reading', 'lookup_medical_protocol']),
   callId: text(120).optional(),
   args: z
     .object({
@@ -138,6 +138,7 @@ export const VoiceToolCallRequestSchema = CrewContextSchema.extend({
       metricId: text(80).optional(),
       value: num().optional(),
       note: text(1000).optional(),
+      query: text(1000).optional(),
     })
     .optional(),
 });

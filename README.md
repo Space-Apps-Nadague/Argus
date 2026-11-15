@@ -72,6 +72,13 @@ npm run dev:all                       # sign in as valkyrie/apex/pulse/solaris (
 ```
 Without `DATABASE_URL`, the HUD runs as an offline demo with browser-only data.
 
+### AI knowledge base (RAG)
+Verified protocols and checklists the AI Flight Surgeon looks up and cites (`SRC-xxx`) before giving procedures or doses. How to add documents, pick an embedding model and call it from code: [`docs/AI_KNOWLEDGE_BASE.md`](docs/AI_KNOWLEDGE_BASE.md).
+```bash
+npm run rag:ingest                                      # chunk + embed the corpus into DATABASE_URL
+npm run rag:search -- "smoke and a burning smell"       # try the retriever the AI uses
+```
+
 ## Architecture & Key Modules
 
 | Path | Responsibility | Spec Reference |
@@ -94,6 +101,7 @@ Without `DATABASE_URL`, the HUD runs as an offline demo with browser-only data.
 | `src/components/CrewTab.tsx` & `CrewManagerModal.tsx` | Crew roster cards and individualized baseline creation modal | `specs/02-ui-dashboard.md` (§2.5) |
 | `src/components/ui/`, `InfoTip.tsx` | Shared HUD primitives (`Card`, `StatTile`, `StatusPill`, `ZoneIcon`) and accessible ⓘ popovers | `specs/02-ui-dashboard.md` (§3) |
 | `server/` | Hono AI backend with provider fallback chain, Zod schemas, and deterministic test suite | `specs/04-ai-backend.md` |
+| `server/rag/` | AI knowledge base: corpus, clinical-unit chunker, embeddings, ingest, hybrid retriever, `lookup_medical_protocol` tool ([guide](docs/AI_KNOWLEDGE_BASE.md)) | `specs/05-data-platform.md` (§3.6), `specs/04-ai-backend.md` (§4.2) |
 
 ---
 

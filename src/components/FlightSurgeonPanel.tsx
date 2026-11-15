@@ -9,6 +9,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Activity,
   AlertTriangle,
+  BookOpen,
   Camera,
   CheckCircle2,
   ChevronDown,
@@ -36,6 +37,7 @@ import {
   X,
 } from 'lucide-react';
 import { useMission } from '../context/MissionContext';
+import type { RagDocKind } from '../types/aiApi';
 import { VISUAL_EXAM_SAMPLES } from '../data/telemetryScenarios';
 import {
   createRealtimeDoctorSession,
@@ -54,6 +56,13 @@ const URGENCY_LABEL = {
   priority_packet: 'Priority packet',
   immediate_emergency_packet: 'Send now',
 } as const;
+
+const RAG_KIND_LABEL: Record<RagDocKind, string> = {
+  emergency_checklist: 'Emergency checklist',
+  countermeasure: 'Countermeasure',
+  clinical_reference: 'Clinical reference',
+  medication: 'Medication',
+};
 
 const SYMPTOM_PRESETS = [
   { label: 'SANS / Eye Pressure', text: 'Throbbing headache behind eyes, blurred near vision, and optic disc swelling' },
@@ -156,6 +165,7 @@ export const FlightSurgeonPanel: React.FC = () => {
   const videoStreamIntervalRef = useRef<number | null>(null);
   const [voiceDraft, setVoiceDraft] = useState('');
   const [cameraFramesSent, setCameraFramesSent] = useState(0);
+  const [openProtocolKey, setOpenProtocolKey] = useState<string | null>(null);
 
   useEffect(() => {
     sessionRef.current?.updateContext(doctorContext, runtimeApiKey);
@@ -559,6 +569,10 @@ export const FlightSurgeonPanel: React.FC = () => {
   const total = guidance.guidedSteps.length;
   const isOfflinePipeline = doctorState.mode === 'on-ship-pipeline';
   const latestVoiceTurn = doctorState.turns[0] || null;
+  const activeProtocolCitations =
+    doctorState.citedProtocols.length > 0
+      ? doctorState.citedProtocols
+      : latestVoiceTurn?.ragHits ?? [];
 
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
@@ -783,7 +797,7 @@ export const FlightSurgeonPanel: React.FC = () => {
             </div>
           </div>
 
-          {/* Active Tool Calls Pill Strip (`get_crew_snapshot`, `log_checkin_reading`) */}
+          {/* Active Tool Calls Pill Strip (`get_crew_snapshot`, `log_checkin_reading`, `lookup_medical_protocol`) */}
           {doctorState.activeToolCalls.length > 0 && (
             <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
               <span className="font-mono text-hud-muted">Tools:</span>
@@ -795,7 +809,9 @@ export const FlightSurgeonPanel: React.FC = () => {
                   {tc.toolName}
                   {tc.loggedReading
                     ? ` (${tc.loggedReading.metricId}=${tc.loggedReading.value})`
-                    : ''}
+                    : tc.ragHits?.length
+                      ? ` (${tc.ragHits.length} refs)`
+                      : ''}
                 </span>
               ))}
             </div>
@@ -828,6 +844,74 @@ export const FlightSurgeonPanel: React.FC = () => {
                   </p>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Verified Protocol Citations (specs/02-ui-dashboard.md §2.4 & specs/04-ai-backend.md §4.2) */}
+          {activeProtocolCitations.length > 0 && (
+            <div
+              className="space-y-2 rounded-lg border border-hud-line bg-hud-bg/50 p-3"
+              aria-label="Verified protocol citations"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-hud-text">
+                  <BookOpen className="h-3.5 w-3.5 text-hud-accent" aria-hidden="true" />
+                  Verified protocol citations
+                </span>
+                <span className="font-mono text-[10px] text-hud-muted">
+                  {activeProtocolCitations.length}{' '}
+                  {activeProtocolCitations.length === 1 ? 'chunk' : 'chunks'}
+                </span>
+              </div>
+              <ul className="space-y-1.5">
+                {activeProtocolCitations.slice(0, 3).map((hit, idx) => {
+                  const key = `${hit.documentId}#${hit.heading}#${idx}`;
+                  const isOpen = openProtocolKey ? openProtocolKey === key : idx === 0;
+                  return (
+                    <li
+                      key={key}
+                      className="rounded-md border border-hud-line bg-hud-panel/70 text-xs"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setOpenProtocolKey(isOpen ? '__closed__' : key)}
+                        aria-expanded={isOpen}
+                        className="hud-focus flex w-full items-center justify-between gap-2 px-2.5 py-2 text-left"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="rounded border border-hud-accent/50 bg-hud-accent/10 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-hud-accent">
+                              {hit.sourceId ?? 'IN-REPO'}
+                            </span>
+                            <span className="rounded border border-hud-line bg-hud-bg/80 px-1.5 py-0.5 font-mono text-[10px] text-hud-muted">
+                              {RAG_KIND_LABEL[hit.kind] ?? hit.kind}
+                            </span>
+                          </div>
+                          <span className="mt-1 block truncate font-medium text-hud-text">
+                            {hit.title} — {hit.heading}
+                          </span>
+                        </div>
+                        <ChevronDown
+                          className={`h-4 w-4 shrink-0 text-hud-muted transition-transform ${
+                            isOpen ? 'rotate-180' : ''
+                          }`}
+                          aria-hidden="true"
+                        />
+                      </button>
+                      {isOpen && (
+                        <div className="space-y-1.5 border-t border-hud-line px-2.5 py-2 text-xs leading-relaxed text-hud-text/90">
+                          <p className="whitespace-pre-line">{hit.content}</p>
+                          {hit.origin && (
+                            <p className="font-mono text-[10px] text-hud-muted">
+                              Source: {hit.origin}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
             </div>
           )}
 
