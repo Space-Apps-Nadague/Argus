@@ -148,6 +148,7 @@ async function generateAuditPlan(apiKey, prompt) {
     preferredModel,
     'gemini-3.8-flash',
     'gemini-3.5-flash-lite',
+    'gemini-2.5-flash',
   ].filter((m, idx, arr) => Boolean(m) && arr.indexOf(m) === idx);
 
   const schema = {

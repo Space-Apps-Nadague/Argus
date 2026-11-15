@@ -79,6 +79,9 @@ export const VOICE_CLINICAL_DISCLAIMER = 'Decision support, not a medical diagno
 export const DEFAULT_LIVE_MODEL = 'gemini-3.8-live';
 export const DEFAULT_STT_MODEL = 'gemini-3.5-transcribe';
 export const DEFAULT_TTS_MODEL = 'gemini-3.8-flash-lite-tts';
+/** Gemini 2.5 fallbacks (standard `generateContent` API) used when the 3.x speech models fail. */
+export const FALLBACK_STT_MODEL = 'gemini-2.5-flash';
+export const FALLBACK_TTS_MODEL = 'gemini-2.5-flash-preview-tts';
 
 export const VOICE_TOOL_DECLARATIONS: VoiceToolDeclaration[] = [
   {
@@ -227,6 +230,125 @@ export function buildVoiceSystemInstruction(
   ]
     .filter(Boolean)
     .join('\n\n');
+}
+
+interface GenerateContentResponse {
+  candidates?: Array<{
+    content?: { parts?: Array<{ text?: string; inlineData?: { data?: string; mimeType?: string } }> };
+  }>;
+}
+
+async function geminiGenerateContent(
+  apiKey: string,
+  model: string,
+  body: unknown,
+  timeoutMs: number
+): Promise<GenerateContentResponse | null> {
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(timeoutMs),
+    }
+  );
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    console.warn(`[ARGUS Voice] ${model} failed (${res.status}):`, errText.slice(0, 240));
+    return null;
+  }
+  return (await res.json()) as GenerateContentResponse;
+}
+
+/** Wraps raw 16-bit little-endian mono PCM in a WAV header so `<audio>` can play it. */
+export function pcmToWavBase64(pcmBase64: string, sampleRate = 24000): string {
+  const pcm = Buffer.from(pcmBase64, 'base64');
+  const header = Buffer.alloc(44);
+  header.write('RIFF', 0);
+  header.writeUInt32LE(36 + pcm.length, 4);
+  header.write('WAVE', 8);
+  header.write('fmt ', 12);
+  header.writeUInt32LE(16, 16);
+  header.writeUInt16LE(1, 20);
+  header.writeUInt16LE(1, 22);
+  header.writeUInt32LE(sampleRate, 24);
+  header.writeUInt32LE(sampleRate * 2, 28);
+  header.writeUInt16LE(2, 32);
+  header.writeUInt16LE(16, 34);
+  header.write('data', 36);
+  header.writeUInt32LE(pcm.length, 40);
+  return Buffer.concat([header, pcm]).toString('base64');
+}
+
+/** Gemini 2.5 transcription fallback. Returns the transcript, or `null` on any failure. */
+export async function fallbackTranscribe(
+  apiKey: string,
+  audioBase64: string,
+  mimeType: string,
+  model = FALLBACK_STT_MODEL
+): Promise<string | null> {
+  try {
+    const data = await geminiGenerateContent(
+      apiKey,
+      model,
+      {
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              { text: 'Transcribe the astronaut speech verbatim. Return only the spoken words with no extra commentary.' },
+              { inlineData: { mimeType, data: audioBase64 } },
+            ],
+          },
+        ],
+      },
+      12_000
+    );
+    const text = data?.candidates?.[0]?.content?.parts
+      ?.map((part) => part.text?.trim() ?? '')
+      .filter(Boolean)
+      .join(' ')
+      .trim();
+    return text || null;
+  } catch (err) {
+    console.warn('[ARGUS Voice STT] Gemini 2.5 fallback failed:', err);
+    return null;
+  }
+}
+
+/** Gemini 2.5 speech-synthesis fallback. Returns WAV audio, or `null` on any failure. */
+export async function fallbackSynthesize(
+  apiKey: string,
+  text: string,
+  voice: string,
+  style: string,
+  model = FALLBACK_TTS_MODEL
+): Promise<{ audioBase64: string; mimeType: string } | null> {
+  try {
+    const data = await geminiGenerateContent(
+      apiKey,
+      model,
+      {
+        contents: [{ role: 'user', parts: [{ text: `Say in a ${style} voice: ${text}` }] }],
+        generationConfig: {
+          responseModalities: ['AUDIO'],
+          speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } },
+        },
+      },
+      20_000
+    );
+    const inline = data?.candidates?.[0]?.content?.parts?.find((part) => part.inlineData?.data)?.inlineData;
+    if (!inline?.data) return null;
+    const mime = (inline.mimeType ?? '').toLowerCase();
+    if (mime.includes('wav')) return { audioBase64: inline.data, mimeType: 'audio/wav' };
+    // Gemini TTS returns raw PCM, e.g. `audio/L16;codec=pcm;rate=24000`.
+    const rate = Number(/rate=(\d+)/.exec(mime)?.[1]) || 24000;
+    return { audioBase64: pcmToWavBase64(inline.data, rate), mimeType: 'audio/wav' };
+  } catch (err) {
+    console.warn('[ARGUS Voice TTS] Gemini 2.5 fallback failed:', err);
+    return null;
+  }
 }
 
 /**
@@ -665,10 +787,12 @@ voiceRoutes.post('/stt', async (c) => {
     }
   }
 
+  const primarySttModel = process.env.GEMINI_STT_MODEL?.trim() || 'gemini-3.8-flash';
+  let liveSttModel = primarySttModel;
   if (!transcript && req.audioBase64 && geminiKey) {
     try {
       const mimeType = (req.mimeType || 'audio/webm').split(';')[0].trim();
-      const sttModel = process.env.GEMINI_STT_MODEL?.trim() || 'gemini-3.8-flash';
+      const sttModel = primarySttModel;
       const res = await fetch('https://generativelanguage.googleapis.com/v1beta/interactions', {
         method: 'POST',
         headers: {
@@ -723,6 +847,16 @@ voiceRoutes.post('/stt', async (c) => {
     }
   }
 
+  if (!transcript && req.audioBase64 && geminiKey) {
+    const mimeType = (req.mimeType || 'audio/webm').split(';')[0].trim();
+    const fallback = await fallbackTranscribe(geminiKey, req.audioBase64, mimeType);
+    if (fallback) {
+      transcript = fallback;
+      usedLiveStt = true;
+      liveSttModel = FALLBACK_STT_MODEL;
+    }
+  }
+
   if (!transcript && !usedLocalStt && req.tier !== 'autonomous' && req.audioBase64 && localSpeech) {
     const local = await localTranscribe(localSpeech, req.audioBase64, req.mimeType, req.languageCode);
     if (local) {
@@ -755,7 +889,7 @@ voiceRoutes.post('/stt', async (c) => {
         ? {
             source: 'live_ai',
             provider: req.tier ? 'gemini' : mode === 'on-ship-pipeline' ? 'local' : 'gemini',
-            model: req.tier ? process.env.GEMINI_STT_MODEL?.trim() || 'gemini-3.8-flash' : mode === 'on-ship-pipeline' ? 'on-ship-stt-v1' : DEFAULT_STT_MODEL,
+            model: req.tier ? liveSttModel : mode === 'on-ship-pipeline' ? 'on-ship-stt-v1' : liveSttModel === FALLBACK_STT_MODEL ? FALLBACK_STT_MODEL : DEFAULT_STT_MODEL,
             latencyMs: Date.now() - started,
           }
         : OFFLINE_META,
@@ -877,6 +1011,31 @@ voiceRoutes.post('/tts', async (c) => {
       }
     } catch (err) {
       console.warn('[ARGUS Voice TTS] Behind-the-scenes synthesis fallback:', err);
+    }
+  }
+
+  if (geminiKey && cleanText) {
+    const style = req.style || (req.tier ? 'warm, calm and unhurried' : 'calm, clear clinical');
+    const fallback = await fallbackSynthesize(geminiKey, cleanText, geminiVoice, style);
+    if (fallback) {
+      const envelope: AiEnvelope<VoiceTtsResponse> = {
+        result: {
+          audioBase64: fallback.audioBase64,
+          mimeType: fallback.mimeType,
+          mode,
+          nodeLabel,
+          pipelineStage: 'tts',
+          useBrowserSpeechFallback: false,
+          durationEstimateMs: Math.max(1200, cleanText.split(/\s+/).length * 360),
+        },
+        meta: {
+          source: 'live_ai',
+          provider: mode === 'on-ship-pipeline' && !req.tier ? 'local' : 'gemini',
+          model: mode === 'on-ship-pipeline' && !req.tier ? 'on-ship-tts-v1' : FALLBACK_TTS_MODEL,
+          latencyMs: Date.now() - started,
+        },
+      };
+      return c.json(envelope);
     }
   }
 

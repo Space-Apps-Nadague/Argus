@@ -51,6 +51,9 @@ function clientFor(cfg: ProviderConfig): OpenAI {
 }
 
 export const GEMINI_QUOTA_FALLBACK_MODEL = 'gemini-3.5-flash-lite';
+/** Last-resort Gemini model, tried when both the primary and the 3.5 fallback fail. */
+export const GEMINI_LEGACY_FALLBACK_MODEL = 'gemini-2.5-flash';
+const GEMINI_FALLBACK_MODELS = [GEMINI_QUOTA_FALLBACK_MODEL, GEMINI_LEGACY_FALLBACK_MODEL];
 
 export function providerChainFor(options: LlmOptions): Array<{ cfg: ProviderConfig; model: string }> {
   if (currentPrivacy().offlineOnly) return []; // astronaut withdrew AI consent (spec 05 §6)
@@ -64,8 +67,10 @@ export function providerChainFor(options: LlmOptions): Array<{ cfg: ProviderConf
     const model = options.vision ? cfg.visionModel ?? '' : cfg.model;
     if (!model) continue;
     out.push({ cfg, model });
-    if (cfg.id === 'gemini' && model !== GEMINI_QUOTA_FALLBACK_MODEL) {
-      out.push({ cfg, model: GEMINI_QUOTA_FALLBACK_MODEL });
+    if (cfg.id === 'gemini') {
+      for (const fallback of GEMINI_FALLBACK_MODELS) {
+        if (!out.some((e) => e.cfg === cfg && e.model === fallback)) out.push({ cfg, model: fallback });
+      }
     }
   }
   return out;

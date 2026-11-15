@@ -43,7 +43,7 @@ Env vars are **server-only** (never `VITE_`). See `.env.example`.
 - `AI_PROVIDERS` — ordered chain, e.g. `local`, `local,openrouter`, `openrouter,gemini`. Default `auto` = every configured cloud provider, then `local`.
 - `AI_ROUTE_<FEATURE>` — per-feature chain override (`AI_ROUTE_CHAT=local`, `AI_ROUTE_DIAGNOSTICS=openrouter,local`).
 - `X-AI-Key` request header — a key typed into the HUD; its provider is detected by prefix and tried first for that request only.
-- A provider that errors, times out (`AI_TIMEOUT_MS`, `AI_LOCAL_TIMEOUT_MS`) or returns invalid JSON twice is skipped; the next one is tried; then the offline result is returned. For `gemini`, if the primary model (`gemini-3.8-flash`) errors or hits quota, the chain automatically falls back to `gemini-3.5-flash-lite` before moving to the next provider.
+- A provider that errors, times out (`AI_TIMEOUT_MS`, `AI_LOCAL_TIMEOUT_MS`) or returns invalid JSON twice is skipped; the next one is tried; then the offline result is returned. For `gemini`, if the primary model (`gemini-3.8-flash`) errors or hits quota, the chain automatically falls back to `gemini-3.5-flash-lite`, then to `gemini-2.5-flash`, before moving to the next provider.
 - Vision requests use `<PROVIDER>_VISION_MODEL` (OpenRouter defaults to `openrouter/free`, Gemini to its chat model); providers without a vision model are skipped.
 
 ## 4. Endpoints
@@ -61,8 +61,8 @@ All JSON endpoints return `AiEnvelope<T> = { result: T, meta: { source, provider
 | `POST /api/ai/wellbeing` | `WellbeingRequest` | `WellbeingAssessment` | risk score, status, trend, factors, crisis flag, urgency | supportive message, suggested actions |
 | `POST /api/ai/chat` | `ChatRequest` | SSE `ChatStreamEvent`s | crisis detection + escalation preamble, offline intent replies | companion reply grounded in the crew snapshot |
 | `POST /api/ai/live-token` | `LiveTokenRequest` | `LiveTokenResponse` | crew snapshot, deterministic urgency floor, tool schemas | short-lived Gemini Live API ephemeral token (`v1beta/auth_tokens`) |
-| `POST /api/ai/stt` | `VoiceSttRequest` | `VoiceSttResponse` | crisis language detection on transcript, offline fallback | speech-to-text transcription (Gemini multimodal / local Whisper) |
-| `POST /api/ai/tts` | `VoiceTtsRequest` | `VoiceTtsResponse` | deterministic WAV fallback + browser speech flag | speech synthesis (`gemini-3.8-flash-lite-tts` / local TTS) |
+| `POST /api/ai/stt` | `VoiceSttRequest` | `VoiceSttResponse` | crisis language detection on transcript, offline fallback | speech-to-text transcription (Gemini multimodal, falling back to `gemini-2.5-flash` / local Whisper) |
+| `POST /api/ai/tts` | `VoiceTtsRequest` | `VoiceTtsResponse` | deterministic WAV fallback + browser speech flag | speech synthesis (`gemini-3.8-flash-lite-tts`, falling back to `gemini-2.5-flash-preview-tts` / local TTS) |
 | `POST /api/ai/voice-tool` | `VoiceToolCallRequest` | `VoiceToolCallResponse` | `get_crew_snapshot`, `log_checkin_reading` & `lookup_medical_protocol` execution + triage | — |
 | `POST /api/ai/voice-turn` | `VoiceTurnRequest` | `VoiceTurnResponse` | crisis & red-flag escalation, urgency floor, hybrid RAG protocol retrieval (`ragHits`), DB chat/voice + `rag_citations` audit | concise spoken clinical guidance grounded in `CrewSnapshot` and `REFERENCE` chunks |
 | `POST /api/ai/rag/search` | `RagSearchRequest` (`query`, optional `zoneId`, `limit` 1–10, `mode`, `crewMember.id`) | `RagSearchResponse` (`hits[]`, `retrieval`, `embeddingModel`) | hybrid keyword + vector retrieval, citation log | — |
