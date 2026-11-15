@@ -258,6 +258,7 @@ type MissionAction =
   | { type: 'SET_ROSTER'; payload: { roster: CrewMemberProfile[]; selectId?: string } }
   | { type: 'ADD_CREW_MEMBER'; payload: CrewMemberProfile }
   | { type: 'UPDATE_CREW_SEX'; payload: { crewId: string; sex: BiologicalSex } }
+  | { type: 'REPLACE_CREW_MEMBER'; payload: CrewMemberProfile }
   | { type: 'DELETE_CREW_MEMBER'; payload: string }
   | { type: 'SET_CREW_MODAL_OPEN'; payload: boolean }
   | { type: 'SET_SCENARIO'; payload: ScenarioId }
@@ -397,6 +398,11 @@ function missionReducer(
         crewRoster: nextRoster,
       };
     }
+    case 'REPLACE_CREW_MEMBER':
+      return {
+        ...state,
+        crewRoster: state.crewRoster.map((c) => (c.id === action.payload.id ? action.payload : c)),
+      };
     case 'DELETE_CREW_MEMBER': {
       const filtered = state.crewRoster.filter(
         (c) => c.id !== action.payload || !c.isCustom
@@ -620,6 +626,8 @@ interface MissionContextValue extends MissionState {
   /** True when the signed-in user is allowed to fetch health/chat/wellbeing data for `activeCrewMember`. */
   canReadActiveCrew: boolean;
   updateCrewMemberSex: (crewId: string, sex: BiologicalSex) => void;
+  /** Server mode: turns cloud AI on/off for one astronaut (`ai_consent`, specs/05 §6). Rejects on a server error. */
+  setCrewAiConsent: (crewId: string, consent: boolean) => Promise<void>;
   deleteCrewMember: (crewId: string) => void;
   setCrewModalOpen: (open: boolean) => void;
   setScenario: (scenario: ScenarioId) => void;
@@ -933,6 +941,15 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
     (crewId: string, sex: BiologicalSex) => {
       if (serverBacked) void crewApi.update(crewId, { sex }).catch((err) => console.warn('[ARGUS] could not update', err));
       dispatch({ type: 'UPDATE_CREW_SEX', payload: { crewId, sex } });
+    },
+    [serverBacked]
+  );
+
+  const setCrewAiConsent = useCallback(
+    async (crewId: string, consent: boolean) => {
+      if (!serverBacked) return;
+      const { crewMember } = await crewApi.update(crewId, { aiConsent: consent });
+      dispatch({ type: 'REPLACE_CREW_MEMBER', payload: crewMember });
     },
     [serverBacked]
   );
@@ -1299,6 +1316,7 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
       selectCrewMember,
       createCrewMember,
       updateCrewMemberSex,
+      setCrewAiConsent,
       deleteCrewMember,
       setCrewModalOpen,
       setScenario,
@@ -1352,6 +1370,7 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
       selectCrewMember,
       createCrewMember,
       updateCrewMemberSex,
+      setCrewAiConsent,
       deleteCrewMember,
       setCrewModalOpen,
       setScenario,

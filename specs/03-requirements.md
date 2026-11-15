@@ -80,11 +80,11 @@ The following capabilities are recommended considerations to strengthen crew eng
 | `REQ-08` | Periodic mission routine measurement & action prompts | **Implemented** (`ScheduledRoutineBanner.tsx` with sol indicator, due alert & 1-click quick-log) | `specs/01-data-schema.md` (§8), `specs/02-ui-dashboard.md` (§1) |
 | `REQ-09` | Gamification system for health task engagement | **Implemented** (`ReadinessMilestone` badges, streak tracking, interactive badge popover) | `specs/01-data-schema.md` (§8), `src/utils/routineMilestones.ts` |
 | `REQ-10` | NASA HRP & partner agency grounding | **Implemented** (Mapped to 5 HRP hazards & cataloged in `SOURCES.md`) | `SOURCES.md`, `specs/01-data-schema.md` |
-| `REQ-10` | Durable, shared storage of crew health data (not per-browser) | **In progress** (PostgreSQL on Azure + Docker; `feature/data-platform`) | `specs/05-data-platform.md` §2–§3 |
-| `REQ-11` | Per-user accounts and roles with server-side access control (astronaut / flight surgeon / admin) | **In progress** | `specs/05-data-platform.md` §6 |
+| `REQ-10b` | Durable, shared storage of crew health data (not per-browser) | **Implemented** (PostgreSQL on Azure + Docker, embedded PGlite for dev/tests; Drizzle migrations) | `specs/05-data-platform.md` §2–§3 |
+| `REQ-11` | Per-user accounts and roles with server-side access control (astronaut / flight surgeon / admin) | **Implemented** (argon2id, lockout, per-IP rate limit, revocable sessions, role matrix in `server/auth/access.ts`) | `specs/05-data-platform.md` §6 |
 | `REQ-12` | Passive data collection with as few devices and as little typing as possible | **Implemented** (smartwatch + dosimeter; simulator + ingest API) | `specs/05-data-platform.md` §4 |
-| `REQ-13` | Personal baselines, averages and anomaly detection per astronaut | **In progress** | `specs/05-data-platform.md` §5 |
-| `REQ-14` | Privacy: pseudonymized health data, no names or medical notes to cloud LLMs, audit log, data export | **In progress** | `specs/05-data-platform.md` §1, §6 |
+| `REQ-13` | Personal baselines, averages and anomaly detection per astronaut | **Implemented** (preflight / early-flight / rolling 14 d / hour-of-day baselines; `robust_z`, `ewma`, `cusum` in `shared/analytics/`) | `specs/05-data-platform.md` §5 |
+| `REQ-14` | Privacy: pseudonymized health data, no names or medical notes to cloud LLMs, audit log, data export | **Implemented** (`astronaut_private`, prompt privacy in `server/ai/privacy.ts`, `audit_log`, Cloud AI switch + Download data in the Eyes tab) | `specs/05-data-platform.md` §1, §6 |
 | `REQ-15` | Traceable sources for every external fact and dataset | **Implemented** (`SOURCES.md` IDs, `npm run check:sources`) | `AGENTS.md` §7 |
 | `REQ-16` | Daily gamified cognitive readiness testing with crew leaderboard and decline alerts routed on board or to the Earth Flight Surgeon | **Implemented** (Cognition tab: 9 NASA Cognition–based games, one per day shuffled, personal-baseline decline detection, CMO vs Flight Surgeon routing [SRC-089..095]) | `specs/01-data-schema.md` §12, `specs/02-ui-dashboard.md` §2.8, `src/features/cognition/` |
 

@@ -43,6 +43,7 @@ export function toProfile(
     defaultScenarioId: a.defaultScenarioId as ScenarioId,
     medicalNotes: full && priv ? priv.medicalNotes : '',
     isCustom: !a.isDemo,
+    aiConsent: a.aiConsent,
   };
 }
 
