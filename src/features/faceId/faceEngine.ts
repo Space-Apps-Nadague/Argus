@@ -19,12 +19,11 @@ export function loadFaceEngine(): Promise<FaceApi> {
   if (!loading) {
     loading = (async () => {
       const faceapi = await import('@vladmandic/face-api');
-      try {
-        await faceapi.tf.setBackend('webgl');
-      } catch {
-        await faceapi.tf.setBackend('cpu');
-      }
-      await faceapi.tf.ready();
+      // The bundled TensorFlow.js has these at runtime; face-api's type stub omits them.
+      const tf = faceapi.tf as unknown as { setBackend(name: string): Promise<boolean>; ready(): Promise<void> };
+      const webgl = await tf.setBackend('webgl').catch(() => false);
+      if (!webgl) await tf.setBackend('cpu');
+      await tf.ready();
       await Promise.all([
         faceapi.nets.tinyFaceDetector.loadFromUri(FACE_MODEL_URL),
         faceapi.nets.faceLandmark68Net.loadFromUri(FACE_MODEL_URL),
