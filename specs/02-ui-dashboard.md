@@ -40,6 +40,7 @@
 
 ### 2.1 Bio-Twin (`BioTwinTab.tsx`) — default tab
 - Grid: 3D stage (≈ 2/3 width, `BioTwinMap.tsx`, unchanged behavior) + side column (≈ 1/3) of **vital tiles** for the selected zone (`StatTile`: big value, small unit, status pill, drift chip, ⓘ with `plainDescription` + flight norm). Clicking a tile selects the metric and switches to **Trends**.
+- **Manual Vital Check-in Trigger (`+ Log Vital`):** Button in the selected-zone card header opens `VitalLoggerModal.tsx` pre-focused on the active zone (and selected metric), submitting via `MissionContext.logVitalReading` (persisted to PostgreSQL in database mode or `localStorage` in offline demo mode).
 - 3D Bio-Twin details (preserved from Sprint 3):
   - **Anatomically Sculpted 3D Human Morphology (Male & Female Differentiation):**
     - Continuous parametric vertex-sculpted cranial/facial mesh, neck (sternocleidomastoid/trapezius), torso (pectoralis major plates & rectus abdominis in `male`; anatomically sculpted mammary contours, narrower ribcage, indented waist, and flared iliac/trochanteric hip curves in `female`), sculpted upper limbs (deltoids, biceps/triceps, forearms, hands with fingers), and sculpted lower limbs (quadriceps, hamstrings, femorotibial Q-angle, patella, gastrocnemius calves, ankles, and feet).
@@ -56,13 +57,12 @@
 
 ### 2.2 Trends (`TrendsTab.tsx`, `TelemetryPanel.tsx`)
 - **Metric picker row:** every metric of the selected zone as compact chips (label + value + drift arrow). Zone switcher (5 zone pills with status color).
-- **Interactive Vital Reading Logger (`TelemetryPanel.tsx`):**
-  - Collapsible/inline **"+ Log Vital Reading"** interactive form to record live astronaut health readings directly onto `MD-30` (latest day).
-  - Zone selector (5 zones: Neuro, Cardio, Musculo, Immune, Behavioral).
-  - Metric picker covering all 17 canonical metrics, including systolic blood pressure (`systolic_bp`), blood glucose (`blood_glucose`), core body temperature (`core_temp`), daily sleep duration (`daily_sleep_hours`), and behavioral mood index (`mood_index`).
-  - Numeric input with instant client validation against `METRIC_INPUT_RANGES`, measurement guidance tooltip (`how`), live Green/Yellow/Red triage preview badge, and one-click presets (`Nominal`, `Caution`, `Alert`) for rapid demonstration/testing.
-  - **Responsive Layout:** Separated 3-column input fields row (`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 min-w-0`) and dedicated action footer (`presets · range · Record reading`) with `flex-wrap` and `min-w-0`, ensuring controls never spill into the adjacent Drift card at any viewport or column width.
-  - Submitting calls `logVitalReading(zoneId, metricKey, value)` to update `MD-30` live, re-evaluate deterministic status & readiness score, update the 3D Bio-Twin colors, and trigger Flight Surgeon AI guidance synthesis.
+- **Interactive Vital Reading Logger (`VitalLoggerModal.tsx`, accessible from `+ Log Vital` in `BioTwinTab.tsx` and `TelemetryPanel.tsx` / `TrendsTab.tsx`):**
+  - Compact accessible modal dialog (`role="dialog"`, `aria-modal="true"`, Esc to close, focus return) to record live astronaut health readings directly onto `MD-30` (latest day).
+  - Zone selector (5 zones: Neuro, Cardio, Musculo, Immune, Behavioral) + quick core-vital shortcuts (`systolic_bp`, `blood_glucose`, `core_temp`, `daily_sleep_hours`, `mood_index`).
+  - Metric picker covering all 17 canonical metrics, including systolic blood pressure (`systolic_bp`), blood glucose (`blood_glucose`, mg/dL), core body temperature (`core_temp`), daily sleep duration (`daily_sleep_hours`), and behavioral mood index (`mood_index`).
+  - Numeric input with instant client validation against `METRIC_INPUT_RANGES`, measurement guidance (`how`), live deterministic Green/Yellow/Red triage preview (`evaluateMetricStatus` + `StatusPill` with icon & label), and one-click presets (`Nominal`, `Caution`, `Alert`) for rapid demonstration/testing.
+  - Submitting calls `logVitalReading(zoneId, metricKey, value)` to persist the reading (database via `dataApi.checkIn` + `refreshServerZones` when server-backed, or `localStorage` in offline demo mode), re-evaluate deterministic status & readiness score, update the 3D Bio-Twin colors, and trigger Flight Surgeon AI guidance synthesis.
 - **Main chart (Recharts `ComposedChart`):** history line/area (14d / 30d toggle) · shaded nominal band (`ReferenceArea`) · dashed yellow limit lines · dotted **personal baseline** band (mean ± 1 SD) · dashed **forecast** line for `MD+1..+3` with shaded 90% interval · check-in and logged points drawn as larger dots. A legend with 4 swatches replaces explanatory text.
 - **Drift card:** big `↑ 1.8σ` with level word (`Steady` / `Watch` / `Drifting`), one line "vs your first-week baseline (mean ± SD)". Forecast summary: `MD+3 ≈ value (lo–hi)`.
 - **"Why" card:** up to 5 `MetricLink` rows: `Sleep eff ↓ → HRV ↓ · next day`, a strength bar for `|r|`, the mechanism in an ⓘ tooltip. Footer: "Association, not cause." Empty state: "No strong links yet".

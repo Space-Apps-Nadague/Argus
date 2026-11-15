@@ -3,7 +3,7 @@
  * 3D hero stage + selected-zone vital tiles. Clicking a tile opens Trends for that metric.
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Stethoscope } from 'lucide-react';
 import { useMission } from '../context/MissionContext';
 import { BODY_ZONES } from '../data/telemetryScenarios';
@@ -11,6 +11,7 @@ import { computeDrift } from '../utils/driftAnalytics';
 import { evaluateMetricStatus, formatFlightNormBadge } from '../utils/triageEngine';
 import { BioTwinMap } from './BioTwinMap';
 import { InfoTip } from './InfoTip';
+import { VitalLoggerModal } from './VitalLoggerModal';
 import { Card } from './ui/Card';
 import { StatTile } from './ui/StatTile';
 import { StatusPill } from './ui/StatusPill';
@@ -27,6 +28,7 @@ export const BioTwinTab: React.FC = () => {
     setActiveTab,
     guidance,
   } = useMission();
+  const [isLoggerOpen, setIsLoggerOpen] = useState(false);
   const zone = BODY_ZONES[selectedZone];
   const zoneStatus = zoneStatuses[selectedZone];
 
@@ -48,9 +50,7 @@ export const BioTwinTab: React.FC = () => {
             <>
               <button
                 type="button"
-                onClick={() => {
-                  setActiveTab('trends');
-                }}
+                onClick={() => setIsLoggerOpen(true)}
                 className="hud-focus rounded border border-hud-accent/40 bg-hud-accent/10 px-2 py-1 text-xs font-mono text-hud-accent hover:bg-hud-accent/20 transition-colors"
                 title="Log Vital Reading for this zone"
               >
@@ -103,6 +103,13 @@ export const BioTwinTab: React.FC = () => {
           </Card>
         )}
       </div>
+
+      <VitalLoggerModal
+        isOpen={isLoggerOpen}
+        onClose={() => setIsLoggerOpen(false)}
+        initialZone={selectedZone}
+        initialMetricId={selectedMetricId}
+      />
     </div>
   );
 };
