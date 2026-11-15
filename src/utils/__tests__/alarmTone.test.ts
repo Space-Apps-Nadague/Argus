@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { alertSpeech, alertSteps } from '../alarmTone';
+import { alertSpeech, alertSteps, splitSentences } from '../alarmTone';
 import { FEVER_ACTION, FEVER_LIMIT_C, type LifeThreat } from '../vitalLimits';
 
 const threat = (over: Partial<LifeThreat> = {}): LifeThreat => ({
@@ -44,6 +44,15 @@ describe('spoken alert', () => {
   it('rings once, says "Alert", then the explanation', () => {
     const steps = alertSteps('38.5 degrees Celsius body temperature detected.');
     expect(steps.map((s) => (s.kind === 'beep' ? 'beep' : s.text))).toEqual(['beep', 'Alert!', '38.5 degrees Celsius body temperature detected.']);
+  });
+
+  it('speaks each sentence separately (Chrome stalls on long utterances)', () => {
+    expect(splitSentences('38.5 degrees Celsius body temperature detected for VEGA. You should drink water now.')).toEqual([
+      '38.5 degrees Celsius body temperature detected for VEGA.',
+      'You should drink water now.',
+    ]);
+    const steps = alertSteps('One. Two! Three?', 1, 'ARGUS!');
+    expect(steps.map((s) => (s.kind === 'beep' ? 'beep' : s.text))).toEqual(['beep', 'ARGUS!', 'One.', 'Two!', 'Three?']);
   });
 
   it('is silent with nothing to report', () => {
