@@ -194,18 +194,26 @@ export function resolveProviderChain(
   env: Env,
   options: { feature?: AiFeature; keyOverride?: string; tier?: CommTier } = {}
 ): ProviderConfig[] {
-  // Deep space / blackout: nothing may leave the ship, whatever the env or a typed key says
-  // (specs/04-ai-backend.md §4.2).
-  if (options.tier === 'autonomous') {
-    const local = buildProvider('local', env);
-    return local ? [local] : [];
-  }
   const route = options.feature
     ? parseList(env[`AI_ROUTE_${options.feature.toUpperCase()}`])
     : [];
   const configured = parseList(env.AI_PROVIDERS);
   const ids = route.length ? route : configured.length ? configured : ['auto'];
   const chain = expand(ids, env);
+
+  // Deep space / blackout (specs/04-ai-backend.md §4.2): the on-ship model answers first.
+  // Strict mode keeps everything on the ship; otherwise Earth models stand in when no
+  // on-ship model is installed or reachable (the demo usually runs without one).
+  if (options.tier === 'autonomous') {
+    const local = buildProvider('local', env);
+    if (onShipStrict(env)) return local ? [local] : [];
+    const withOverride = (() => {
+      const key = trimmed(options.keyOverride);
+      const cfg = key ? buildProvider(detectProviderFromKey(key), env, key) : null;
+      return cfg ? [cfg, ...chain.filter((c) => !(c.id === cfg.id && c.apiKey === cfg.apiKey))] : chain;
+    })();
+    return local ? [local, ...withOverride.filter((c) => c.id !== 'local')] : withOverride;
+  }
 
   const override = trimmed(options.keyOverride);
   if (override) {
@@ -216,6 +224,11 @@ export function resolveProviderChain(
     }
   }
   return chain;
+}
+
+/** `ARGUS_ONSHIP_STRICT=1`: the on-ship tier never uses Earth models or speech. */
+export function onShipStrict(env: Env = process.env): boolean {
+  return env.ARGUS_ONSHIP_STRICT?.trim() === '1';
 }
 
 /** Features that have their own `AI_ROUTE_<FEATURE>` chain. */

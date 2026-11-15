@@ -22,6 +22,9 @@ import { commDelayAt } from '../data/spaceLocations';
 import { assistantApi, earthApi, streamConverse } from '../services/assistantApi';
 import { chatHistoryApi } from '../services/dataApi';
 import { MicCapture, type Utterance } from '../services/speech/micCapture';
+import { base64ToBytes, bytesToBase64, encodeWav, getAudioContext } from '../services/speech/audio';
+import { DEFAULT_DEVICE_VOICE, deviceSpeech, type DeviceSpeechStatus, wavToFloat32 } from '../services/speech/deviceSpeech';
+import { cleanForSpeech } from '../services/speech/sentenceChunker';
 import { LiveSession, type LiveToolCall } from '../services/speech/liveSession';
 import { SpeechOutput, primaryVoiceEngine } from '../services/speech/speechOutput';
 import { loadVoicePrefs, saveVoicePrefs, type VoicePrefs } from '../services/speech/voicePrefs';
@@ -94,6 +97,22 @@ function migrateLegacy(crewId: string): AssistantMessage[] {
   } catch {
     return [];
   }
+}
+
+/** Drops Whisper's silence artefacts ("[BLANK_AUDIO]", a lone "you") so noise never becomes a message. */
+export function cleanTranscript(raw: string): string {
+  const text = raw.replace(/\[[^\]]*\]|\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!text || /^[\W_]*$/.test(text)) return '';
+  if (/^(you|thank you|thanks for watching)[.!]?$/i.test(text)) return '';
+  return text;
+}
+
+/** A protocol steers the AI only while it is live: started recently and not finished. */
+export const PROTOCOL_ACTIVE_MS = 30 * 60_000;
+export function isProtocolLive(run: { startedAtIso: string; steps: string[]; completed: Record<number, string> } | null, now = Date.now()): boolean {
+  if (!run) return false;
+  if (Object.keys(run.completed).length >= run.steps.length) return false;
+  return now - Date.parse(run.startedAtIso) < PROTOCOL_ACTIVE_MS;
 }
 
 const uid = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -188,6 +207,8 @@ interface AssistantContextValue {
 
   prefs: VoicePrefs;
   updatePrefs: (patch: Partial<VoicePrefs>) => void;
+  /** On-device speech models (used when no server voice / transcription is available). */
+  deviceSpeechStatus: DeviceSpeechStatus;
   voices: VoicesResponse | null;
   previewVoice: (engine: VoiceEngineId, voiceId: string) => void;
 
@@ -350,6 +371,8 @@ export const AssistantProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [online, setOnline] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine));
   const [override, setOverride] = useState<CommTier | null>(null);
   const [failedDown, setFailedDown] = useState<{ tier: CommTier; reason: string } | null>(null);
+  /** Set when the on-ship tier had to use Earth models or voices (none installed on the ship). */
+  const [standIn, setStandIn] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const on = () => setOnline(true);
@@ -375,8 +398,9 @@ export const AssistantProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       effective = failedDown.tier;
       note = failedDown.reason;
     }
+    if (!note && standIn) note = standIn;
     return { physical, effective, oneWaySec, roundTripSec: roundTripSeconds(oneWaySec), override, note };
-  }, [spaceLocation, now, online, override, failedDown]);
+  }, [spaceLocation, now, online, override, failedDown, standIn]);
   const tierRef = useRef(tier);
   tierRef.current = tier;
 
@@ -397,6 +421,10 @@ export const AssistantProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     });
   }, []);
   const [voices, setVoices] = useState<VoicesResponse | null>(null);
+  const voicesRef = useRef<VoicesResponse | null>(null);
+  voicesRef.current = voices;
+  const [deviceSpeechStatus, setDeviceSpeechStatus] = useState<DeviceSpeechStatus>(deviceSpeech.status);
+  useEffect(() => deviceSpeech.subscribe(setDeviceSpeechStatus), []);
   useEffect(() => {
     let alive = true;
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -434,16 +462,40 @@ export const AssistantProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       synthesize: async (text, signal) => {
         const t = tierRef.current.effective;
         const engine = primaryVoiceEngine(t);
-        const env = await assistantApi.tts({ text, tier: t, voice: prefsRef.current.voices[engine] }, runtimeKeyRef.current, signal);
-        return {
-          audioBase64: env.result.audioBase64,
-          mimeType: env.result.mimeType,
-          useBrowserSpeechFallback: env.result.useBrowserSpeechFallback,
-          engine: env.meta.provider === 'local' ? 'local' : 'gemini',
-        };
+        const v = voicesRef.current;
+        // Skip the round trip when the server has no voice at all.
+        const serverVoice = !v || v.engines.gemini.available || v.engines.local.available;
+        if (serverVoice) {
+          try {
+            const env = await assistantApi.tts({ text, tier: t, voice: prefsRef.current.voices[engine] }, runtimeKeyRef.current, signal);
+            if (!env.result.useBrowserSpeechFallback) {
+              return {
+                audioBase64: env.result.audioBase64,
+                mimeType: env.result.mimeType,
+                useBrowserSpeechFallback: false,
+                engine: env.meta.provider === 'local' ? 'local' : 'gemini',
+              };
+            }
+          } catch (err) {
+            if ((err as Error).name === 'AbortError') throw err;
+          }
+        }
+        // On-device neural voice: no key, no server.
+        if (deviceSpeech.supported && deviceSpeech.status.tts !== 'failed') {
+          try {
+            const { samples, rate } = await deviceSpeech.speak(cleanForSpeech(text), prefsRef.current.voices.local ?? DEFAULT_DEVICE_VOICE, 1);
+            if (samples.length) {
+              return { audioBase64: bytesToBase64(encodeWav(samples, rate)), mimeType: 'audio/wav', useBrowserSpeechFallback: false, engine: 'local' };
+            }
+          } catch {
+            // last resort below
+          }
+        }
+        return { audioBase64: '', mimeType: '', useBrowserSpeechFallback: true };
       },
       onSpeakingChange: (s) => setSpeaking(s),
       onEngine: (e) => setSpeechEngine(e),
+      onError: (message) => setError(message),
       onFirstAudio: (ms) => setLatency((l) => ({ ...l, firstAudioMs: ms })),
     });
   }
@@ -657,6 +709,18 @@ export const AssistantProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     },
     [setEmergency]
   );
+
+  // A stale protocol (all steps done, or older than 30 min) stops steering the AI; drop it from the
+  // screen too once it is finished, so it never colours unrelated conversation.
+  useEffect(() => {
+    if (!emergency) return;
+    if (Object.keys(emergency.completed).length >= emergency.steps.length) {
+      const t = setTimeout(() => endEmergencyRef.current?.(), 1500);
+      return () => clearTimeout(t);
+    }
+    return undefined;
+  }, [emergency]);
+  const endEmergencyRef = useRef<(() => void) | null>(null);
   const endEmergency = useCallback(() => {
     const run = emergencyRef.current;
     if (run) {
@@ -665,6 +729,7 @@ export const AssistantProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
     setEmergency(null);
   }, [setEmergency, sendReport]);
+  endEmergencyRef.current = endEmergency;
 
   const toggleGuidedStep = useCallback(
     (n: number) =>
@@ -788,7 +853,7 @@ export const AssistantProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         tierOverride: t.effective,
         frame,
         observation: observationRef.current?.facePresent ? observationRef.current : undefined,
-        activeProtocol: run
+        activeProtocol: run && isProtocolLive(run)
           ? { protocolId: run.protocolId, title: run.title, steps: run.steps, completedSteps: Object.keys(run.completed).map(Number) }
           : undefined,
         guidedSteps: s.guidedSteps?.steps,
@@ -855,6 +920,12 @@ export const AssistantProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     async (rawText, opts = {}) => {
       const text = rawText.trim();
       if (!text) return;
+      // Browsers only let audio start from a click or key press: unlock it now, not after the network call.
+      if (prefsRef.current.speak) {
+        getAudioContext();
+        const v = voicesRef.current;
+        if (v && !v.engines.gemini.available && !v.engines.local.available) deviceSpeech.preload('tts');
+      }
       const modality = opts.modality ?? 'text';
       setError(null);
       setInterim('');
@@ -897,6 +968,15 @@ export const AssistantProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         if (controller.signal.aborted) return;
         switch (e.type) {
           case 'meta':
+            if (e.meta.source !== 'live_ai') {
+              setStandIn('No AI model is reachable: answers come from onboard protocols.');
+            } else if (e.tier === 'autonomous' && e.meta.provider !== 'local') {
+              setStandIn('No on-ship model installed: Earth AI is standing in.');
+            } else if (e.tier !== 'autonomous' && e.meta.provider === 'local') {
+              setStandIn('No Earth AI configured: the on-ship model is answering.');
+            } else {
+              setStandIn(null);
+            }
             setMessages((prev) => prev.map((m) => (m.id === replyId ? { ...m, meta: e.meta, tier: e.tier, crisis: e.crisis, sources: e.ragHits?.length ? e.ragHits : m.sources } : m)));
             break;
           case 'sources':
@@ -980,9 +1060,9 @@ export const AssistantProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const recognitionRef = useRef<{ stop: () => void } | null>(null);
   const interimRef = useRef('');
 
-  /** Interim captions from the browser recogniser (never in on-ship mode: it may send audio off-ship). */
+  /** Interim captions from the browser recogniser, also used as a backup transcript. */
   const startCaptions = useCallback(() => {
-    if (tierRef.current.effective === 'autonomous' || recognitionRef.current) return;
+    if (recognitionRef.current) return;
     const Ctor =
       (window as unknown as { SpeechRecognition?: new () => SpeechRecognitionLike }).SpeechRecognition ??
       (window as unknown as { webkitSpeechRecognition?: new () => SpeechRecognitionLike }).webkitSpeechRecognition;
@@ -1013,12 +1093,33 @@ export const AssistantProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     recognitionRef.current = null;
   }, []);
 
+  /** On-device Whisper when the server has nothing better (always, on the ship, without a speech server). */
+  const preferDeviceStt = useCallback((): boolean => {
+    if (!deviceSpeech.supported || deviceSpeech.status.stt === 'failed') return false;
+    const v = voicesRef.current;
+    if (!v) return false;
+    if (tierRef.current.effective === 'autonomous') return !v.engines.local.available;
+    return !v.engines.gemini.available && !v.engines.local.available;
+  }, []);
+
   const transcribeAndSend = useCallback(
     async (utterance: Utterance) => {
       stopCaptions();
       setStatus('transcribing');
       const fallback = interimRef.current;
       interimRef.current = '';
+      if (preferDeviceStt()) {
+        try {
+          const heard = cleanTranscript(await deviceSpeech.transcribe(wavToFloat32(base64ToBytes(utterance.wavBase64))));
+          if (heard) {
+            await send(heard, { modality: 'voice' });
+            if (voiceModeRef.current === 'conversation') startCaptions();
+            return;
+          }
+        } catch {
+          // fall through to the server and the browser captions
+        }
+      }
       try {
         const env = await assistantApi.stt(
           { ...crewContext, audioBase64: utterance.wavBase64, mimeType: utterance.mimeType, fallbackTranscript: fallback || undefined, tier: tierRef.current.effective, languageCode: 'en-US' },
@@ -1036,7 +1137,7 @@ export const AssistantProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
       if (voiceModeRef.current === 'conversation') startCaptions();
     },
-    [crewContext, send, startCaptions, stopCaptions]
+    [crewContext, send, startCaptions, stopCaptions, preferDeviceStt]
   );
 
   const ensureMic = useCallback(async (): Promise<MicCapture> => {
@@ -1080,7 +1181,7 @@ export const AssistantProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           tierOverride: tierRef.current.effective,
           voice: prefsRef.current.voices.gemini,
           observation: observationRef.current?.facePresent ? observationRef.current : undefined,
-          activeProtocol: run ? { protocolId: run.protocolId, title: run.title, steps: run.steps, completedSteps: Object.keys(run.completed).map(Number) } : undefined,
+          activeProtocol: run && isProtocolLive(run) ? { protocolId: run.protocolId, title: run.title, steps: run.steps, completedSteps: Object.keys(run.completed).map(Number) } : undefined,
           guidedSteps: s.guidedSteps?.steps,
           checkIns: wellbeingCheckIns.slice(-30),
           previousAssessment: s.assessment ?? undefined,
@@ -1222,6 +1323,8 @@ export const AssistantProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const startConversation = useCallback(async () => {
     setError(null);
+    getAudioContext();
+    if (preferDeviceStt()) deviceSpeech.preload('stt');
     try {
       const mic = await ensureMic();
       setVoiceMode('conversation');
@@ -1238,7 +1341,7 @@ export const AssistantProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setVoiceMode('off');
       setStatus('idle');
     }
-  }, [ensureMic, openLive, setVoiceMode, startCaptions]);
+  }, [ensureMic, openLive, setVoiceMode, startCaptions, preferDeviceStt]);
 
   const stopConversation = useCallback(() => {
     closeLive();
@@ -1253,6 +1356,8 @@ export const AssistantProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const togglePushToTalk = useCallback(async () => {
     setError(null);
+    getAudioContext();
+    if (preferDeviceStt()) deviceSpeech.preload('stt');
     if (voiceModeRef.current === 'conversation') return;
     if (voiceModeRef.current === 'push') {
       const u = micRef.current?.endUtterance() ?? null;
@@ -1283,7 +1388,7 @@ export const AssistantProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     } catch {
       setError('Microphone access was blocked. Allow it in the browser to talk to ARGUS.');
     }
-  }, [ensureMic, setVoiceMode, startCaptions, stopCaptions, transcribeAndSend, send]);
+  }, [ensureMic, setVoiceMode, startCaptions, stopCaptions, transcribeAndSend, send, preferDeviceStt]);
 
   // Leaving the live tier (moved further out, override) ends a live session.
   useEffect(() => {
@@ -1319,6 +1424,15 @@ export const AssistantProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (!out) return;
     out.cancel();
     out.begin();
+    getAudioContext();
+    if (engine === 'local' && !voicesRef.current?.engines.local.available) {
+      // No on-ship voice server: preview the same voice running on this device.
+      void deviceSpeech
+        .speak(line, voiceId || DEFAULT_DEVICE_VOICE, 1)
+        .then(({ samples, rate }) => out.playClip(bytesToBase64(encodeWav(samples, rate)), 'audio/wav'))
+        .catch(() => setError('The on-device voice could not load in this browser.'));
+      return;
+    }
     void assistantApi
       .tts({ text: line, voice: voiceId, tier: engine === 'local' ? 'autonomous' : 'relay' }, runtimeKeyRef.current)
       .then((env) => {
@@ -1360,6 +1474,7 @@ export const AssistantProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     interrupt,
     prefs,
     updatePrefs,
+    deviceSpeechStatus,
     voices,
     previewVoice,
     camera,

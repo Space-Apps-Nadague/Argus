@@ -146,11 +146,25 @@ describe('comm tier on the server', () => {
     expect(events.find((e) => e.type === 'meta')).toMatchObject({ tier: 'autonomous' });
   });
 
-  it('forces a local-only chain when autonomous, even with cloud keys and a typed key', () => {
+  it('puts the on-ship model first when autonomous, with Earth models standing in', () => {
     const env = { GEMINI_API_KEY: 'AIzaTest', AI_LOCAL_MODEL: 'qwen3:8b', AI_PROVIDERS: 'gemini,local' };
     expect(resolveProviderChain(env, { feature: 'chat' }).map((p) => p.id)).toEqual(['gemini', 'local']);
+    expect(resolveProviderChain(env, { feature: 'chat', tier: 'autonomous' }).map((p) => p.id)).toEqual(['local', 'gemini']);
+    // No on-ship model installed: Earth AI answers instead of nothing.
+    expect(resolveProviderChain({ GEMINI_API_KEY: 'AIzaTest' }, { feature: 'chat', tier: 'autonomous' }).map((p) => p.id)).toEqual(['gemini']);
+  });
+
+  it('keeps everything on the ship in strict mode, even with cloud keys and a typed key', () => {
+    const env = { GEMINI_API_KEY: 'AIzaTest', AI_LOCAL_MODEL: 'qwen3:8b', AI_PROVIDERS: 'gemini,local', ARGUS_ONSHIP_STRICT: '1' };
     expect(resolveProviderChain(env, { feature: 'chat', tier: 'autonomous', keyOverride: 'AIzaOther' }).map((p) => p.id)).toEqual(['local']);
-    expect(resolveProviderChain({ GEMINI_API_KEY: 'AIzaTest' }, { feature: 'chat', tier: 'autonomous' })).toEqual([]);
+    expect(resolveProviderChain({ GEMINI_API_KEY: 'AIzaTest', ARGUS_ONSHIP_STRICT: '1' }, { feature: 'chat', tier: 'autonomous' })).toEqual([]);
+  });
+
+  it('says plainly when no model is reachable instead of reading out unrelated data', async () => {
+    const events = await converse({ locationId: 'mars_transit', messages: [{ role: 'user', content: 'what do you think about the mission so far?' }] });
+    const text = reply(events);
+    expect(text).toMatch(/AI model isn't reachable/);
+    expect(text).not.toMatch(/readiness is|zone is/i);
   });
 });
 
@@ -287,5 +301,22 @@ describe('knowledge retrieval for the conversation', () => {
     const events = (await res.text()).split('\n').filter((l) => l.startsWith('data:')).map((l) => JSON.parse(l.slice(5)) as ConverseEvent);
     const meta = events.find((e) => e.type === 'meta') as Extract<ConverseEvent, { type: 'meta' }>;
     expect(meta.ragHits?.length).toBeGreaterThan(0);
+  });
+});
+
+describe('a running protocol does not colour unrelated conversation', () => {
+  const protocol = { protocolId: 'medical' as const, title: 'Crew medical emergency', steps: ['a', 'b', 'c'], completedSteps: [1] };
+  const metaOf = async (content: string) => {
+    const events = await converse({ messages: [{ role: 'user', content }], activeProtocol: protocol });
+    return events.find((e) => e.type === 'meta') as Extract<ConverseEvent, { type: 'meta' }>;
+  };
+
+  it('looks the protocol up for step talk', async () => {
+    expect((await metaOf('done, what now?')).ragHits?.length).toBeGreaterThan(0);
+  });
+
+  it('does not attach emergency sources to an unrelated message', async () => {
+    const meta = await metaOf("I'm stressed about tomorrow's spacewalk and keep thinking about my family");
+    expect((meta.ragHits ?? []).some((h) => h.kind === 'emergency_checklist')).toBe(false);
   });
 });
