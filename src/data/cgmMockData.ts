@@ -221,7 +221,16 @@ export const CREW_CGM_MOCK_DATA: Record<string, CrewCgmMockDataset> = Object.fro
 );
 
 /** Returns the 24h 5-minute CGM mock dataset for a crew member (falls back to Commander Vance). */
-export function getCrewCgmMockData(crewId: string): CrewCgmMockDataset {
+export function getCrewCgmMockData(crewId: string, scenarioId?: string): CrewCgmMockDataset {
+  if (scenarioId === 'unexplained_fatigue') {
+    const baseProfile = CREW_METABOLIC_PROFILES[crewId] ?? CREW_METABOLIC_PROFILES['crew-vance'];
+    const callsign = DEFAULT_CREW_ROSTER.find((c) => c.id === crewId)?.callsign ?? 'VALKYRIE';
+    return buildCrewCgmDataset(crewId, callsign, {
+      ...baseProfile,
+      fastingBaseline: 118,
+      stressSurgeDelta: 12,
+    });
+  }
   return CREW_CGM_MOCK_DATA[crewId] ?? CREW_CGM_MOCK_DATA['crew-vance'];
 }
 

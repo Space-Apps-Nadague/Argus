@@ -23,7 +23,7 @@ export type AnatomicalLayer = 'all' | 'dermal' | 'skeletal' | 'organs';
 
 export type TriageStatus = 'green' | 'yellow' | 'red';
 
-export type ScenarioId = 'nominal' | 'sans_alert' | 'high_co2' | 'solar_storm';
+export type ScenarioId = 'nominal' | 'unexplained_fatigue' | 'sans_alert' | 'high_co2' | 'solar_storm';
 
 export type MetricId =
   | 'onsd'
