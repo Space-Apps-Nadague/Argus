@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { GAME_IDS } from '../catalog';
-import { cycleOrder, dayIndexOf, gameOfTheDay } from '../schedule';
+import { cycleDays, cycleOrder, dateKeyOfDayIndex, dayIndexOf, gameOfTheDay } from '../schedule';
 
 const addDays = (key: string, n: number) => {
   const [y, m, d] = key.split('-').map(Number);
@@ -36,5 +36,19 @@ describe('cognition schedule', () => {
 
   it('day index advances by one per calendar day', () => {
     expect(dayIndexOf('2026-11-16') - dayIndexOf('2026-11-15')).toBe(1);
+    expect(dateKeyOfDayIndex(dayIndexOf('2026-11-15'))).toBe('2026-11-15');
+  });
+
+  it('cycle track: 9 days, today in place, every game once, matching the game of the day', () => {
+    for (let i = 0; i < 30; i++) {
+      const key = addDays('2026-11-01', i);
+      const { position, days } = cycleDays('crew-a', key);
+      expect(days).toHaveLength(GAME_IDS.length);
+      expect(new Set(days.map((d) => d.gameId)).size).toBe(GAME_IDS.length);
+      expect(days[position].dateKey).toBe(key);
+      expect(days[position].when).toBe('today');
+      days.forEach((d) => expect(gameOfTheDay('crew-a', d.dateKey)).toBe(d.gameId));
+      expect(days.filter((d) => d.when === 'past')).toHaveLength(position);
+    }
   });
 });

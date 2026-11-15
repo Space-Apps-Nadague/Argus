@@ -10,8 +10,8 @@ import { formatCommDelay } from '../data/spaceLocations';
 import { Card } from './ui/Card';
 import { StatusPill } from './ui/StatusPill';
 import { InfoTip } from './InfoTip';
-import { COGNITION_GAMES, GAME_BY_ID } from '../features/cognition/catalog';
-import { dateKeyOf, gameOfTheDay } from '../features/cognition/schedule';
+import { GAME_BY_ID } from '../features/cognition/catalog';
+import { cycleDays, dateKeyOf, gameOfTheDay } from '../features/cognition/schedule';
 import { dailyStreak, evaluateSession, leaderboard, personalBest } from '../features/cognition/scoring';
 import { decideCare, earthPacketNote } from '../features/cognition/routing';
 import { useCognitionStore } from '../features/cognition/store';
@@ -34,7 +34,7 @@ const statusLabel = (e: CognitionEvaluation) =>
 export const CognitionTab: React.FC = () => {
   const { activeCrewMember, crewRoster, zoneStatuses, queueEarthPacket, addCheckIn, latestDay, spaceLocation, setActiveTab } = useMission();
   const { byCrew, addSession } = useCognitionStore();
-  const [playing, setPlaying] = useState<{ gameId: CognitionGameId; retest: boolean; practice?: boolean } | null>(null);
+  const [playing, setPlaying] = useState<{ gameId: CognitionGameId; retest: boolean } | null>(null);
   const [last, setLast] = useState<LastRun | null>(null);
   const [alertOpen, setAlertOpen] = useState(false);
   const [packet, setPacket] = useState<{ id: string; delay: string } | null>(null);
@@ -47,6 +47,7 @@ export const CognitionTab: React.FC = () => {
   const todayDef = GAME_BY_ID[todayGameId];
   const todaySession = history.find((s) => s.daily && s.dateKey === todayKey);
   const streak = dailyStreak(history, todayKey);
+  const cycle = cycleDays(crewId, todayKey);
   const board = useMemo(() => leaderboard(byCrew, crewRoster.map((c) => c.id), todayKey), [byCrew, crewRoster, todayKey]);
   const recent = useMemo(
     () => [...history].sort((a, b) => b.timestampIso.localeCompare(a.timestampIso)).slice(0, 6),
@@ -54,7 +55,7 @@ export const CognitionTab: React.FC = () => {
   );
   const nameOf = (id: string) => crewRoster.find((c) => c.id === id)?.callsign ?? id;
 
-  const finish = (gameId: CognitionGameId, retest: boolean, r: GameResult, practice = false) => {
+  const finish = (gameId: CognitionGameId, retest: boolean, r: GameResult) => {
     const nowIso = new Date().toISOString();
     const session: CognitionSession = {
       ...r,
@@ -64,7 +65,6 @@ export const CognitionTab: React.FC = () => {
       dateKey: todayKey,
       timestampIso: nowIso,
       daily: !retest,
-      ...(practice ? { practice: true } : {}),
     };
     const prevBest = personalBest(history, gameId);
     const evaluation = evaluateSession(session, history);
@@ -139,8 +139,7 @@ export const CognitionTab: React.FC = () => {
           def={GAME_BY_ID[playing.gameId]}
           seed={seedFor(playing.gameId, playing.retest)}
           isRetest={playing.retest}
-          practice={playing.practice}
-          onFinish={(r) => finish(playing.gameId, playing.retest, r, playing.practice)}
+          onFinish={(r) => finish(playing.gameId, playing.retest, r)}
           onCancel={() => setPlaying(null)}
         />
       ) : (
@@ -170,6 +169,42 @@ export const CognitionTab: React.FC = () => {
                   <Play className="h-4 w-4" aria-hidden="true" /> Play
                 </button>
               )}
+            </div>
+
+            {/* 9-day rotation: each game once per cycle, shuffled. Upcoming games stay hidden. */}
+            <div className="mt-4" aria-label={`Day ${cycle.position + 1} of ${cycle.days.length} in the game rotation`}>
+              <p className="mb-1.5 text-xs text-hud-muted">
+                Rotation · day {cycle.position + 1} of {cycle.days.length}: every game once, a new shuffle every {cycle.days.length} days
+              </p>
+              <ol className="grid grid-cols-9 gap-1">
+                {cycle.days.map((d, k) => {
+                  const played = history.some((s) => s.daily && s.dateKey === d.dateKey);
+                  const title = GAME_BY_ID[d.gameId].title;
+                  const label =
+                    d.when === 'upcoming' ? `Day ${k + 1}: upcoming` : `Day ${k + 1}: ${title}${d.when === 'past' ? (played ? ', played' : ', missed') : played ? ', played today' : ', today'}`;
+                  return (
+                    <li
+                      key={d.dateKey}
+                      title={label}
+                      aria-label={label}
+                      className={`flex h-12 flex-col items-center justify-center rounded-lg border px-0.5 text-center ${
+                        d.when === 'today'
+                          ? 'border-hud-accent bg-hud-accent/15 text-hud-text'
+                          : d.when === 'past'
+                            ? played
+                              ? 'border-status-green/50 bg-status-green/10 text-hud-text'
+                              : 'border-hud-line bg-hud-bg/40 text-hud-muted'
+                            : 'border-dashed border-hud-line text-hud-muted'
+                      }`}
+                    >
+                      <span className="font-mono text-[10px] text-hud-muted">{k + 1}</span>
+                      <span className="w-full truncate text-[10px] leading-tight">
+                        {d.when === 'upcoming' ? '?' : d.when === 'past' ? (played ? `✓ ${title}` : '–') : title}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ol>
             </div>
 
             {last && (
@@ -220,23 +255,6 @@ export const CognitionTab: React.FC = () => {
             )}
           </Card>
 
-          <Card title="All games · practice" icon={<Brain className="h-4 w-4" />} className="lg:col-span-3">
-            <p className="mb-3 text-xs text-hud-muted">Play any game, any time. Practice does not replace today’s game; results still count toward your baseline.</p>
-            <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {COGNITION_GAMES.map((g) => (
-                <li key={g.id} className="flex items-center gap-3 rounded-xl border border-hud-line bg-hud-bg/60 p-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="font-display text-sm font-bold text-hud-text">{g.title}</p>
-                    <p className="truncate text-xs text-hud-muted">{g.nasaTest} · 3 min</p>
-                  </div>
-                  <button type="button" className="hud-btn" onClick={() => setPlaying({ gameId: g.id, retest: true, practice: true })} aria-label={`Play ${g.title}`}>
-                    <Play className="h-3.5 w-3.5" aria-hidden="true" /> Play
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </Card>
-
           <Card title="Your recent games" className="lg:col-span-3">
             {recent.length === 0 ? (
               <p className="text-sm text-hud-muted">Play today’s game to start your baseline.</p>
@@ -261,7 +279,7 @@ export const CognitionTab: React.FC = () => {
                           <td className="py-1.5 pr-3 font-mono text-xs text-hud-muted">{s.dateKey}</td>
                           <td className="py-1.5 pr-3">
                             {def.title}
-                            {!s.daily && <span className="ml-1 text-xs text-hud-muted">({s.practice ? 'practice' : 'retest'})</span>}
+                            {!s.daily && <span className="ml-1 text-xs text-hud-muted">(retest)</span>}
                           </td>
                           <td className="py-1.5 pr-3 font-mono">{s.points}</td>
                           <td className="py-1.5 pr-3 font-mono text-xs">

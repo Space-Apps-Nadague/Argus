@@ -51,3 +51,32 @@ export function gameOfTheDay(
   const cycle = Math.floor(day / n);
   return cycleOrder(crewId, cycle, ids)[day - cycle * n];
 }
+
+/** Local day key for a day index (inverse of `dayIndexOf`). */
+export function dateKeyOfDayIndex(day: number): string {
+  return new Date(day * DAY_MS).toISOString().slice(0, 10);
+}
+
+export interface CycleDay {
+  dateKey: string;
+  gameId: CognitionGameId;
+  /** past, today or upcoming within the current 9-day cycle */
+  when: 'past' | 'today' | 'upcoming';
+}
+
+/** Where today sits in the 9-day rotation, and the cycle's days (for the cycle track). */
+export function cycleDays(crewId: string, dateKey: string, ids: readonly CognitionGameId[] = GAME_IDS): { position: number; days: CycleDay[] } {
+  const day = dayIndexOf(dateKey);
+  const n = ids.length;
+  const cycle = Math.floor(day / n);
+  const order = cycleOrder(crewId, cycle, ids);
+  const position = day - cycle * n;
+  return {
+    position,
+    days: order.map((gameId, k) => ({
+      dateKey: dateKeyOfDayIndex(cycle * n + k),
+      gameId,
+      when: k < position ? 'past' : k === position ? 'today' : 'upcoming',
+    })),
+  };
+}
