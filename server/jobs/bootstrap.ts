@@ -32,7 +32,8 @@ export async function bootstrapIfEmpty(db: Db): Promise<void> {
     await seedDatabase(db, { log: () => {} });
   }
   // Resumable: each astronaut without simulated history gets it, so a restart mid-fill continues where it stopped.
-  const filled = await backfillSimulated(db, { days: 30, onlyMissing: true, script: 'server/jobs/bootstrap.ts', log });
+  // The whole mission so far (capped at a year) plus the Earth pre-flight days before launch.
+  const filled = await backfillSimulated(db, { days: 365, onlyMissing: true, script: 'server/jobs/bootstrap.ts', log });
   if (filled) log(`simulated history added: ${filled} readings`);
   const [{ n: refRows }] = await db.select({ n: count() }).from(refRadiationDoseRates);
   if (refRows === 0) {
