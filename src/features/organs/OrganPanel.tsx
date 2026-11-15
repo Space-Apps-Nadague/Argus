@@ -70,6 +70,13 @@ export const OrganPanel: React.FC<{ state: OrganState; locationLabel: string; on
         </button>
       </div>
 
+      {state.zoneStatus != null && state.zoneStatus > 0 && (state.ringStatus == null || state.zoneStatus > state.ringStatus) && (
+        <p className="mt-2 rounded-lg border border-slate-700 bg-slate-900/80 p-2 text-xs text-slate-300">
+          {statusStyle(state.zoneStatus).text} from the zone check (fixed flight thresholds), not from the indicators
+          below. See the zone tiles beside the body.
+        </p>
+      )}
+
       <ul className="mt-3 space-y-2">
         {rows.map((s) => {
           const st = statusStyle(s.n ? s.status : undefined);
