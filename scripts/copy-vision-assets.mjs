@@ -12,9 +12,6 @@ const modelDir = join(root, 'public', 'models', 'vision');
 const DOWNLOADS = {
   'gesture_recognizer.task':
     'https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/latest/gesture_recognizer.task',
-  // Cognition games camera health check (src/features/cognition/faceCapture.ts), ~3.6 MB.
-  'face_landmarker.task':
-    'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
 };
 
 if (!existsSync(src)) {

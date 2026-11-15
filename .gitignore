@@ -31,4 +31,3 @@ public/models/face/
 # MediaPipe WASM, copied from node_modules by scripts/copy-vision-assets.mjs
 public/vision/
 public/models/vision/gesture_recognizer.task
-public/models/vision/face_landmarker.task
