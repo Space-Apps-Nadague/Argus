@@ -245,28 +245,46 @@ function drawEarthFromOrbit(ctx: CanvasRenderingContext2D, w: number, h: number)
 
 function drawCupola(ctx: CanvasRenderingContext2D, w: number, h: number) {
   drawEarthFromOrbit(ctx, w, h);
+  // ISS cupola seen from inside: a round top window ringed by six side windows in a grey frame.
   const cx = w / 2;
-  const cy = h * 0.45;
+  const cy = h * 0.5;
+  const centre = h * 0.27;
+  const ring = h * 0.47;
+  const side = h * 0.15;
+  const windows: [number, number, number][] = [[cx, cy, centre]];
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2 - Math.PI / 2;
+    windows.push([cx + Math.cos(a) * ring * 1.25, cy + Math.sin(a) * ring, side]);
+  }
   ctx.save();
-  ctx.fillStyle = '#c9ced6';
+  const panel = ctx.createLinearGradient(0, 0, 0, h);
+  panel.addColorStop(0, '#d7dce3');
+  panel.addColorStop(1, '#9aa3ae');
+  ctx.fillStyle = panel;
   ctx.beginPath();
   ctx.rect(0, 0, w, h);
-  ctx.arc(cx, cy, h * 0.36, 0, Math.PI * 2, true);
-  for (let i = 0; i < 6; i++) {
-    const a = (i / 6) * Math.PI * 2 + Math.PI / 6;
-    const px = cx + Math.cos(a) * h * 0.62;
-    const py = cy + Math.sin(a) * h * 0.62;
-    ctx.moveTo(px + h * 0.17, py);
-    ctx.arc(px, py, h * 0.17, 0, Math.PI * 2, true);
+  for (const [x, y, r] of windows) {
+    ctx.moveTo(x + r, y);
+    ctx.arc(x, y, r, 0, Math.PI * 2);
   }
   ctx.fill('evenodd');
-  ctx.strokeStyle = '#8a929e';
-  ctx.lineWidth = 14;
+  ctx.strokeStyle = '#6b7480';
+  for (const [x, y, r] of windows) {
+    ctx.lineWidth = r === centre ? 16 : 10;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  // Handrails.
+  ctx.strokeStyle = '#e8b04a';
+  ctx.lineWidth = 8;
+  ctx.lineCap = 'round';
   ctx.beginPath();
-  ctx.arc(cx, cy, h * 0.36, 0, Math.PI * 2);
+  ctx.moveTo(w * 0.06, h * 0.9);
+  ctx.lineTo(w * 0.26, h * 0.9);
+  ctx.moveTo(w * 0.74, h * 0.9);
+  ctx.lineTo(w * 0.94, h * 0.9);
   ctx.stroke();
-  ctx.fillStyle = 'rgba(30,36,46,0.55)';
-  ctx.fillRect(0, h * 0.88, w, h * 0.12);
   ctx.restore();
 }
 
