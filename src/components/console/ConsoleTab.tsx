@@ -6,13 +6,14 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Bot, ClipboardList, Cloud, Cpu, HeartHandshake, Inbox, MessageSquare, Microscope, Radio, Settings2, Wifi } from 'lucide-react';
+import { Bot, ClipboardList, Cloud, Cpu, HeartHandshake, Inbox, MessageSquare, Microscope, Radio, Settings2, Stethoscope, Wifi } from 'lucide-react';
 import { useAssistant } from '../../context/AssistantContext';
 import { useAuth } from '../../context/AuthContext';
 import { useMission } from '../../context/MissionContext';
 import { COMM_TIER_PROFILES, COMM_TIERS, type CommTier } from '../../../shared/commProfile';
 import { Card } from '../ui/Card';
 import { InfoTip } from '../InfoTip';
+import { FlightSurgeonPanel } from '../FlightSurgeonPanel';
 import { DiagnosticsPanel, PlanPanel } from '../ai/InsightPanels';
 import { WellbeingPanel } from '../ai/WellbeingPanel';
 import { ConversationThread, Composer } from './Conversation';
@@ -20,7 +21,7 @@ import { CountermeasureCards, EarthLinkCard, EmergencyCard, SelfView, StepsCard,
 import { EarthInbox } from './EarthInbox';
 import type { VoiceEngineId } from '../../types/assistant';
 
-type Section = 'talk' | 'diagnostics' | 'plan' | 'checkin' | 'inbox';
+type Section = 'talk' | 'surgeon' | 'diagnostics' | 'plan' | 'checkin' | 'inbox';
 
 const TIER_ICON: Record<CommTier, React.FC<{ className?: string }>> = { live: Wifi, relay: Cloud, autonomous: Cpu };
 
@@ -191,6 +192,7 @@ export const ConsoleTab: React.FC = () => {
 
   const sections: Array<{ id: Section; label: string; icon: React.ReactNode }> = [
     { id: 'talk', label: 'Talk', icon: <MessageSquare className="h-4 w-4" /> },
+    { id: 'surgeon', label: 'Flight Surgeon', icon: <Stethoscope className="h-4 w-4" /> },
     { id: 'diagnostics', label: 'Diagnostics', icon: <Microscope className="h-4 w-4" /> },
     { id: 'plan', label: 'Plan', icon: <ClipboardList className="h-4 w-4" /> },
     { id: 'checkin', label: 'Check-in', icon: <HeartHandshake className="h-4 w-4" /> },
@@ -238,6 +240,8 @@ export const ConsoleTab: React.FC = () => {
             <EarthLinkCard />
           </div>
         </div>
+      ) : section === 'surgeon' ? (
+        <FlightSurgeonPanel />
       ) : section === 'inbox' ? (
         <EarthInbox />
       ) : (
