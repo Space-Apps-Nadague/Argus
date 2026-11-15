@@ -155,7 +155,7 @@ const BASE_SCENARIOS: Record<'nominal' | 'unexplained_fatigue' | 'sans_alert' | 
     label: 'Nominal Deep-Space Cruise',
     shortTag: 'NOMINAL',
     description:
-      'All 5 physiological zones remain within expected spaceflight norms across active countermeasures.',
+      'All 6 physiological zones remain within expected spaceflight norms across active countermeasures.',
     recommendedFocusZone: 'neuro',
     zones: {
       neuro: [
@@ -1295,7 +1295,7 @@ const BASE_SCENARIOS: Record<'nominal' | 'unexplained_fatigue' | 'sans_alert' | 
 export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = extendScenarios(BASE_SCENARIOS);
 
 /**
- * Deterministically adjusts a scenario's 5-zone telemetry readings to reflect
+ * Deterministically adjusts a scenario's 6-zone telemetry readings to reflect
  * an individual crew member's pre-flight physiological baselines (`restingHrBaselineBpm`, `preFlightOnsdMm`).
  */
 export function getCrewAdjustedZones(
