@@ -107,16 +107,36 @@ A readable version of the prototype's "Thousand Eyes" ring plus the full data/co
 ### 2.6 Training (`TrainingTab.tsx`, `src/features/training/`)
 - **Two exercise sets, by location (`exercises.ts`):** without gravity body weight loads nothing, so:
   - **Microgravity** (ISS, Mars transit): the ISS countermeasure devices: **ARED** squat, deadlift and heel raise (vacuum cylinders give up to 272 kg of load), **treadmill with a bungee harness** (70–80 % of body weight pulls the runner onto the belt) and the **cycle ergometer** (no seat; feet clipped in, hands on the bar).
-  - **Gravity** (Moon, Mars, Earth): squats, push-ups, reverse lunges, forearm plank, crunches. On the Moon and Mars the tab says to wear the weighted vest (1/6 g, 3/8 g).
-- **When training is needed (`recommend.ts`):** deterministic rules on the latest readings with the same gravity-specific thresholds as triage.
-  - `bmd_delta` below its nominal range → bone loading (micro: ARED squat, deadlift, heel raise, treadmill; gravity: squats, lunges, push-ups).
-  - `ared_load` below its nominal range → resistance (micro: ARED squat, deadlift, heel raise; gravity: squats, push-ups, plank).
+  - **Gravity** (Moon, Mars, Earth): squats, push-ups, reverse lunges, forearm plank, crunches, cycle ergometer. On the Moon and Mars the tab says to wear the weighted vest (1/6 g, 3/8 g).
+- **Exercises follow the metrics (`recommend.ts`, `METRIC_RULES`):** deterministic rules on the latest readings with the same gravity-specific thresholds as triage. Each out-of-range metric can **add** exercises, **skip** risky ones (kept in the library, marked *Skip today* with the reason), **cap** the intensity and add a **before-you-start** note. Every rule cites its source.
+  | Metric out of range | Adds | Skips | Cap / note | Source |
+  |---|---|---|---|---|
+  | `bmd_delta` low | micro: ARED squat, deadlift, heel raise, treadmill · gravity: squats, lunges, push-ups | | | [SRC-090] [SRC-089] |
+  | `ared_load` low | micro: ARED squat, deadlift, heel raise · gravity: squats, push-ups, plank | | | [SRC-089] |
+  | `resting_hr` high / `hrv_rmssd` low | cycle (+ treadmill in micro) | | | [SRC-089] |
+  | `systolic_bp` high | cycle | ARED deadlift, ARED squat, plank | reduced | [SRC-091] |
+  | `iop` / `onsd` high | cycle | ARED deadlift, plank | reduced · breathe out on every lift | [SRC-092] [SRC-093] |
+  | `blood_glucose` < 70 mg/dL | **Do not exercise now** (eat 15–30 g carbohydrate) | | | [SRC-094] |
+  | `blood_glucose` < 90 mg/dL | | | note: eat carbohydrate first | [SRC-094] |
+  | `blood_glucose` high | cycle (+ treadmill in micro) | | | [SRC-094] |
+  | `hydration_intake` low | | treadmill | reduced · drink first | [SRC-095] |
+  | `caloric_intake` low | | treadmill | reduced · eat first | [SRC-096] |
+  | `sleep_eff` / `daily_sleep_hours` low, `pvt_lapses` high | cycle + heel raise (micro) or plank (gravity) | ARED deadlift, ARED squat, lunges | reduced | [SRC-097] |
+  | `mood_index` low | cycle (+ treadmill in micro) | | | [SRC-098] |
+  | `wbc_lymph` low | | treadmill | reduced · under 45 min | [SRC-099] |
+  | `cabin_co2` high | | treadmill | reduced | [SRC-100] |
   - Musculoskeletal zone not green → spine-protecting work (micro: ARED deadlift, squat; gravity: plank, crunches, squats).
-  - Microgravity only: `resting_hr` above or `hrv_rmssd` below range → aerobic (cycle ergometer, treadmill).
-  - **Safety first:** with a cardiovascular alert, body temperature ≥ 38 °C or SpO₂ < 93 % the tab says **Do not exercise now** and recommends nothing.
+  - A skipped exercise that a rule asked for is replaced by its gentler swap (deadlift → heel raise, treadmill → cycle, lunges → squats, push-ups → plank).
+  - The cycle ergometer is in both libraries (it works in any gravity), so aerobic rules also work on the Moon and Mars.
+  - **Safety first:** with a cardiovascular alert, body temperature ≥ 38 °C, SpO₂ < 93 % or blood glucose < 70 mg/dL the tab says **Do not exercise now** and recommends nothing.
+- **Intensity by health level (`trainingIntensity` in `recommend.ts`):** every exercise has three doses (`dose.full / reduced / light` in `exercises.ts`). The lowest of the zone level and any rule cap wins.
+  - **Full:** all zones green → the normal prescription.
+  - **Reduced (~70 %, fewer sets):** any zone yellow (other than cardio), or a rule cap above.
+  - **Light recovery day (~50 %):** any zone red (other than cardio, which blocks training), cardio yellow, body temperature 37.5–37.9 °C or SpO₂ 93–94 %. ARED deadlift, treadmill, lunges and push-ups are swapped for heel raise, cycle, squats and plank. *These zone-level cut-offs are ARGUS defaults, not from a cited protocol; review with the crew medical officer.*
+  - Lines under the banner show the intensity and why, and the *before you start* notes.
 - **Banner:** *Training required today* (amber, with the reasons), *No extra training needed* (green), or *Do not exercise now* (red), plus one line explaining the exercise set for the location. The tab rail shows an amber or red **!** badge for the first and last.
 - **Each exercise:** dose, what it works, device, why it matters in spaceflight, numbered steps, common mistakes and a tip. Recommended ones are listed first with a **Today** chip.
-- **3-D astronaut (`ExerciseFigure3D.tsx`, three.js):** a white-suited astronaut with helmet, gold visor and life-support pack performs every exercise in a loop, with its equipment (ARED platform, bar and load cables; treadmill belt and harness bungees; ergometer crank, pedals and handlebar). `mannequin.ts` keeps feet, toes, back or hands on the floor and solves elbows (push-up) and knees (pedalling) with 2-link IK. Drag to turn, scroll to zoom, pause; reduced motion starts paused.
+- **3-D astronaut (`ExerciseFigure3D.tsx`, three.js):** a white-suited astronaut with helmet, gold visor and life-support pack performs every exercise in a loop, with its equipment (ARED platform, bar and load cables; treadmill belt and harness bungees; ergometer crank, pedals and handlebar). `mannequin.ts` keeps feet, toes, back or hands on the floor and solves elbows (push-up) and knees (pedalling) with 2-link IK. Drag to turn, scroll to zoom, pause; reduced motion starts paused. The view shows the gravity it is set in: a label on the figure (≈0 g: the device or harness replaces body weight; 0.16 g / 0.38 g: weighted vest; 1 g), and on the Moon and Mars the astronaut wears an orange weighted vest.
 
 ### 2.7 Photobooth (`PhotoboothTab.tsx`, `src/features/photobooth/`)
 A fun camera booth so the crew can send photos home. Camera frames are processed on the device only (MediaPipe Tasks, Apache-2.0, gesture recogniser only; the 8 MB gesture model is downloaded to `public/models/vision` and the WASM copied to `public/vision/wasm` by `scripts/copy-vision-assets.mjs` before `dev`/`build` (online fallback if the download is missing); loaded only when the tab opens).

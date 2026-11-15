@@ -4,7 +4,8 @@
  * (mannequin.ts). Two sets, because body weight is useless without gravity:
  *  - microgravity (ISS, Mars transit): the ISS countermeasure devices — ARED (resistance),
  *    T2 treadmill with a bungee harness, CEVIS cycle ergometer;
- *  - gravity (Moon, Mars, Earth): body-weight exercises.
+ *  - gravity (Moon, Mars, Earth): body-weight exercises, plus the cycle ergometer for aerobic work.
+ * Device facts (ARED up to 600 lb, treadmill harness, CEVIS): Source: SRC-089. Bone loss rate: Source: SRC-090.
  */
 
 import type { GravityEnvironment } from '../../types/argus';
@@ -21,10 +22,14 @@ export type ExerciseId =
   | 'plank'
   | 'crunches';
 
+/** How hard to train today, from the crew member's health (recommend.ts). */
+export type TrainingIntensity = 'full' | 'reduced' | 'light';
+
 export interface Exercise {
   id: ExerciseId;
   name: string;
-  dose: string;
+  /** Dose per intensity: full (all green), reduced (a zone in caution), light (recovery day). */
+  dose: Record<TrainingIntensity, string>;
   targets: string;
   /** Why it matters in spaceflight. */
   why: string;
@@ -40,7 +45,7 @@ export const EXERCISES: Record<ExerciseId, Exercise> = {
   aredSquat: {
     id: 'aredSquat',
     name: 'ARED squat',
-    dose: '3 sets × 8–10 reps at your prescribed load',
+    dose: { full: '3 sets × 8–10 reps at your prescribed load', reduced: '2 sets × 8 reps at about 70 % of your prescribed load', light: '1–2 sets × 8 reps at about 50 % load, slow and controlled' },
     targets: 'Thighs, glutes, hip and spine bone loading',
     equipment: 'ARED (Advanced Resistive Exercise Device)',
     why: 'Without gravity your own weight loads nothing. The ARED vacuum cylinders pull the bar down with up to 272 kg, replacing body weight, and are the main defence against 1–1.5 % monthly hip and spine bone loss.',
@@ -56,7 +61,7 @@ export const EXERCISES: Record<ExerciseId, Exercise> = {
   aredDeadlift: {
     id: 'aredDeadlift',
     name: 'ARED deadlift',
-    dose: '3 sets × 8 reps at your prescribed load',
+    dose: { full: '3 sets × 8 reps at your prescribed load', reduced: '2 sets × 6–8 reps at about 70 % of your prescribed load', light: 'Skip today: rest the spine' },
     targets: 'Back, glutes, hamstrings, spine bone loading',
     equipment: 'ARED',
     why: 'Spinal muscles shrink and the spine lengthens in microgravity; back pain is common. Deadlifts load the spine and the muscles that protect it.',
@@ -72,7 +77,7 @@ export const EXERCISES: Record<ExerciseId, Exercise> = {
   aredHeelRaise: {
     id: 'aredHeelRaise',
     name: 'ARED heel raise',
-    dose: '3 sets × 15 reps',
+    dose: { full: '3 sets × 15 reps', reduced: '2 sets × 12 reps', light: '1–2 sets × 10 reps, slow' },
     targets: 'Calves, ankle and heel bone',
     equipment: 'ARED',
     why: 'Calf muscles lose the most mass of any muscle in spaceflight; heel raises under load keep them and the heel bone strong.',
@@ -88,7 +93,7 @@ export const EXERCISES: Record<ExerciseId, Exercise> = {
   treadmill: {
     id: 'treadmill',
     name: 'Treadmill run with harness',
-    dose: '20–30 min at your prescribed speed',
+    dose: { full: '20–30 min at your prescribed speed', reduced: '15–20 min at an easy run, bungees at 60 %', light: 'Skip today: use the cycle ergometer instead' },
     targets: 'Heart and lungs, leg bones (impact)',
     equipment: 'T2 treadmill + bungee harness',
     why: 'Running gives the leg and hip bones impact loading and keeps the heart and leg muscles fit. The harness and bungees pull you onto the belt, because without them you would float off.',
@@ -104,23 +109,23 @@ export const EXERCISES: Record<ExerciseId, Exercise> = {
   cycle: {
     id: 'cycle',
     name: 'Cycle ergometer',
-    dose: '30 min in your heart-rate zone',
+    dose: { full: '30 min in your heart-rate zone', reduced: '20 min, bottom of your heart-rate zone', light: '15 min easy pace, stop if you feel dizzy or short of breath' },
     targets: 'Heart and lungs (aerobic fitness)',
-    equipment: 'CEVIS cycle ergometer',
-    why: 'Aerobic fitness and heart size drop in microgravity. Cycling trains the heart with no impact, so it is safe even on days when the legs are sore.',
+    equipment: 'Cycle ergometer (CEVIS on the ISS)',
+    why: 'Aerobic fitness and heart size drop in microgravity. Cycling trains the heart with no impact, so it is the safe aerobic choice on days when the legs, blood pressure, eyes or sleep call for a gentler session. It works in any gravity.',
     steps: [
-      'Clip your shoes into the pedals. There is no seat: hold the handlebar and use the waist strap if needed.',
+      'Clip your shoes into the pedals. In microgravity there is no seat: hold the handlebar and use the waist strap. With gravity, sit on the seat.',
       'Set the resistance and warm up for 5 minutes at an easy pace.',
       'Pedal smooth circles and keep your heart rate in the prescribed zone.',
       'Cool down for 5 minutes at an easy pace.',
     ],
     mistakes: ['Pushing only down instead of pedalling round', 'Starting hard without a warm-up', 'Not watching the heart-rate zone'],
-    note: 'In microgravity you float above the pedals; your legs push against the handlebar instead of a seat.',
+    note: 'Breathe steadily; this is the exercise the plan swaps in when heavy lifts or running are not advised today.',
   },
   squats: {
     id: 'squats',
     name: 'Squats',
-    dose: '3 sets × 12–15 reps',
+    dose: { full: '3 sets × 12–15 reps', reduced: '2 sets × 10–12 reps', light: '1–2 sets × 8 reps, half depth' },
     targets: 'Thighs, glutes, hip and spine bone loading',
     why: 'Loading the hips and spine is the main way to slow the 1–1.5 % monthly bone loss in microgravity.',
     steps: [
@@ -135,7 +140,7 @@ export const EXERCISES: Record<ExerciseId, Exercise> = {
   pushups: {
     id: 'pushups',
     name: 'Push-ups',
-    dose: '3 sets × 10–15 reps',
+    dose: { full: '3 sets × 10–15 reps', reduced: '2 sets × 8–10 reps', light: 'Skip today: do the plank instead' },
     targets: 'Chest, shoulders, triceps, core',
     why: 'Upper-body muscles and wrist bones lose load in microgravity; push-ups keep them strong.',
     steps: [
@@ -150,7 +155,7 @@ export const EXERCISES: Record<ExerciseId, Exercise> = {
   lunges: {
     id: 'lunges',
     name: 'Reverse lunges',
-    dose: '3 sets × 10 reps per leg',
+    dose: { full: '3 sets × 10 reps per leg', reduced: '2 sets × 8 reps per leg', light: 'Skip today: do squats instead' },
     targets: 'Thighs, glutes, balance',
     why: 'Single-leg work rebuilds leg strength and balance, which drop after time in microgravity. Stepping back is easier on the knees than stepping forward.',
     steps: [
@@ -165,7 +170,7 @@ export const EXERCISES: Record<ExerciseId, Exercise> = {
   plank: {
     id: 'plank',
     name: 'Forearm plank',
-    dose: '3 holds × 30–45 s',
+    dose: { full: '3 holds × 30–45 s', reduced: '2 holds × 20–30 s', light: '2 holds × 15–20 s' },
     targets: 'Deep core and back muscles',
     why: 'Spinal muscles weaken and back pain is common in spaceflight; the plank trains the muscles that protect the spine.',
     steps: [
@@ -180,7 +185,7 @@ export const EXERCISES: Record<ExerciseId, Exercise> = {
   crunches: {
     id: 'crunches',
     name: 'Crunches',
-    dose: '3 sets × 15 reps',
+    dose: { full: '3 sets × 15 reps', reduced: '2 sets × 12 reps', light: '1–2 sets × 10 reps, slow' },
     targets: 'Abdominal muscles',
     why: 'A strong trunk supports the spine, which lengthens and loses support in microgravity.',
     steps: [
@@ -196,7 +201,7 @@ export const EXERCISES: Record<ExerciseId, Exercise> = {
 
 /** Exercises for microgravity (body weight loads nothing) and for gravity (Moon, Mars, Earth). */
 export const MICROGRAVITY_EXERCISES: ExerciseId[] = ['aredSquat', 'aredDeadlift', 'aredHeelRaise', 'treadmill', 'cycle'];
-export const GRAVITY_EXERCISES: ExerciseId[] = ['squats', 'pushups', 'lunges', 'plank', 'crunches'];
+export const GRAVITY_EXERCISES: ExerciseId[] = ['squats', 'pushups', 'lunges', 'plank', 'crunches', 'cycle'];
 
 export function isMicrogravity(env: GravityEnvironment): boolean {
   return env === 'iss_leo' || env === '0g_transit';

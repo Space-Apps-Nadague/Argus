@@ -10,6 +10,7 @@ import React, { useMemo, useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
+import type { GravityEnvironment } from '../../types/argus';
 import { aredBar, EXERCISE_MOTIONS, pedalPoints, SEG, skeletonAt, type P2, type Skeleton } from './mannequin';
 
 const SUIT = '#eef2f6';
@@ -52,22 +53,23 @@ const v2 = new THREE.Vector3();
 const dir = new THREE.Vector3();
 const off = new THREE.Vector3();
 
-/** Puts a Y-axis mesh between two points (optionally stretching it to the distance). */
+/** Puts a Y-axis mesh between two points (optionally stretching it to the distance; x/z thickness is kept). */
 function span(mesh: THREE.Object3D | null, a: THREE.Vector3, b: THREE.Vector3, stretch = false) {
   if (!mesh) return;
   mesh.position.copy(a).add(b).multiplyScalar(0.5);
   dir.copy(b).sub(a);
   const len = dir.length();
   if (len > 1e-6) mesh.quaternion.setFromUnitVectors(Y_AXIS, dir.normalize());
-  if (stretch) mesh.scale.set(1, Math.max(len, 1e-3), 1);
+  if (stretch) mesh.scale.y = Math.max(len, 1e-3);
 }
 
-const Astronaut: React.FC<{ exerciseId: string; playing: boolean }> = ({ exerciseId, playing }) => {
+const Astronaut: React.FC<{ exerciseId: string; playing: boolean; vest: boolean }> = ({ exerciseId, playing, vest }) => {
   const motion = EXERCISE_MOTIONS[exerciseId];
   const eq = motion.equipment;
   const bones = useRef<(THREE.Mesh | null)[]>([]);
   const helmet = useRef<THREE.Group>(null);
   const pack = useRef<THREE.Mesh>(null);
+  const vestRef = useRef<THREE.Mesh>(null);
   const shoulders = useRef<THREE.Mesh>(null);
   const bar = useRef<THREE.Mesh>(null);
   const cables = useRef<(THREE.Mesh | null)[]>([]);
@@ -100,6 +102,11 @@ const Astronaut: React.FC<{ exerciseId: string; playing: boolean }> = ({ exercis
       pack.current.quaternion.copy(torsoQ);
       off.set(0, 0, -0.2).applyQuaternion(torsoQ);
       pack.current.position.copy(v1).add(v2).multiplyScalar(0.5).add(off);
+    }
+    // Weighted vest (Moon/Mars): on the upper torso, so body-weight exercises still load the body.
+    if (vestRef.current) {
+      vestRef.current.quaternion.copy(torsoQ);
+      vestRef.current.position.copy(v1).lerp(v2, 0.62);
     }
     if (shoulders.current) {
       p3(s.shoulder, 0, shoulders.current.position);
@@ -155,6 +162,12 @@ const Astronaut: React.FC<{ exerciseId: string; playing: boolean }> = ({ exercis
         <boxGeometry args={[0.36, 0.46, 0.14]} />
         <meshStandardMaterial color={PACK} roughness={0.5} />
       </mesh>
+      {vest && (
+        <mesh ref={vestRef} castShadow>
+          <boxGeometry args={[0.33, 0.2, 0.32]} />
+          <meshStandardMaterial color="#e07b2a" roughness={0.7} />
+        </mesh>
+      )}
       <group ref={helmet}>
         <mesh castShadow>
           <sphereGeometry args={[0.16, 28, 20]} />
@@ -245,8 +258,12 @@ const Astronaut: React.FC<{ exerciseId: string; playing: boolean }> = ({ exercis
   );
 };
 
-export const ExerciseFigure3D: React.FC<{ exerciseId: string; playing: boolean }> = ({ exerciseId, playing }) => (
-  <Canvas shadows dpr={[1, 1.75]} camera={{ position: [2.7, 1.25, 1.1], fov: 40 }} aria-label="Animated 3-D astronaut showing the exercise" role="img">
+export const ExerciseFigure3D: React.FC<{ exerciseId: string; playing: boolean; environment?: GravityEnvironment }> = ({
+  exerciseId,
+  playing,
+  environment,
+}) => (
+  <Canvas shadows dpr={[1, 1.75]} camera={{ position: [3.4, 1.55, 1.5], fov: 40 }} aria-label="Animated 3-D astronaut showing the exercise" role="img">
     <color attach="background" args={['#0b1220']} />
     <ambientLight intensity={0.6} />
     <directionalLight position={[3, 4, 2]} intensity={1.15} castShadow />
@@ -256,7 +273,7 @@ export const ExerciseFigure3D: React.FC<{ exerciseId: string; playing: boolean }
       <meshStandardMaterial color="#1e2b3c" />
     </mesh>
     <gridHelper args={[6, 24, '#24364d', '#162233']} position={[0, -0.001, 0]} />
-    <Astronaut exerciseId={exerciseId} playing={playing} />
-    <OrbitControls target={[0, 0.5, 0]} enablePan={false} minDistance={1.5} maxDistance={6} />
+    <Astronaut exerciseId={exerciseId} playing={playing} vest={environment === 'lunar_base' || environment === 'mars_base'} />
+    <OrbitControls target={[0, 0.8, 0]} enablePan={false} minDistance={1.5} maxDistance={6} />
   </Canvas>
 );
