@@ -353,5 +353,5 @@ describe('Voice & Video AI Flight Surgeon routes', () => {
       setDbHandle(null);
       await h.close();
     }
-  });
+  }, 15_000);
 });

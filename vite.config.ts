@@ -5,6 +5,8 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  // On-device speech runs in a module worker that code-splits transformers.js / kokoro-js.
+  worker: { format: 'es' },
   server: {
     port: 5173,
     host: true,

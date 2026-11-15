@@ -9,6 +9,7 @@ import type { ZodType } from 'zod';
 import type { AiFeature, AiProviderId } from '../../src/types/aiApi';
 import { extractJson } from './json';
 import { currentPrivacy } from './privacy';
+import type { CommTier } from '../../shared/commProfile';
 import { type ProviderConfig, resolveProviderChain } from './providers';
 
 export type ChatMessage = OpenAI.Chat.Completions.ChatCompletionMessageParam;
@@ -19,6 +20,8 @@ export interface LlmOptions {
   vision?: boolean;
   temperature?: number;
   maxTokens?: number;
+  /** Comm tier; `autonomous` restricts the chain to the on-ship model. */
+  tier?: CommTier;
   env?: Record<string, string | undefined>;
 }
 
@@ -47,15 +50,25 @@ function clientFor(cfg: ProviderConfig): OpenAI {
   return client;
 }
 
+export const GEMINI_QUOTA_FALLBACK_MODEL = 'gemini-3.5-flash-lite';
+
 export function providerChainFor(options: LlmOptions): Array<{ cfg: ProviderConfig; model: string }> {
   if (currentPrivacy().offlineOnly) return []; // astronaut withdrew AI consent (spec 05 §6)
   const chain = resolveProviderChain(options.env ?? process.env, {
     feature: options.feature,
     keyOverride: options.keyOverride,
+    tier: options.tier,
   });
-  return chain
-    .map((cfg) => ({ cfg, model: options.vision ? cfg.visionModel ?? '' : cfg.model }))
-    .filter((entry) => entry.model);
+  const out: Array<{ cfg: ProviderConfig; model: string }> = [];
+  for (const cfg of chain) {
+    const model = options.vision ? cfg.visionModel ?? '' : cfg.model;
+    if (!model) continue;
+    out.push({ cfg, model });
+    if (cfg.id === 'gemini' && model !== GEMINI_QUOTA_FALLBACK_MODEL) {
+      out.push({ cfg, model: GEMINI_QUOTA_FALLBACK_MODEL });
+    }
+  }
+  return out;
 }
 
 function extraParams(cfg: ProviderConfig): Record<string, unknown> {
@@ -183,46 +196,143 @@ export class ThinkFilter {
 export type StreamChunk =
   | { type: 'start'; provider: AiProviderId; model: string }
   | { type: 'text'; text: string }
+  | { type: 'tool_call'; id: string; name: string; args: Record<string, unknown> }
   | { type: 'error'; message: string };
 
+export type ChatTool = OpenAI.Chat.Completions.ChatCompletionFunctionTool;
+
+export interface StreamOptions extends LlmOptions {
+  /** Function tools the model may call. Dropped automatically for models that reject them. */
+  tools?: ChatTool[];
+  /**
+   * Runs a tool and returns its result for the model. When set, a turn that ends in tool
+   * calls is continued (up to `maxToolRounds`) so the model can speak about the result.
+   */
+  executeTool?: (name: string, args: Record<string, unknown>) => Promise<unknown> | unknown;
+  maxToolRounds?: number;
+}
+
+interface PendingToolCall {
+  id: string;
+  name: string;
+  args: string;
+}
+
+function parseToolArgs(raw: string): Record<string, unknown> {
+  try {
+    const parsed: unknown = JSON.parse(raw || '{}');
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
+
 /**
- * Streams a chat reply. Falls through the chain until a provider produces its first token;
- * a failure after that ends the stream with an `error` chunk. Yields nothing if no provider answers.
+ * Streams a chat reply. Falls through the chain until a provider produces its first token
+ * or tool call; a failure after that ends the stream with an `error` chunk. Yields nothing
+ * if no provider answers.
  */
 export async function* streamChat(
   messages: ChatMessage[],
-  options: LlmOptions
+  options: StreamOptions
 ): AsyncGenerator<StreamChunk> {
   for (const { cfg, model } of providerChainFor(options)) {
     let started = false;
-    const filter = new ThinkFilter();
+    let useTools = Boolean(options.tools?.length);
+    let convo = messages;
+    const maxRounds = options.executeTool ? (options.maxToolRounds ?? 2) : 0;
+
     try {
-      const stream = await clientFor(cfg).chat.completions.create({
-        model,
-        messages,
-        stream: true,
-        temperature: options.temperature ?? 0.6,
-        max_tokens: options.maxTokens ?? 2048,
-        ...extraParams(cfg),
-      });
-      for await (const chunk of stream) {
-        const raw = chunk.choices[0]?.delta?.content;
-        if (!raw) continue;
-        const text = filter.push(raw);
-        if (!text) continue;
+      for (let round = 0; ; round++) {
+        const filter = new ThinkFilter();
+        const pending = new Map<number, PendingToolCall>();
+        let roundText = '';
+        let stream;
+        try {
+          stream = await clientFor(cfg).chat.completions.create({
+            model,
+            messages: convo,
+            stream: true,
+            temperature: options.temperature ?? 0.6,
+            max_tokens: options.maxTokens ?? 2048,
+            ...(useTools ? { tools: options.tools, tool_choice: 'auto' as const } : {}),
+            ...extraParams(cfg),
+          });
+        } catch (err) {
+          if (err instanceof APIError && err.status === 400 && useTools && !started) {
+            useTools = false; // model/provider has no tool support: fast path still fires actions
+            round--;
+            continue;
+          }
+          throw err;
+        }
+
+        for await (const chunk of stream) {
+          const delta = chunk.choices[0]?.delta;
+          if (!delta) continue;
+          for (const call of delta.tool_calls ?? []) {
+            const slot = pending.get(call.index) ?? { id: '', name: '', args: '' };
+            if (call.id) slot.id = call.id;
+            if (call.function?.name) slot.name += call.function.name;
+            if (call.function?.arguments) slot.args += call.function.arguments;
+            pending.set(call.index, slot);
+          }
+          if (!delta.content) continue;
+          const text = filter.push(delta.content);
+          if (!text) continue;
+          if (!started) {
+            started = true;
+            yield { type: 'start', provider: cfg.id, model };
+          }
+          roundText += text;
+          yield { type: 'text', text };
+        }
+        const tail = filter.flush();
+        if (tail) {
+          if (!started) {
+            started = true;
+            yield { type: 'start', provider: cfg.id, model };
+          }
+          roundText += tail;
+          yield { type: 'text', text: tail };
+        }
+
+        const calls = [...pending.values()].filter((call) => call.name);
+        if (!calls.length) break;
         if (!started) {
           started = true;
           yield { type: 'start', provider: cfg.id, model };
         }
-        yield { type: 'text', text };
-      }
-      const tail = filter.flush();
-      if (tail) {
-        if (!started) {
-          started = true;
-          yield { type: 'start', provider: cfg.id, model };
+        const results: ChatMessage[] = [];
+        for (const [i, call] of calls.entries()) {
+          const id = call.id || `call_${round}_${i}`;
+          call.id = id;
+          const args = parseToolArgs(call.args);
+          yield { type: 'tool_call', id, name: call.name, args };
+          if (options.executeTool) {
+            let result: unknown;
+            try {
+              result = await options.executeTool(call.name, args);
+            } catch (err) {
+              result = { ok: false, error: describeError(err) };
+            }
+            results.push({ role: 'tool', tool_call_id: id, content: JSON.stringify(result ?? { ok: true }).slice(0, 4000) });
+          }
         }
-        yield { type: 'text', text: tail };
+        if (round >= maxRounds || !options.executeTool) break;
+        convo = [
+          ...convo,
+          {
+            role: 'assistant',
+            content: roundText || null,
+            tool_calls: calls.map((call) => ({
+              id: call.id,
+              type: 'function' as const,
+              function: { name: call.name, arguments: call.args || '{}' },
+            })),
+          },
+          ...results,
+        ];
       }
       if (started) return;
       warn(options.feature, cfg, model, 'empty response');

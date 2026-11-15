@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { describeProvider, detectProviderFromKey, resolveProviderChain } from '../ai/providers';
+import { providerChainFor } from '../ai/llm';
 
 describe('detectProviderFromKey', () => {
   it('detects providers by key prefix', () => {
@@ -79,5 +80,16 @@ describe('resolveProviderChain', () => {
     const info = describeProvider(cfg);
     expect(JSON.stringify(info)).not.toContain('sk-or-secret');
     expect(info.hasKey).toBe(true);
+  });
+
+  it('appends gemini-3.5-flash-lite as fallback after gemini-3.8-flash', () => {
+    const entries = providerChainFor({
+      feature: 'chat',
+      env: { GEMINI_API_KEY: 'AIza-test' },
+    });
+    expect(entries.map((e) => `${e.cfg.id}:${e.model}`)).toEqual([
+      'gemini:gemini-3.8-flash',
+      'gemini:gemini-3.5-flash-lite',
+    ]);
   });
 });

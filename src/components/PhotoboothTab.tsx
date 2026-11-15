@@ -9,11 +9,12 @@
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Camera, Check, Download, ExternalLink, Hand, Heart, Mail, MapPin, Send, Trash2, UserPlus, X } from 'lucide-react';
+import { AlertTriangle, Camera, Check, Download, ExternalLink, Eye, Hand, Heart, Mail, MapPin, Send, Trash2, Upload, UserPlus, X } from 'lucide-react';
 import { useMission } from '../context/MissionContext';
 import { useAuth } from '../context/AuthContext';
 import { familyApi } from '../services/dataApi';
 import { commDelayAt, formatCommDelay, marsTime } from '../data/spaceLocations';
+import { VISUAL_EXAM_SAMPLES } from '../data/telemetryScenarios';
 import { Card } from './ui/Card';
 import {
   BoothRenderer,
@@ -192,7 +193,17 @@ const ShotDelivery: React.FC<{ card?: FamilyPostcard; now: Date }> = ({ card, no
 };
 
 export const PhotoboothTab: React.FC = () => {
-  const { activeCrewMember, spaceLocation, latestDay } = useMission();
+  const {
+    activeCrewMember,
+    spaceLocation,
+    latestDay,
+    visualExamAnalysis,
+    activePreviewImageUrl,
+    isAnalyzingVisual,
+    runSampleVisualExam,
+    runUploadedVisualExam,
+    clearVisualExam,
+  } = useMission();
   const { mode } = useAuth();
   const crewId = activeCrewMember.id;
   const autoPlace = placeName(spaceLocation.id);
@@ -703,6 +714,114 @@ export const PhotoboothTab: React.FC = () => {
           </p>
         </Card>
       </div>
+
+      <Card title="Optic Nerve &amp; Medical Visual Exam" icon={<Eye className="h-4 w-4" />}>
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs text-hud-muted">
+              Select a sample scan (e.g., <strong className="text-hud-text">SANS Optic Nerve Ultrasound</strong>) or upload an eye/skin photo to run visual triage.
+            </p>
+            <label className="hud-btn cursor-pointer text-xs">
+              <Upload className="h-3.5 w-3.5" aria-hidden="true" />
+              Upload photo
+              <input
+                type="file"
+                accept="image/*"
+                className="sr-only"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void runUploadedVisualExam(f);
+                  e.target.value = '';
+                }}
+              />
+            </label>
+          </div>
+
+          <div className="grid gap-2.5 sm:grid-cols-3">
+            {VISUAL_EXAM_SAMPLES.map((sample) => {
+              const selected = activePreviewImageUrl === sample.previewSvgDataUrl;
+              const isOptic = sample.id === 'sans_ultrasound';
+              return (
+                <button
+                  key={sample.id}
+                  type="button"
+                  disabled={isAnalyzingVisual}
+                  onClick={() => void runSampleVisualExam(sample)}
+                  className={`hud-focus flex items-center gap-2.5 rounded-lg border p-2 text-left transition-colors ${
+                    selected
+                      ? isOptic
+                        ? 'border-amber-400/80 bg-amber-950/30'
+                        : 'border-hud-accent bg-hud-accent/15'
+                      : 'border-hud-line bg-hud-panel/60 hover:border-hud-accent/60'
+                  }`}
+                >
+                  <img
+                    src={sample.previewSvgDataUrl}
+                    alt={sample.title}
+                    className="h-14 w-16 shrink-0 rounded border border-hud-line object-cover"
+                  />
+                  <div className="min-w-0">
+                    <div className="truncate text-xs font-semibold text-hud-text">{sample.title}</div>
+                    <div className="line-clamp-2 text-[11px] text-hud-muted">{sample.modality}</div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {isAnalyzingVisual && <p className="text-xs text-hud-accent">Analyzing visual scan…</p>}
+
+          {visualExamAnalysis && (
+            <div
+              role="alert"
+              className={`rounded-lg border p-3 ${
+                visualExamAnalysis.findingStatus === 'red'
+                  ? 'border-red-500/70 bg-red-950/40 text-red-100'
+                  : visualExamAnalysis.findingStatus === 'yellow'
+                    ? 'border-amber-400/70 bg-amber-950/35 text-amber-100'
+                    : 'border-emerald-500/60 bg-emerald-950/30 text-emerald-100'
+              }`}
+            >
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span className="text-xs font-bold uppercase tracking-wider">
+                    {visualExamAnalysis.findingStatus === 'red'
+                      ? 'Critical Optic Nerve Alert'
+                      : visualExamAnalysis.findingStatus === 'yellow'
+                        ? 'Optic Nerve / Visual Caution'
+                        : 'Nominal Visual Exam'}
+                  </span>
+                  <span className="rounded bg-black/30 px-1.5 py-0.5 font-mono text-[11px]">
+                    {visualExamAnalysis.modality}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={clearVisualExam}
+                  className="hud-focus rounded px-2 py-0.5 text-[11px] underline opacity-80 hover:opacity-100"
+                >
+                  Clear
+                </button>
+              </div>
+              <div className="mt-2 flex flex-col gap-3 sm:flex-row">
+                {activePreviewImageUrl && (
+                  <img
+                    src={activePreviewImageUrl}
+                    alt="Analyzed visual scan"
+                    className="h-28 w-36 shrink-0 rounded border border-white/15 object-cover"
+                  />
+                )}
+                <div className="space-y-1.5 text-xs">
+                  <p className="font-medium">{visualExamAnalysis.plainCrewGuidance}</p>
+                  <p className="opacity-90">{visualExamAnalysis.clinicalSummary}</p>
+                  <p className="font-semibold">Action: {visualExamAnalysis.recommendedAction}</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </Card>
     </div>
   );
 };

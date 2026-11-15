@@ -27,6 +27,18 @@ services:
       - ollama-models:/root/.ollama
     restart: unless-stopped
 
+  # On-ship speech for the deep-space tier (specs/04-ai-backend.md §4.2) [SRC-105].
+  #   docker compose up -d speaches
+  #   then set AI_LOCAL_SPEECH_BASE_URL=http://localhost:8000/v1 and run `npm run ai:local`.
+  # GPU: use image ghcr.io/speaches-ai/speaches:latest-cuda.
+  speaches:
+    image: ghcr.io/speaches-ai/speaches:latest-cpu
+    ports:
+      - "8000:8000"
+    volumes:
+      - speaches-models:/home/ubuntu/.cache/huggingface/hub
+    restart: unless-stopped
+
   whatsapp-bot:
     profiles: ["whatsapp"]
     build:
@@ -45,5 +57,6 @@ services:
 
 volumes:
   ollama-models:
+  speaches-models:
   argus-pg:
   whatsapp-session:

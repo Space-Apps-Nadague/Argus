@@ -5,6 +5,7 @@
  * local model, a free cloud tier, or a hosted agent gateway is configuration, not code.
  */
 
+import type { CommTier } from '../../shared/commProfile';
 import type { AiFeature, AiProviderId, AiProviderInfo } from '../../src/types/aiApi';
 
 export interface ProviderConfig {
@@ -186,11 +187,12 @@ function expand(ids: string[], env: Env): ProviderConfig[] {
 
 /**
  * Resolves the ordered provider chain for a feature.
- * Precedence: `X-AI-Key` override (tried first) → `AI_ROUTE_<FEATURE>` → `AI_PROVIDERS` → `auto`.
+ * `tier: 'autonomous'` forces the on-ship (local) provider only.
+ * Otherwise precedence: `X-AI-Key` override (tried first) → `AI_ROUTE_<FEATURE>` → `AI_PROVIDERS` → `auto`.
  */
 export function resolveProviderChain(
   env: Env,
-  options: { feature?: AiFeature; keyOverride?: string } = {}
+  options: { feature?: AiFeature; keyOverride?: string; tier?: CommTier } = {}
 ): ProviderConfig[] {
   const route = options.feature
     ? parseList(env[`AI_ROUTE_${options.feature.toUpperCase()}`])
@@ -198,6 +200,20 @@ export function resolveProviderChain(
   const configured = parseList(env.AI_PROVIDERS);
   const ids = route.length ? route : configured.length ? configured : ['auto'];
   const chain = expand(ids, env);
+
+  // Deep space / blackout (specs/04-ai-backend.md §4.2): the on-ship model answers first.
+  // Strict mode keeps everything on the ship; otherwise Earth models stand in when no
+  // on-ship model is installed or reachable (the demo usually runs without one).
+  if (options.tier === 'autonomous') {
+    const local = buildProvider('local', env);
+    if (onShipStrict(env)) return local ? [local] : [];
+    const withOverride = (() => {
+      const key = trimmed(options.keyOverride);
+      const cfg = key ? buildProvider(detectProviderFromKey(key), env, key) : null;
+      return cfg ? [cfg, ...chain.filter((c) => !(c.id === cfg.id && c.apiKey === cfg.apiKey))] : chain;
+    })();
+    return local ? [local, ...withOverride.filter((c) => c.id !== 'local')] : withOverride;
+  }
 
   const override = trimmed(options.keyOverride);
   if (override) {
@@ -208,6 +224,11 @@ export function resolveProviderChain(
     }
   }
   return chain;
+}
+
+/** `ARGUS_ONSHIP_STRICT=1`: the on-ship tier never uses Earth models or speech. */
+export function onShipStrict(env: Env = process.env): boolean {
+  return env.ARGUS_ONSHIP_STRICT?.trim() === '1';
 }
 
 /** Features that have their own `AI_ROUTE_<FEATURE>` chain. */

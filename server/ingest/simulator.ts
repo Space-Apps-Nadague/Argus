@@ -23,6 +23,9 @@ import type { IncomingReading } from './normalize';
 const MIN_MS = 60_000;
 const DAY_MS = 86_400_000;
 const TEMPLATE_DAYS = 30;
+/** Secondary streams (SpO₂, breathing, skin temperature, dose rate) every 2 min by default; the CGM stays 5-min. */
+export const DEFAULT_SECONDARY_EVERY_MIN = 2;
+const CGM_EVERY_MIN = 5;
 
 export interface SimulationOptions {
   crew: CrewMemberProfile;
@@ -92,12 +95,14 @@ export function simulate(opts: SimulationOptions): SimulatedBatch {
     onsd: opts.crew.preFlightOnsdMm,
     rad_dose: 3.1 / 365,
     bmd_delta: 0,
+    body_mass_delta: 0,
+    hyperopic_shift: 0,
     cabin_co2: NaN,
     ared_load: NaN,
   };
   const targetFor = (metric: MetricId, day: number, earth: boolean) =>
     earth && metric in EARTH ? (EARTH[metric] as number) : target(metric, day);
-  const every = Math.max(1, opts.secondaryEveryMin ?? 5);
+  const every = Math.max(1, opts.secondaryEveryMin ?? DEFAULT_SECONDARY_EVERY_MIN);
   const out: SimulatedBatch = new Map();
   const push = (kind: DeviceKind, metric: string, ts: number, value: number) => {
     const list = out.get(kind) ?? [];
@@ -145,18 +150,33 @@ export function simulate(opts: SimulationOptions): SimulatedBatch {
         push('smartwatch', 'core_temp', wakeTs, r2(body));
         push('smartwatch', 'wrist_temp', wakeTs, r2(body - 2.6));
         push('smartwatch', 'daily_sleep_hours', wakeTs, r1(T('daily_sleep_hours') + gauss() * 0.25));
+        // Average overnight breathing rate (Source: SRC-074).
+        push('smartwatch', 'sleep_resp_rate', wakeTs, r1(T('sleep_resp_rate') + gauss() * 0.3));
       }
       // Daily automatic feeds, watch apps, and periodic exams. CGM streams 5-min glucose below.
       const midnight = wakeTs - (420 + shiftMin) * MIN_MS;
       const daily: Array<[DeviceKind, string, number, number, number]> = [
         ['smartwatch', 'pvt_lapses', 8 * 60 + 30, Math.max(0, Math.round(T('pvt_lapses'))), 1],
+        ['smartwatch', 'reaction_time', 8 * 60 + 33, Math.round(T('reaction_time') + gauss() * 8), 1],
+        ['smartwatch', 'vocal_jitter', 8 * 60 + 36, Math.max(0.1, r2(T('vocal_jitter') + gauss() * 0.05)), 1],
         ['smartwatch', 'mood_index', 21 * 60, clamp(Math.round(T('mood_index') + gauss() * 0.5), 1, 10), 1],
+        ['smartwatch', 'headache_severity', 21 * 60 + 5, clamp(r1(T('headache_severity') + gauss() * 0.3), 0, 10), 1],
+        ['exercise_device', 'vo2_max', 18 * 60 + 15, r1(T('vo2_max') + gauss() * 0.6), 3],
         ['habitat_sensor', 'cabin_co2', 12 * 60, r1(T('cabin_co2') + gauss() * 0.1), 1],
+        ['habitat_sensor', 'hydration_intake', 20 * 60, r1(T('hydration_intake') + gauss() * 0.1), 1],
+        ['manual', 'caloric_intake', 21 * 60 + 30, Math.round(T('caloric_intake') + gauss() * 40), 1],
         ['exercise_device', 'ared_load', 18 * 60 + 45, r1(T('ared_load') + gauss() * 0.8), 1],
         ['clinical_exam', 'onsd', 9 * 60, r2(T('onsd') + gauss() * 0.03), 3],
         ['clinical_exam', 'iop', 9 * 60 + 5, Math.round(T('iop') + gauss() * 0.5), 3],
         ['clinical_exam', 'wbc_lymph', 9 * 60 + 10, r2(T('wbc_lymph') + gauss() * 0.05), 3],
         ['clinical_exam', 'bmd_delta', 9 * 60 + 15, r2(T('bmd_delta')), 7],
+        ['clinical_exam', 'hemoglobin', 9 * 60 + 20, r1(T('hemoglobin') + gauss() * 0.15), 3],
+        ['clinical_exam', 'crp', 9 * 60 + 22, r1(Math.max(0, T('crp') + gauss() * 0.3)), 3],
+        ['clinical_exam', 'cortisol', 7 * 60 + 30 + shiftMin, r1(Math.max(0.5, T('cortisol') + gauss() * 0.8)), 3],
+        ['clinical_exam', 'urine_sg', 7 * 60 + 40 + shiftMin, Math.round((T('urine_sg') + gauss() * 0.0015) * 1000) / 1000, 1],
+        ['clinical_exam', 'grip_strength', 9 * 60 + 30, r1(T('grip_strength') + gauss() * 1), 3],
+        ['clinical_exam', 'body_mass_delta', 7 * 60 + 45 + shiftMin, r1(T('body_mass_delta') + gauss() * 0.1), 1],
+        ['clinical_exam', 'hyperopic_shift', 9 * 60 + 40, r2(T('hyperopic_shift') + gauss() * 0.03), 7],
       ];
       const isLastDay = midnight + DAY_MS >= toMs;
       for (const [kind, metric, minute, value, everyDays] of daily) {
@@ -195,6 +215,10 @@ export function simulate(opts: SimulationOptions): SimulatedBatch {
       // Dose rate (µGy/h) from the daily mSv target, ±8 % (Source: SRC-026).
       const dose = (targetFor('rad_dose', plan.tDay, plan.earth) * 1000) / 24;
       push('dosimeter', 'dose_rate', ts, r1(Math.max(0, dose * (1 + gauss() * 0.08))));
+      // Skin temperature from the watch, a little lower than core and warmer when exercising (Source: SRC-021).
+      push('smartwatch', 'skin_temp', ts, r2(clamp(targetFor('core_temp', plan.tDay, plan.earth) - 2.9 + (exercising ? 0.9 : 0) + (asleep ? -0.2 : 0) + gauss() * 0.1, 25, 42)));
+    }
+    if (minuteOfDay % CGM_EVERY_MIN === 0) {
       // CGM 5-minute interstitial glucose stream with postprandial peaks and exercise dips (Source: SRC-028, SRC-072, SRC-073).
       const baseGlucose = targetFor('blood_glucose', plan.tDay, plan.earth);
       if (Number.isFinite(baseGlucose)) {
@@ -211,7 +235,7 @@ export function simulate(opts: SimulationOptions): SimulatedBatch {
     if (bodyMinute === 8 * 60 || bodyMinute === 14 * 60 || bodyMinute === 20 * 60) {
       const sys = targetFor('systolic_bp', plan.tDay, plan.earth) + gauss() * 4;
       push('smartwatch', 'systolic_bp', ts, Math.round(sys));
-      push('smartwatch', 'diastolic_bp', ts, Math.round(sys * 0.64 + gauss() * 3));
+      push('smartwatch', 'diastolic_bp', ts, Math.round(targetFor('diastolic_bp', plan.tDay, plan.earth) + gauss() * 3));
     }
   }
   return out;

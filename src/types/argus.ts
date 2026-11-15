@@ -23,7 +23,15 @@ export type AnatomicalLayer = 'all' | 'dermal' | 'skeletal' | 'organs';
 
 export type TriageStatus = 'green' | 'yellow' | 'red';
 
-export type ScenarioId = 'nominal' | 'sans_alert' | 'high_co2' | 'solar_storm';
+export type ScenarioId =
+  | 'nominal'
+  | 'unexplained_fatigue'
+  | 'sans_alert'
+  | 'high_co2'
+  | 'solar_storm'
+  | 'dehydration'
+  | 'sleep_loss'
+  | 'deconditioning';
 
 export type MetricId =
   | 'onsd'
@@ -44,15 +52,28 @@ export type MetricId =
   | 'sleep_eff'
   | 'pvt_lapses'
   | 'daily_sleep_hours'
-  | 'mood_index';
+  | 'mood_index'
+  | 'diastolic_bp'
+  | 'sleep_resp_rate'
+  | 'vo2_max'
+  | 'hemoglobin'
+  | 'urine_sg'
+  | 'grip_strength'
+  | 'body_mass_delta'
+  | 'crp'
+  | 'cortisol'
+  | 'reaction_time'
+  | 'headache_severity'
+  | 'hyperopic_shift'
+  | 'vocal_jitter';
 
 export type HudTabId =
   | 'biotwin'
   | 'trends'
   | 'forecast'
   | 'eyes'
-  | 'ai'
-  | 'emergency'
+  | 'console'
+  | 'cognition'
   | 'crew'
   | 'users'
   | 'photobooth';
@@ -90,24 +111,6 @@ export interface UserAccount {
   crewId?: string;
   createdAtIso: string;
   disabled?: boolean;
-}
-
-/** Emergency protocols (specs/01-data-schema.md §10) */
-export type EmergencyProtocolId = 'fire' | 'depress' | 'toxic' | 'medical' | 'radiation' | 'co2';
-
-export interface EmergencyProtocol {
-  id: EmergencyProtocolId;
-  title: string;
-  icon: string;
-  trigger: string;
-  steps: string[];
-}
-
-export interface EmergencyRun {
-  protocolId: EmergencyProtocolId;
-  crewId: string;
-  startedAtIso: string;
-  completed: Record<number, string>;
 }
 
 export type BloodType = 'O+' | 'O-' | 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-';
@@ -238,6 +241,14 @@ export interface EarthTelemetryPacket {
   visualExamAttached?: VisualExamAnalysis | null;
   recentCheckIns?: CheckInEntry[];
   crewNotes: string;
+  /** How fast Earth should look at this (specs/01-data-schema.md §9). Absent on older packets = routine. */
+  urgency?: 'routine_downlink' | 'priority_packet' | 'immediate_emergency_packet';
+  /** What the report is about. */
+  kind?: 'medical' | 'behavioral' | 'emergency' | 'digest';
+  /** Mental-state section for the doctors on Earth (specs/04-ai-backend.md §4.4). */
+  behavioralHealth?: import('./assistant').BehavioralHealthReport | null;
+  /** Camera summary at the time of the report (on-device estimates, no images). */
+  visualObservation?: import('./assistant').VisualObservation | null;
 }
 
 export interface ScenarioDefinition {

@@ -159,7 +159,7 @@ chatRoutes.post('/chat', async (c) => {
         await sendMeta({ source: 'live_ai', provider: chunk.provider, model: chunk.model, latencyMs: Date.now() - started });
       } else if (chunk.type === 'text') {
         await send({ type: 'delta', text: chunk.text });
-      } else {
+      } else if (chunk.type === 'error') {
         await send({ type: 'error', message: chunk.message });
       }
     }

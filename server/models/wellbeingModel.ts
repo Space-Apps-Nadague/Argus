@@ -15,41 +15,10 @@ import { linearRegression } from './trendModels';
 
 // ── Crisis-language detection ────────────────────────────────────────────────
 
-const CRISIS_PATTERNS: RegExp[] = [
-  /\bsuicid/i,
-  /\bkill(ing)?\s+my\s?self\b/i,
-  /\bend(ing)?\s+(it\s+all|my\s+life)\b/i,
-  /\b(hurt|harm|cut)(ing)?\s+my\s?self\b/i,
-  /\bself[-\s]?harm/i,
-  /\b(want|wish)(ed)?\s+(to\s+)?(die|be\s+dead)\b/i,
-  /\bbetter\s+off\s+dead\b/i,
-  /\bno\s+(reason|point)\s+(to|in)\s+(live|living|going\s+on)\b/i,
-  /\bcan'?t\s+go\s+on\b/i,
-  /\bdon'?t\s+want\s+to\s+(live|be\s+alive|wake\s+up)\b/i,
-  // Hebrew (crew notes / chat may be bilingual)
-  /להתאבד/,
-  /התאבדות/,
-  /לפגוע\s*בעצמי/,
-  /רוצה\s*למות/,
-  /אין\s*טעם\s*לחיות/,
-];
+import { detectCrisisLanguage } from '../../shared/redFlags';
 
-export interface CrisisResult {
-  crisis: boolean;
-  matched: string[];
-}
-
-export function detectCrisisLanguage(...texts: Array<string | undefined>): CrisisResult {
-  const matched: string[] = [];
-  for (const text of texts) {
-    if (!text) continue;
-    for (const p of CRISIS_PATTERNS) {
-      const m = text.match(p);
-      if (m) matched.push(m[0]);
-    }
-  }
-  return { crisis: matched.length > 0, matched };
-}
+export { detectCrisisLanguage };
+export type CrisisResult = ReturnType<typeof detectCrisisLanguage>;
 
 export const CRISIS_ESCALATION_MESSAGE =
   'What you wrote matters, and you are not alone with it. Please tell your Crew Medical Officer or Commander right now, ' +
