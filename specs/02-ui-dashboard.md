@@ -110,7 +110,7 @@ A readable version of the prototype's "Thousand Eyes" ring plus the full data/co
   - Musculoskeletal zone not green → plank, crunches, squats.
   - **Safety first:** with a cardiovascular alert, body temperature ≥ 38 °C or SpO₂ < 93 % the tab says **Do not exercise now** and recommends nothing.
 - **Banner:** *Training required today* (amber, with the reasons), *No extra training needed* (green), or *Do not exercise now* (red). The tab rail shows an amber or red **!** badge for the first and last.
-- **Exercise library (`exercises.ts`):** squats, push-ups, forward lunges, forearm plank, crunches. Recommended ones are listed first with a **Today** chip. Each has a dose, what it works, why it matters in spaceflight, numbered steps, common mistakes and how to do it in microgravity.
+- **Exercise library (`exercises.ts`):** squats, push-ups, reverse lunges, forearm plank, crunches. Recommended ones are listed first with a **Today** chip. Each has a dose, what it works, why it matters in spaceflight, numbered steps, common mistakes and how to do it in microgravity.
 - **How it is shown:** an animated **3-D figure** (`ExerciseFigure3D.tsx`, three.js) that performs the exercise in a loop. `mannequin.ts` keeps feet, back or hands on the floor (push-up hands are fixed with 2-link IK). You can drag to turn, scroll to zoom, and pause; reduced motion starts paused. Where available, an **AI illustration** (start → end position, generated with ElevenLabs / `gpt-image-2`) can be shown instead: push-ups, crunches and squats. Lunges and plank use the 3-D figure only.
 
 ### 2.5 Crew (`CrewTab.tsx`) — admin only

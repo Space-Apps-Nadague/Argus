@@ -60,17 +60,17 @@ export const EXERCISES: Record<ExerciseId, Exercise> = {
   },
   lunges: {
     id: 'lunges',
-    name: 'Forward lunges',
+    name: 'Reverse lunges',
     dose: '3 sets × 10 reps per leg',
     targets: 'Thighs, glutes, balance',
-    why: 'Single-leg work rebuilds leg strength and balance, which drop after time in microgravity.',
+    why: 'Single-leg work rebuilds leg strength and balance, which drop after time in microgravity. Stepping back is easier on the knees than stepping forward.',
     steps: [
       'Stand tall with your hands on your hips.',
-      'Take a big step forward with one leg.',
+      'Take a big step back with one leg and land on the ball of that foot.',
       'Lower until both knees are bent about 90°. The back knee stops just above the floor, the front knee stays over the ankle.',
-      'Push through the front heel back to standing. Switch legs.',
+      'Push through the front heel and bring the back leg forward to standing. Switch legs.',
     ],
-    mistakes: ['Front knee drifting past the toes or inward', 'Leaning the torso forward', 'Too short a step'],
+    mistakes: ['Front knee drifting inward or past the toes', 'Leaning the torso forward', 'Too short a step'],
     microgravity: 'Best during post-flight rehabilitation on Earth or on the Moon or Mars; in 0 g use the ARED.',
   },
   plank: {
