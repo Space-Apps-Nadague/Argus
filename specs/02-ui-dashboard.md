@@ -141,3 +141,10 @@ Port of the ARGOS prototype's chat companion (`jv()`, `send()`, `brain()`, `spea
 - **Mission location (`SpaceLocationId`, §8 of spec 01):** selector in the top bar, stored per crew member. Drives the comm-delay badge, gravity label, the clock's local-time line and the AI context. Thresholds stay on the `0g_transit` table until location-aware thresholds are specified.
 - **Clock (`MissionClock.tsx`, `src/data/dualClock.ts`):** two clocks. **Earth** is always Houston (NASA JSC, `America/Chicago`, with CST/CDT). Away from Earth, the **mission area's own time** is shown above it: Mars (`MTC hh:mm` + sol) on Mars surface and rover; Moon (`Day x / 29.5` of the lunar cycle) on the Moon and Gateway; Station (`GMT`, as on the ISS, + orbit minute and day/night side) in LEO; Ship (`UTC`) in Mars transit. On Earth (before/after mission) only the Earth clock is shown. Plus `Mission day N`.
 - **Security note:** accounts live in the browser (`localStorage`, PBKDF2-hashed passwords). This separates astronauts' views on a shared device; it is not server-side security.
+
+## 7. Life-threat alarm (`LifeThreatAlert.tsx`, `src/utils/vitalLimits.ts`, `src/utils/alarmTone.ts`)
+- **Trigger:** the active crew member's latest reading of a metric is inside the physiological limits but at or beyond `LIFE_THREAT_LIMITS` (specs/01-data-schema.md §2), e.g. body temperature 42 °C. Physically impossible values (e.g. 50 °C) never trigger it: they are dropped as typos or sensor faults.
+- **Screen:** a full-screen red overlay (`role="alertdialog"`) with a large **ALERT**, the crew callsign, each threatening metric with its value, the limit it crossed and one plain-language action.
+- **Sound:** one 1.5 s two-tone alarm (WebAudio, plus vibration where supported) when the alert appears. Audio is unlocked on the first click or key press because browsers block sound before a user gesture.
+- **Dismissal:** only the **I acknowledge** button closes it. Acknowledgement is stored per crew member, metric and value for the browser session, so a new dangerous value raises a new alert.
+- Shown only to users who can view health data.

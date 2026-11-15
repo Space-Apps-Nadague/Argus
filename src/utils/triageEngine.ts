@@ -203,23 +203,27 @@ export interface MetricInputRange {
 }
 
 /**
- * Hard plausibility limits + measurement instructions for manual check-in
- * entry (specs/01-data-schema.md §2 & §6). Never affects triage status.
+ * Hard physiological limits + measurement instructions (specs/01-data-schema.md §2 & §6).
+ * The limits are survivable extremes: values inside can be deadly but are possible
+ * (e.g. 42 °C in heat stroke). Anything outside is physically impossible for a living
+ * person (e.g. 50 °C), so it is treated as a typo or sensor fault and dropped from
+ * every data path (check-ins, voice, server ingest, demo/mock series).
+ * Life-threatening cut-offs live in `src/utils/vitalLimits.ts`. Never affects triage status.
  */
 export const METRIC_INPUT_RANGES: Record<MetricId, MetricInputRange> = {
-  onsd: { min: 3.0, max: 8.0, how: 'Ocular ultrasound, transverse plane, 3 mm behind globe; average both eyes.' },
-  iop: { min: 5, max: 40, how: 'Rebound tonometer, seated, average of 3 readings per eye.' },
-  cabin_co2: { min: 0, max: 15, how: 'Read the nearest cabin CO₂ monitor (CDM) at crew head height.' },
-  resting_hr: { min: 30, max: 180, how: 'On waking, before moving: wearable or 30 s pulse count × 2.' },
-  hrv_rmssd: { min: 5, max: 250, how: 'Overnight RMSSD from your wearable.' },
-  spo2: { min: 70, max: 100, how: 'Finger oximeter, warm hand, still for 30 s.' },
-  systolic_bp: { min: 60, max: 240, how: 'Automatic: watch blood-pressure spot readings, seated (watch calibrated with a cuff every 28 days).' },
-  bmd_delta: { min: -5, max: 3, how: 'Monthly QCT/DXA-equivalent scan result vs previous scan (%).' },
+  onsd: { min: 2.0, max: 10.0, how: 'Ocular ultrasound, transverse plane, 3 mm behind globe; average both eyes.' },
+  iop: { min: 0, max: 80, how: 'Rebound tonometer, seated, average of 3 readings per eye.' },
+  cabin_co2: { min: 0, max: 76, how: 'Read the nearest cabin CO₂ monitor (CDM) at crew head height.' },
+  resting_hr: { min: 20, max: 250, how: 'On waking, before moving: wearable or 30 s pulse count × 2.' },
+  hrv_rmssd: { min: 1, max: 300, how: 'Overnight RMSSD from your wearable.' },
+  spo2: { min: 40, max: 100, how: 'Finger oximeter, warm hand, still for 30 s.' },
+  systolic_bp: { min: 40, max: 300, how: 'Automatic: watch blood-pressure spot readings, seated (watch calibrated with a cuff every 28 days).' },
+  bmd_delta: { min: -10, max: 5, how: 'Monthly QCT/DXA-equivalent scan result vs previous scan (%).' },
   ared_load: { min: 0, max: 60, how: 'Total from the ARED/resistance device log for today.' },
-  blood_glucose: { min: 40, max: 400, how: 'Weekly fasting finger-prick on the glucometer, then a photo of the meter screen.' },
-  rad_dose: { min: 0, max: 50, how: 'Personal dosimeter: last 24 h reading.' },
-  wbc_lymph: { min: 0.1, max: 10, how: 'Point-of-care blood analyzer, finger-prick sample.' },
-  core_temp: { min: 34.0, max: 42.0, how: 'Automatic: estimated from overnight watch wrist temperature vs your baseline.' },
+  blood_glucose: { min: 10, max: 2000, how: 'Weekly fasting finger-prick on the glucometer, then a photo of the meter screen.' },
+  rad_dose: { min: 0, max: 20000, how: 'Personal dosimeter: last 24 h reading.' },
+  wbc_lymph: { min: 0, max: 100, how: 'Point-of-care blood analyzer, finger-prick sample.' },
+  core_temp: { min: 20.0, max: 46.5, how: 'Automatic: estimated from overnight watch wrist temperature vs your baseline.' },
   sleep_eff: { min: 0, max: 100, how: 'Wearable sleep efficiency for last night (%).' },
   pvt_lapses: { min: 0, max: 50, how: '3-minute Psychomotor Vigilance Test on the watch.' },
   daily_sleep_hours: { min: 0, max: 24, how: 'Automatic: sleep duration from the watch.' },
