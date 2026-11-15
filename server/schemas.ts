@@ -120,6 +120,7 @@ export const VoiceSttRequestSchema = CrewContextSchema.extend({
   fallbackTranscript: text(4000).optional(),
   mode: VoiceTransportModeSchema.optional(),
   languageCode: text(40).optional(),
+  tier: z.enum(['live', 'relay', 'autonomous']).optional(),
 });
 
 export const VoiceTtsRequestSchema = z.object({
@@ -127,6 +128,8 @@ export const VoiceTtsRequestSchema = z.object({
   voice: text(80).optional(),
   style: text(200).optional(),
   mode: VoiceTransportModeSchema.optional(),
+  tier: z.enum(['live', 'relay', 'autonomous']).optional(),
+  speed: z.number().min(0.5).max(2).optional(),
 });
 
 export const VoiceToolCallRequestSchema = CrewContextSchema.extend({
@@ -318,4 +321,20 @@ export const ConverseRequestSchema = CrewContextSchema.extend({
   checkIns: z.array(WellbeingCheckInSchema).max(60).optional(),
   previousAssessment: MentalStateAssessmentSchema.optional(),
   countermeasureLog: z.array(z.object({ id: text(80), title: text(160), helped: z.boolean().optional() })).max(30).optional(),
+});
+
+const AssistantContextSchema = ConverseRequestSchema.omit({ messages: true, modality: true, frame: true });
+
+export const LiveSessionRequestSchema = AssistantContextSchema.extend({
+  messages: ConverseRequestSchema.shape.messages.optional(),
+  voice: text(80).optional(),
+});
+
+export const AssistantToolRequestSchema = AssistantContextSchema.extend({
+  name: text(80),
+  args: z.record(z.string(), z.unknown()),
+});
+
+export const AssessRequestSchema = ConverseRequestSchema.extend({
+  assistantReply: text(8000).optional(),
 });

@@ -16,6 +16,7 @@ import { dataRoutes } from './routes/data';
 import { diagnosticsRoutes } from './routes/diagnostics';
 import { guidanceRoutes } from './routes/guidance';
 import { healthRoutes } from './routes/health';
+import { packetRoutes } from './routes/packets';
 import { recommendationsRoutes } from './routes/recommendations';
 import { visionRoutes } from './routes/vision';
 import { voiceRoutes } from './routes/voice';
@@ -38,6 +39,7 @@ export function createApp(): Hono<AppEnv> {
   app.route('/api', adminRoutes);
   app.route('/api', astronautRoutes);
   app.route('/api', dataRoutes);
+  app.route('/api', packetRoutes);
   const ai = new Hono<AppEnv>();
   ai.use('*', requireAuth(), aiGuard);
   ai.route('/', guidanceRoutes);

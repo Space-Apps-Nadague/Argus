@@ -237,6 +237,14 @@ export interface EarthTelemetryPacket {
   visualExamAttached?: VisualExamAnalysis | null;
   recentCheckIns?: CheckInEntry[];
   crewNotes: string;
+  /** How fast Earth should look at this (specs/01-data-schema.md §9). Absent on older packets = routine. */
+  urgency?: 'routine_downlink' | 'priority_packet' | 'immediate_emergency_packet';
+  /** What the report is about. */
+  kind?: 'medical' | 'behavioral' | 'emergency' | 'digest';
+  /** Mental-state section for the doctors on Earth (specs/04-ai-backend.md §4.4). */
+  behavioralHealth?: import('./assistant').BehavioralHealthReport | null;
+  /** Camera summary at the time of the report (on-device estimates, no images). */
+  visualObservation?: import('./assistant').VisualObservation | null;
 }
 
 export interface ScenarioDefinition {

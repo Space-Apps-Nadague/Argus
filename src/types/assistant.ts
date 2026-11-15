@@ -211,3 +211,95 @@ export interface VoicesResponse {
   defaults: Partial<Record<VoiceEngineId, string>>;
   engines: Record<Exclude<VoiceEngineId, 'browser'>, { available: boolean; model?: string }>;
 }
+
+// ── Live session + turn bookkeeping ──────────────────────────────────────────
+
+/** POST /api/ai/live-session: everything the browser needs to open a full-duplex session. */
+export interface LiveSessionRequest extends Omit<ConverseRequest, 'messages' | 'modality' | 'frame'> {
+  messages?: ConverseRequest['messages'];
+  voice?: string;
+}
+
+export interface LiveSessionResponse {
+  available: boolean;
+  tier: CommTier;
+  /** Why a live session is not available (shown under the tier badge). */
+  reason?: string;
+  wsUrl?: string;
+  model?: string;
+  voice?: string;
+  expiresAtIso?: string;
+  /** First message to send on the socket. */
+  setup?: unknown;
+}
+
+/** POST /api/ai/assistant-tool: validate one tool call from a live session. */
+export interface AssistantToolRequest extends Omit<ConverseRequest, 'messages' | 'modality' | 'frame'> {
+  name: string;
+  args: Record<string, unknown>;
+}
+
+export interface AssistantToolResponse {
+  result: Record<string, unknown>;
+  action?: AssistantAction;
+}
+
+/**
+ * POST /api/ai/assess: the non-conversation half of a turn (fast-path actions, mental
+ * state, countermeasure, Earth report, chat log) for turns spoken over a live session.
+ */
+export interface AssessRequest extends ConverseRequest {
+  /** What the assistant said in the live session, for the chat log. */
+  assistantReply?: string;
+}
+
+export interface AssessResponse {
+  tier: CommTier;
+  crisis: boolean;
+  redFlag: boolean;
+  earthConsultUrgency: EarthConsultUrgency;
+  actions: AssistantAction[];
+  assessment: MentalStateAssessment;
+}
+
+// ── Reports to Earth ─────────────────────────────────────────────────────────
+
+/** Mental-state section of a report to the doctors on Earth. */
+export interface BehavioralHealthReport {
+  assessment: MentalStateAssessment;
+  /** Countermeasures suggested, and whether the crew member said they helped. */
+  countermeasures: Array<{ id: string; title: string; suggestedAtIso: string; helped?: boolean }>;
+  /** Recent concern levels, oldest first. */
+  history: Array<{ atIso: string; concernLevel: ConcernLevel; score: number }>;
+  /** Free text the crew member added. */
+  crewNote?: string;
+}
+
+export type EarthReportKind = 'medical' | 'behavioral' | 'emergency' | 'digest';
+
+/** A stored report and its delivery state (GET /api/astronauts/:id/packets, /api/packets/inbox). */
+export interface EarthReport {
+  id: string;
+  astronautId: string;
+  /** Callsign for the doctors' inbox. */
+  astronautLabel?: string;
+  createdAtIso: string;
+  urgency: EarthConsultUrgency;
+  kind: EarthReportKind;
+  summary: string;
+  oneWayDelaySec: number;
+  /** When Earth can first see it. */
+  deliverAtIso: string;
+  delivered: boolean;
+  readAtIso?: string | null;
+  payload: import('./argus').EarthTelemetryPacket;
+  reply?: { text: string; author: string; sentAtIso: string; arrivesAtIso: string; arrived: boolean } | null;
+}
+
+export interface NewEarthReport {
+  urgency: EarthConsultUrgency;
+  kind: EarthReportKind;
+  summary: string;
+  payload: import('./argus').EarthTelemetryPacket;
+  locationId?: import('./argus').SpaceLocationId;
+}

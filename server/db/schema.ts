@@ -469,3 +469,53 @@ export const messages = pgTable(
   },
   (t) => [index('messages_conversation_ts_idx').on(t.conversationId, t.ts)]
 );
+
+// ── 3.6 Reports to Earth and mental-state history (specs/04-ai-backend.md §4.4) ──
+/**
+ * A report queued for the doctors on Earth. It becomes visible to flight surgeons at
+ * `deliverAt` (creation + one-way light time); their reply becomes visible to the crew
+ * member at `replyDeliverAt`.
+ */
+export const earthPackets = pgTable(
+  'earth_packets',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    astronautId: text('astronaut_id')
+      .notNull()
+      .references(() => astronauts.id, { onDelete: 'cascade' }),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: tsz('created_at').notNull().defaultNow(),
+    urgency: text('urgency').notNull(), // EarthConsultUrgency
+    kind: text('kind').notNull(), // 'behavioral' | 'medical' | 'emergency' | 'digest'
+    summary: text('summary').notNull(),
+    oneWayDelaySec: real('one_way_delay_sec').notNull().default(0),
+    deliverAt: tsz('deliver_at').notNull(),
+    payload: jsonb('payload').notNull(),
+    readAt: tsz('read_at'),
+    replyText: text('reply_text'),
+    repliedBy: uuid('replied_by').references(() => users.id, { onDelete: 'set null' }),
+    repliedByName: text('replied_by_name'),
+    repliedAt: tsz('replied_at'),
+    replyDeliverAt: tsz('reply_deliver_at'),
+  },
+  (t) => [index('earth_packets_astronaut_idx').on(t.astronautId, t.createdAt), index('earth_packets_deliver_idx').on(t.deliverAt)]
+);
+
+export const mentalStateAssessments = pgTable(
+  'mental_state_assessments',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    astronautId: text('astronaut_id')
+      .notNull()
+      .references(() => astronauts.id, { onDelete: 'cascade' }),
+    ts: tsz('ts').notNull().defaultNow(),
+    concernLevel: text('concern_level').notNull(), // none | watch | concern | urgent
+    score: smallint('score').notNull(),
+    mood: text('mood').notNull(),
+    stress: text('stress').notNull(),
+    fatigue: text('fatigue').notNull(),
+    trend: text('trend').notNull(),
+    assessment: jsonb('assessment').notNull(),
+  },
+  (t) => [index('mental_state_astronaut_ts_idx').on(t.astronautId, t.ts)]
+);

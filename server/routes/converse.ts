@@ -14,7 +14,19 @@ import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import type { BodyZoneId } from '../../src/types/argus';
 import type { EarthConsultUrgency } from '../../src/types/aiApi';
-import type { AssistantAction, ConverseEvent, ConverseRequest, MentalStateAssessment, VisualObservation } from '../../src/types/assistant';
+import type {
+  AssessRequest,
+  AssessResponse,
+  AssistantAction,
+  AssistantToolRequest,
+  AssistantToolResponse,
+  ConverseEvent,
+  ConverseRequest,
+  LiveSessionRequest,
+  LiveSessionResponse,
+  MentalStateAssessment,
+  VisualObservation,
+} from '../../src/types/assistant';
 import { SPACE_LOCATIONS, commDelayAt } from '../../src/data/spaceLocations';
 import { BODY_ZONES } from '../../src/data/telemetryScenarios';
 import { STATUS_LABELS } from '../../src/utils/triageEngine';
@@ -29,10 +41,21 @@ import { getOrStartConversation, latestTriageEventId, logMessage } from '../db/c
 import { type CrewSnapshot, buildCrewSnapshot, formatSnapshotForPrompt } from '../models/crewSnapshot';
 import { computeWellbeing, CRISIS_ESCALATION_MESSAGE } from '../models/wellbeingModel';
 import { buildAssistantPrompt, jsonInstruction, MENTAL_STATE_EXTRACTION_PROMPT } from '../prompts';
-import { ConverseRequestSchema, MentalStateLlmSchema } from '../schemas';
+import { AssessRequestSchema, AssistantToolRequestSchema, ConverseRequestSchema, LiveSessionRequestSchema, MentalStateLlmSchema } from '../schemas';
+import { DEFAULT_GEMINI_VOICE, isGeminiVoice } from '../ai/geminiVoices';
+import { buildAssistantLiveSetup, mintLiveToken } from '../ai/geminiLive';
+import { assistantToolsForLive } from '../ai/assistantTools';
 import { offlineReply } from './chat';
 import { keyFromHeader, parseBody } from './util';
-import { executeVoiceToolCall, maxUrgency, parseSpokenVitalLogCommand, urgencyFloorForStatus, worstZoneStatus } from './voice';
+import {
+  DEFAULT_LIVE_MODEL,
+  executeVoiceToolCall,
+  maxUrgency,
+  parseSpokenVitalLogCommand,
+  resolveGeminiApiKey,
+  urgencyFloorForStatus,
+  worstZoneStatus,
+} from './voice';
 
 export const converseRoutes = new Hono<AppEnv>();
 
@@ -391,6 +414,148 @@ converseRoutes.post('/converse', async (c) => {
     }
     await send({ type: 'done' });
   });
+});
+
+// ── Live tier: full-duplex session straight from the browser to Earth ────────
+
+converseRoutes.post('/live-session', async (c) => {
+  const body = await parseBody(c, LiveSessionRequestSchema);
+  if (!body.ok) return body.response;
+  const req = body.data as LiveSessionRequest;
+  const { tier, oneWaySec } = tierForRequest(req);
+  const unavailable = (reason: string) => c.json({ available: false, tier, reason } satisfies LiveSessionResponse);
+
+  if (tier !== 'live') return unavailable(tier === 'relay' ? 'Too far from Earth for a live session.' : 'On-ship mode: no Earth link.');
+  const geminiKey = resolveGeminiApiKey(process.env, keyFromHeader(c));
+  if (!geminiKey) return unavailable('No Earth AI key configured.');
+  const token = await mintLiveToken(geminiKey);
+  if (!token) return unavailable('Earth AI did not answer.');
+
+  const snapshot = buildCrewSnapshot(req);
+  const userMessages = (req.messages ?? []).filter((m) => m.role === 'user').map((m) => m.content);
+  const wellbeing = req.checkIns?.length ? computeWellbeing(req.checkIns, snapshot.zones) : null;
+  const assessment =
+    req.previousAssessment ??
+    combineAssessment({
+      userMessages,
+      observation: req.observation,
+      selfReport: wellbeing ? { riskScore: wellbeing.riskScore, status: wellbeing.status, trend: wellbeing.trend } : null,
+      physiology: { behavioralStatus: snapshot.zoneStatuses.behavioral },
+    });
+  const recent = (req.messages ?? []).slice(-8).map((m) => `${m.role === 'user' ? 'Crew' : m.role === 'earth' ? 'Earth doctors' : 'You'}: ${m.content}`).join('\n');
+  const model = process.env.GEMINI_LIVE_MODEL?.trim() || DEFAULT_LIVE_MODEL;
+  const voice = isGeminiVoice(req.voice) ? req.voice : DEFAULT_GEMINI_VOICE;
+  const systemInstruction = [
+    buildAssistantPrompt({
+      tier,
+      modality: 'voice',
+      data: formatSnapshotForPrompt(snapshot, { allMetrics: true }),
+      earthRoundTrip: oneWaySec > 0.5 ? formatDuration(roundTripSeconds(oneWaySec)) : undefined,
+      observation: req.observation ? describeObservation(req.observation) : undefined,
+      mentalState: describeAssessment(assessment),
+      activeProtocol: req.activeProtocol
+        ? `${req.activeProtocol.title}\n${req.activeProtocol.steps.map((s, i) => `${i + 1}. [${req.activeProtocol!.completedSteps.includes(i + 1) ? 'x' : ' '}] ${s}`).join('\n')}`
+        : undefined,
+      guidedSteps: !req.activeProtocol && req.guidedSteps?.length ? req.guidedSteps.map((s, i) => `${i + 1}. ${s}`).join('\n') : undefined,
+      countermeasures: req.countermeasureLog?.length ? req.countermeasureLog.map((cm) => `- ${cm.title}`).join('\n') : undefined,
+      toolsAvailable: true,
+    }),
+    'You can see them through the camera: frames arrive about once a second.',
+    recent ? `EARLIER IN THIS CONVERSATION\n${recent}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+
+  const response: LiveSessionResponse = {
+    available: true,
+    tier,
+    wsUrl: token.wsUrl,
+    model,
+    voice,
+    expiresAtIso: token.expiresAtIso,
+    setup: buildAssistantLiveSetup({ model, voice, systemInstruction, tools: assistantToolsForLive() }),
+  };
+  return c.json(response);
+});
+
+/** Validates one tool call made inside a live session and returns the action to carry out. */
+converseRoutes.post('/assistant-tool', async (c) => {
+  const body = await parseBody(c, AssistantToolRequestSchema);
+  if (!body.ok) return body.response;
+  const req = body.data as AssistantToolRequest;
+  const full = { ...req, messages: [], modality: 'voice' } as ConverseRequest;
+  const outcome = runAssistantTool(req.name, req.args, toolContext(full, buildCrewSnapshot(req)));
+  return c.json({ result: outcome.result, action: outcome.action } satisfies AssistantToolResponse);
+});
+
+/**
+ * The non-conversation half of a turn, for turns spoken over a live session: fast-path
+ * actions, mental state, countermeasure, Earth report and the chat log.
+ */
+converseRoutes.post('/assess', async (c) => {
+  const body = await parseBody(c, AssessRequestSchema);
+  if (!body.ok) return body.response;
+  const req = body.data as AssessRequest;
+  const snapshot = buildCrewSnapshot(req);
+  const { tier } = tierForRequest(req);
+  const userMessages = req.messages.filter((m) => m.role === 'user').map((m) => m.content);
+  const lastUser = userMessages[userMessages.length - 1] ?? '';
+  const flags = detectRedFlags(lastUser);
+  const wellbeing = req.checkIns?.length ? computeWellbeing(req.checkIns, snapshot.zones) : null;
+
+  const actions = fastPathActions(req, lastUser, snapshot);
+  const assessment = combineAssessment({
+    userMessages,
+    observation: req.observation,
+    selfReport: wellbeing ? { riskScore: wellbeing.riskScore, status: wellbeing.status, trend: wellbeing.trend } : null,
+    physiology: { behavioralStatus: snapshot.zoneStatuses.behavioral },
+    previous: req.previousAssessment,
+  });
+  if (assessment.concernLevel !== 'none' && !req.activeProtocol) {
+    const already = req.countermeasureLog ?? [];
+    const pick = already.some((cm) => cm.helped === undefined) ? null : pickCountermeasure(assessment.cues, already.map((cm) => cm.id));
+    if (pick) actions.push({ origin: 'fast_path', type: 'suggest_countermeasure', suggestion: pick });
+  }
+  if (shouldAutoReport(assessment.concernLevel, req.previousAssessment?.concernLevel ?? null) && !actions.some((a) => a.type === 'queue_earth_packet')) {
+    actions.push({ origin: 'fast_path', type: 'queue_earth_packet', urgency: urgencyForConcern(assessment.concernLevel), note: `Behavioural health: ${assessment.summary}` });
+  }
+
+  const db = c.get('db');
+  const astronautId = req.crewMember?.id;
+  if (db && astronautId && lastUser) {
+    try {
+      const user = c.get('user');
+      const conversationId = await getOrStartConversation(db, astronautId, user?.id ?? null);
+      await logMessage(db, { conversationId, role: 'user', authorUserId: user?.id ?? null, content: lastUser, crisisFlag: flags.crisis });
+      if (req.assistantReply) {
+        await logMessage(db, {
+          conversationId,
+          role: 'assistant',
+          content: req.assistantReply,
+          provider: 'gemini',
+          model: process.env.GEMINI_LIVE_MODEL?.trim() || DEFAULT_LIVE_MODEL,
+          source: 'ai',
+          contextSnapshot: { tier, modality: 'voice', live: true, mentalState: { concernLevel: assessment.concernLevel, score: assessment.score } },
+          crisisFlag: flags.crisis,
+        });
+      }
+    } catch (err) {
+      console.error('[ARGUS assess] could not store turn', err);
+    }
+  }
+
+  const response: AssessResponse = {
+    tier,
+    crisis: flags.crisis,
+    redFlag: flags.flagged,
+    earthConsultUrgency: maxUrgency(
+      urgencyFloorForStatus(worstZoneStatus(snapshot.zoneStatuses)),
+      flags.flagged ? 'immediate_emergency_packet' : urgencyForConcern(assessment.concernLevel)
+    ),
+    actions,
+    assessment,
+  };
+  return c.json(response);
 });
 
 void BODY_ZONES;
