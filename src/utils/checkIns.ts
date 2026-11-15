@@ -149,7 +149,7 @@ export function lastLoggedDay(entries: CheckInEntry[]): number | null {
   return entries.length ? Math.max(...entries.map((e) => e.missionDay)) : null;
 }
 
-const SCENARIO_IDS: readonly ScenarioId[] = ['nominal', 'sans_alert', 'high_co2', 'solar_storm', 'dehydration', 'sleep_loss', 'deconditioning'];
+const SCENARIO_IDS: readonly ScenarioId[] = ['nominal', 'unexplained_fatigue', 'sans_alert', 'high_co2', 'solar_storm', 'dehydration', 'sleep_loss', 'deconditioning'];
 
 /**
  * Entries that belong to one scenario (specs/01-data-schema.md §6 "Scenario scope").

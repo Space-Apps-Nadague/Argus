@@ -69,7 +69,7 @@ import {
 } from '../services/flightSurgeonAi';
 
 const CREW_STORAGE_KEY = 'argus_crew_roster_v1';
-const GUIDANCE_SCENARIO_ORDER: ScenarioId[] = ['nominal', 'sans_alert', 'high_co2', 'solar_storm', 'dehydration', 'sleep_loss', 'deconditioning'];
+const GUIDANCE_SCENARIO_ORDER: ScenarioId[] = ['nominal', 'unexplained_fatigue', 'sans_alert', 'high_co2', 'solar_storm', 'dehydration', 'sleep_loss', 'deconditioning'];
 
 const URGENCY_RANK: Record<FlightSurgeonGuidance['earthConsultUrgency'], number> = {
   routine_downlink: 0,
@@ -1140,8 +1140,21 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
     async (sample: VisualExamSample) => {
       dispatch({ type: 'SET_ANALYZING_VISUAL', payload: true });
       try {
+        const effectiveSample: VisualExamSample =
+          state.scenarioId === 'unexplained_fatigue' && sample.id === 'sans_ultrasound'
+            ? {
+                ...sample,
+                defaultFindingStatus: 'yellow',
+                clinicalSummary:
+                  'Optic Nerve Sheath Diameter (ONSD) measured 3 mm posterior to globe is 5.80 mm (early SANS caution threshold 5.5–6.0 mm) with mild posterior scleral flattening.',
+                plainCrewGuidance:
+                  'The ultrasound shows early fluid expansion inside the optic nerve sheath behind your eye (5.8 mm — early SANS), amplified by elevated Node 2 CO₂ (4.4 mmHg).',
+                recommendedAction:
+                  'Apply LBNP cuff (-25 mmHg), inspect Node 2 CO₂ scrubber & sleeping-rack airflow, and queue an Earth telemetry packet.',
+              }
+            : sample;
         const result = await analyzeVisualSelfExam({
-          sample,
+          sample: effectiveSample,
           environment: state.environment,
           runtimeApiKey: state.runtimeApiKey,
         });
@@ -1149,14 +1162,14 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
           type: 'SET_VISUAL_EXAM_RESULT',
           payload: {
             analysis: result,
-            previewUrl: sample.previewSvgDataUrl,
+            previewUrl: effectiveSample.previewSvgDataUrl,
           },
         });
       } finally {
         dispatch({ type: 'SET_ANALYZING_VISUAL', payload: false });
       }
     },
-    [state.environment, state.runtimeApiKey]
+    [state.environment, state.runtimeApiKey, state.scenarioId]
   );
 
   const runUploadedVisualExam = useCallback(

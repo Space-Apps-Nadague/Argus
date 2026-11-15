@@ -36,6 +36,7 @@ ARGUS supports 5 canonical mission location / habitat presets grounded in NASA H
 
 ### Crisis Scenarios (`ScenarioId`)
 - `'nominal'` — **Nominal Deep-Space Cruise**: All 6 zones within expected spaceflight norms.
+- `'unexplained_fatigue'` — **Cdr. Vance — Unexplained Fatigue**: Subtle multi-system drift during `0g_transit` — early Optic Nerve Sheath Diameter swelling (`5.8 mm`, yellow), elevated Node 2 cabin $\text{ppCO}_2$ (`4.4 mmHg`), HRV drop (`36 ms`), fasting blood glucose drift (`118 mg/dL`), and slower PVT reaction latency (`4` lapses).
 - `'sans_alert'` — **SANS Optic Disc Edema Alert**: Elevated Optic Nerve Sheath Diameter (ONSD `6.4 mm`) and intraocular pressure (`23 mmHg`) in `neuro`.
 - `'high_co2'` — **Habitat $\text{CO}_2$ Scrubber Degradation**: Elevated cabin $\text{ppCO}_2$ (`5.8 mmHg`) driving cerebral vasodilation (`neuro` yellow/red), tachycardia (`cardio` yellow), and cognitive fatigue (`behavioral` yellow).
 - `'solar_storm'` — **SPE Radiation Storm Alert**: Acute solar particle event raising cumulative dose rate (`immune` red, lymphocyte drop `1.05 k/µL`, skin erythema risk) and stress response (`cardio` / `behavioral` yellow).

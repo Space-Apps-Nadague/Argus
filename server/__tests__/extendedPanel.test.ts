@@ -8,8 +8,8 @@ import { simulate } from '../ingest/simulator';
 const SCENARIOS = Object.keys(TELEMETRY_SCENARIOS) as Array<keyof typeof TELEMETRY_SCENARIOS>;
 
 describe('extended 31-metric panel', () => {
-  it('has seven scenarios, each carrying every metric with a full 30-day history', () => {
-    expect(SCENARIOS).toHaveLength(7);
+  it('has eight scenarios, each carrying every metric with a full 30-day history', () => {
+    expect(SCENARIOS).toHaveLength(8);
     for (const id of SCENARIOS) {
       const readings = Object.values(TELEMETRY_SCENARIOS[id].zones).flat();
       expect(new Set(readings.map((r) => r.metricId))).toEqual(new Set(METRIC_IDS));
