@@ -24,6 +24,7 @@ import { AiTab } from './components/AiTab';
 import { EmergencyTab } from './components/EmergencyTab';
 import { CrewTab } from './components/CrewTab';
 import { UsersTab } from './components/UsersTab';
+import { PhotoboothTab } from './components/PhotoboothTab';
 import { CrewManagerModal } from './components/CrewManagerModal';
 import { CompanionDrawer } from './components/CompanionDrawer';
 
@@ -36,6 +37,7 @@ const PANELS: Record<HudTabId, React.FC> = {
   emergency: EmergencyTab,
   crew: CrewTab,
   users: UsersTab,
+  photobooth: PhotoboothTab,
 };
 
 const Hud: React.FC = () => {

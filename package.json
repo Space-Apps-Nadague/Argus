@@ -5,7 +5,7 @@
   "description": "ARGUS \u2014 Astronaut Readiness Guidance & Unified Surveillance: Autonomous Crew Bio-Twin HUD",
   "type": "module",
   "scripts": {
-    "predev": "node scripts/copy-face-models.mjs",
+    "predev": "node scripts/copy-face-models.mjs && node scripts/copy-vision-assets.mjs",
     "dev": "vite",
     "dev:server": "tsx watch server/index.ts",
     "dev:all": "concurrently -k -n web,api -c cyan,magenta \"npm:dev\" \"npm:dev:server\"",
@@ -13,7 +13,7 @@
     "start": "tsx server/index.ts",
     "start:server": "tsx server/index.ts",
     "ai:local": "tsx scripts/check-local-ai.ts",
-    "prebuild": "node scripts/copy-face-models.mjs",
+    "prebuild": "node scripts/copy-face-models.mjs && node scripts/copy-vision-assets.mjs",
     "build": "tsc -b && vite build",
     "typecheck:server": "tsc -p server/tsconfig.json",
     "preview": "vite preview",
@@ -32,6 +32,7 @@
   "dependencies": {
     "@electric-sql/pglite": "^0.5.16",
     "@hono/node-server": "^2.1.8",
+    "@mediapipe/tasks-vision": "^1.2.3",
     "@node-rs/argon2": "^2.2.2",
     "@react-three/drei": "^9.121.4",
     "@react-three/fiber": "^8.17.10",

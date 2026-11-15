@@ -102,6 +102,16 @@ A readable version of the prototype's "Thousand Eyes" ring plus the full data/co
 - A red **SOS** shortcut at the bottom of the tab rail opens this tab from anywhere.
 - Footer: "Generic training aid based on public ISS practice — follow your mission's flight rules."
 
+### 2.7 Photobooth (`PhotoboothTab.tsx`, `src/features/photobooth/`)
+A fun camera booth so the crew can send photos home. Camera frames are processed on the device only (MediaPipe Tasks, Apache-2.0: selfie segmenter, gesture recogniser, face detector; segmenter and face models committed in `public/models/vision`; the 8 MB gesture model is downloaded there and the WASM copied to `public/vision/wasm` by `scripts/copy-vision-assets.mjs` before `dev`/`build` (online fallback if the download is missing); loaded only when the tab opens).
+- **Hands-free shutter (`gesture.ts`):** close your hand into a fist for 0.4 s → a big **3-2-1** countdown → the photo is taken (shutter sound and flash). The countdown keeps going if the hand opens; the next photo needs the hand to open again. The **Take photo (3 s)** button starts the same timer.
+- **Effects (`effects.ts`, all drawn on a canvas, no image files):**
+  - Backgrounds: Mars, Moon (with Earth in the sky), Earth from orbit, ISS cupola. The person is cut out with the selfie segmenter.
+  - Helmet & stickers: an astronaut helmet that follows the face (white shell, gold visor tint, reflection, neck ring), an ARGUS mission patch with the callsign, zero-g floaties (stars, water bubbles, a planet, a bolt) and a "Hi from Mars!" banner (place from the mission location).
+  - Colour filters: Mars red, Lunar grey, Night vision (green, scan lines), Retro film (vignette).
+  - Frames: Postcard ("Greetings from Mars!", callsign, mission day, sol on Mars, date, message, stamp) and Polaroid (handwritten-style message).
+- **Family mail (`familyMail.ts`):** the photo (JPEG, 800 px) goes into an Earth downlink queue and shows *On its way · arrives in 10m 58s*, using the live one-way light time (`commDelayAt`), then *Delivered*. Family contacts (name, relation) are kept per astronaut; the last 12 postcards per astronaut are kept on this device. Download is always available.
+
 ### 2.5 Crew (`CrewTab.tsx`) — admin only
 - Grid of crew cards: callsign, name, role, sex icon, readiness (computed for that member's `defaultScenarioId`, or the active scenario for the active member), 5-dot zone status row, check-in streak, `Set active` button. Custom crew can be deleted.
 - `+ Add crew member` opens the existing creator form in `CrewManagerModal.tsx`. Crew details (baselines, blood type, age, medical notes) appear in an expandable section on each card.
