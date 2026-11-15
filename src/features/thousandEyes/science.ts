@@ -6,7 +6,7 @@
  * pre-flight baseline, after subtracting the adaptation expected at their location.
  */
 
-import { INDICATORS, INDICATOR_BY_KEY } from './indicators';
+import { INDICATORS, INDICATOR_BY_KEY, ALL_INDICATORS } from './indicators';
 import { expectedShift } from './locationShift';
 import type {
   Baseline,
@@ -132,12 +132,12 @@ export function indicatorStatus(p: Person, key: string, now: number): IndicatorS
 
 /** Status of every indicator that has data. */
 export function allStatuses(p: Person, now: number): IndicatorStatus[] {
-  return INDICATORS.map((i) => indicatorStatus(p, i.key, now)).filter((s) => s.n > 0);
+  return ALL_INDICATORS.map((i) => indicatorStatus(p, i.key, now)).filter((s) => s.n > 0);
 }
 
-/** Personal deviation index (RMS badness of baseline indicators), in sigma. */
+/** Personal deviation index (RMS badness of baseline indicators), in sigma. Sensor-ring indicators are trend only. */
 export function deviationIndex(statuses: IndicatorStatus[]): number {
-  const a = statuses.filter((s) => !s.indicator.flag);
+  const a = statuses.filter((s) => !s.indicator.flag && !s.indicator.sensor);
   return a.length ? Math.sqrt(avg(a.map((s) => s.badness ** 2))) : NaN;
 }
 

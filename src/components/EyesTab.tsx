@@ -105,6 +105,7 @@ export const EyesTab: React.FC = () => {
             <li><span className="mr-1 inline-block h-2.5 w-2.5 rounded-full align-middle" style={{ background: STATUS_HEX.critical }} />! Red flag</li>
             <li><span className="mr-1 inline-block h-2.5 w-2.5 rounded-full align-middle" style={{ background: STATUS_HEX.none }} />No data</li>
             <li><span className="mr-1 inline-block h-0.5 w-4 bg-hud-drift align-middle" />Hidden link in your data</li>
+            <li><span className="mr-1 inline-block h-2.5 w-3.5 rounded-full border border-dashed border-hud-muted align-middle" />Inner ring: new sensors, trend only</li>
           </ul>
           <p className="mt-1 text-center text-[11px] text-hud-muted">
             Each eye compares you only with your own pre-flight baseline. Tap an eye for details.

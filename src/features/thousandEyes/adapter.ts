@@ -29,6 +29,7 @@ export const METRIC_TO_INDICATOR: Readonly<Record<string, string>> = {
   resting_hr: 'rhr',
   hrv_rmssd: 'hrv',
   spo2: 'spo2',
+  blood_glucose: 'glu', // CGM, sensor ring
 };
 
 export function indicatorKeyFor(metricId: string): string | null {

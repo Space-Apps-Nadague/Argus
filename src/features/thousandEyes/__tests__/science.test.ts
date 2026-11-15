@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { INDICATOR_BY_KEY, INDICATORS, RING_ORDER } from '../indicators';
+import { INDICATOR_BY_KEY, INDICATORS, RING_ORDER, SENSOR_INDICATORS, SENSOR_RING_ORDER } from '../indicators';
 import { expectedShift } from '../locationShift';
 import {
   badness,
@@ -163,5 +163,37 @@ describe('adapter (real data only)', () => {
   it('marks pre-flight readings as the baseline phase', () => {
     const p = buildPerson({ locationId: 'earth_pre', now: NOW, metrics: [{ metricId: 'spo2', history: [{ missionDay: 1, value: 97 }] }] });
     expect(p.checkIns[0].phase).toBe('pre');
+  });
+});
+
+describe('sensor ring', () => {
+  it('adds 26 sensor indicators with unique keys, sources and no red-flag limits', () => {
+    expect(SENSOR_INDICATORS).toHaveLength(26);
+    expect(SENSOR_RING_ORDER).toHaveLength(26);
+    const keys = [...INDICATORS, ...SENSOR_INDICATORS].map((i) => i.key);
+    expect(new Set(keys).size).toBe(keys.length);
+    for (const ind of SENSOR_INDICATORS) {
+      expect(ind.sensor, ind.key).toBeDefined();
+      expect(ind.sensor!.sources.length, ind.key).toBeGreaterThan(0);
+      ind.sensor!.sources.forEach((id) => expect(id).toMatch(/^SRC-\d{3}$/));
+      expect(ind.redLow, ind.key).toBeUndefined();
+      expect(ind.redHigh, ind.key).toBeUndefined();
+      expect(ind.lo).toBeLessThan(ind.hi);
+      expect(ind.sd).toBeGreaterThan(0);
+    }
+    expect(INDICATOR_BY_KEY.ecg.sensor!.readiness).toBe('flight-proven');
+  });
+
+  it('feeds HUD CGM glucose into the glucose eye', () => {
+    expect(indicatorKeyFor('blood_glucose')).toBe('glu');
+  });
+
+  it('shows drift on a sensor eye but keeps it out of the deviation index', () => {
+    const p = personWith('cort', [40, 42, 38, 41, 39, 40, 41], [40, 90, 110, 120]);
+    const s = indicatorStatus(p, 'cort', NOW);
+    expect(s.status).toBe(1);
+    expect(s.red).toBe(false);
+    expect(Number.isNaN(deviationIndex([s]))).toBe(true);
+    expect(findLinks(p).every((l) => l.a !== 'cort' && l.b !== 'cort')).toBe(true);
   });
 });

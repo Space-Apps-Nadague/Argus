@@ -3,14 +3,15 @@
  * One "eye" per indicator around a ring, ordered by body system. The eye's colour is its status vs.
  * the person's OWN baseline; the pupil grows with severity. Violet curves are statistically found
  * links. Values are never shown on the ring: click / tap / Enter on an eye to open its details.
+ * The inner ring holds the sensor indicators (specs/02 §2.4b): trend only, dashed when the sensor is research-grade.
  */
 
 import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { RING_ORDER, SYSTEM_COLORS } from './indicators';
+import { RING_ORDER, SENSOR_RING_ORDER, SYSTEM_COLORS } from './indicators';
 import { LOCATION_LABEL } from './locationShift';
 import { allStatuses, deviationIndex, findLinks, fmt, indicatorStatus, linkText, readiness } from './science';
 import { readinessColor, statusStyle } from './statusColors';
-import type { IndicatorStatus, Person } from './types';
+import type { Indicator, IndicatorStatus, Person } from './types';
 import { EyePopover } from './EyePopover';
 
 // Geometry: eyes ~36% bigger than the prototype (rx 11 -> 15, ry 6 -> 8.5); ring and viewBox grown to fit.
@@ -21,8 +22,54 @@ const EYE_RX = 15;
 const EYE_RY = 8.5;
 const HIT_R = 19; // invisible, generous click/tap target
 const LABEL_R = R + 32;
+// Inner sensor ring: smaller eyes, labels inside the ring.
+const R2 = 124;
+
+interface RingSpec {
+  order: readonly Indicator[];
+  r: number;
+  rx: number;
+  ry: number;
+  hitR: number;
+  labelR: number;
+  fontSize: number;
+  /** Half a step of rotation so inner eyes sit between outer ones. */
+  offset: number;
+}
+
+const RINGS: readonly RingSpec[] = [
+  { order: RING_ORDER, r: R, rx: EYE_RX, ry: EYE_RY, hitR: HIT_R, labelR: LABEL_R, fontSize: 8.5, offset: 0 },
+  { order: SENSOR_RING_ORDER, r: R2, rx: 11, ry: 6.5, hitR: 14, labelR: R2 - 22, fontSize: 7, offset: 0.5 },
+];
 
 const angle = (i: number, n: number) => -Math.PI / 2 + (i / n) * Math.PI * 2;
+
+interface EyeSlot {
+  ind: Indicator;
+  ring: RingSpec;
+  /** Position across both rings (pulse animation phase). */
+  index: number;
+  x: number;
+  y: number;
+  deg: number;
+  a: number;
+}
+
+const EYES: readonly EyeSlot[] = RINGS.flatMap((ring, ringIdx) =>
+  ring.order.map((ind, i) => {
+    const a = angle(i + ring.offset, ring.order.length);
+    return {
+      ind,
+      ring,
+      index: i + (ringIdx ? RING_ORDER.length : 0),
+      x: C + ring.r * Math.cos(a),
+      y: C + ring.r * Math.sin(a),
+      deg: (a * 180) / Math.PI,
+      a,
+    };
+  })
+);
+const EYE_BY_KEY = new Map(EYES.map((e) => [e.ind.key, e]));
 
 export interface ThousandEyesProps {
   person: Person;
@@ -35,7 +82,7 @@ export interface ThousandEyesProps {
 
 export const ThousandEyes: React.FC<ThousandEyesProps> = ({ person, now, locationLabel, className }) => {
   const statuses = useMemo(
-    () => RING_ORDER.map((ind) => indicatorStatus(person, ind.key, now)),
+    () => new Map(EYES.map((e) => [e.ind.key, indicatorStatus(person, e.ind.key, now)])),
     [person, now]
   );
   const withData = useMemo(() => allStatuses(person, now), [person, now]);
@@ -43,12 +90,6 @@ export const ThousandEyes: React.FC<ThousandEyesProps> = ({ person, now, locatio
   const score = readiness(withData);
   const pdi = deviationIndex(withData);
 
-  const n = RING_ORDER.length;
-  const pos = (i: number) => {
-    const a = angle(i, n);
-    return { x: C + R * Math.cos(a), y: C + R * Math.sin(a), deg: (a * 180) / Math.PI, a };
-  };
-  const indexOf = useMemo(() => new Map(RING_ORDER.map((ind, i) => [ind.key, i])), []);
 
   const [openKey, setOpenKey] = useState<string | null>(null);
   const eyeRefs = useRef<Record<string, SVGGElement | null>>({});
@@ -61,8 +102,8 @@ export const ThousandEyes: React.FC<ThousandEyesProps> = ({ person, now, locatio
     });
   }, []);
 
-  const open: IndicatorStatus | undefined = openKey ? statuses.find((s) => s.key === openKey) : undefined;
-  const openPos = openKey != null ? pos(indexOf.get(openKey) ?? 0) : null;
+  const open: IndicatorStatus | undefined = openKey ? statuses.get(openKey) : undefined;
+  const openPos = openKey != null ? EYE_BY_KEY.get(openKey) ?? null : null;
 
   return (
     <div ref={wrapRef} className={`thousand-eyes relative mx-auto w-full max-w-[560px] ${className ?? ''}`}>
@@ -71,11 +112,9 @@ export const ThousandEyes: React.FC<ThousandEyesProps> = ({ person, now, locatio
         <circle cx={C} cy={C} r={R - 52} fill="none" stroke="#1e2b3c" />
 
         {links.map((l) => {
-          const ia = indexOf.get(l.a);
-          const ib = indexOf.get(l.b);
-          if (ia == null || ib == null) return null;
-          const a = pos(ia);
-          const b = pos(ib);
+          const a = EYE_BY_KEY.get(l.a);
+          const b = EYE_BY_KEY.get(l.b);
+          if (!a || !b) return null;
           return (
             <path
               key={`${l.a}-${l.b}-${l.lagDays}`}
@@ -91,14 +130,16 @@ export const ThousandEyes: React.FC<ThousandEyesProps> = ({ person, now, locatio
           );
         })}
 
-        {RING_ORDER.map((ind, i) => {
-          const p = pos(i);
-          const s = statuses[i];
+        {EYES.map((p) => {
+          const { ind, ring } = p;
+          const i = p.index;
+          const s = statuses.get(ind.key)!;
+          const research = ind.sensor?.readiness === 'research';
           const st = statusStyle(s.n ? s.status : undefined);
-          const pupil = s.n ? 3.2 + Math.min(s.badness, 3) * 1.1 : 2.4;
+          const pupil = (s.n ? 3.2 + Math.min(s.badness, 3) * 1.1 : 2.4) * (ring.rx / EYE_RX);
           const isOpen = openKey === ind.key;
-          const lx = C + LABEL_R * Math.cos(p.a);
-          const ly = C + LABEL_R * Math.sin(p.a);
+          const lx = C + ring.labelR * Math.cos(p.a);
+          const ly = C + ring.labelR * Math.sin(p.a);
           const flag = s.n && s.status ? (s.status === 2 ? '!' : '▲') : '';
           const toggle = () => setOpenKey((k) => (k === ind.key ? null : ind.key));
           return (
@@ -113,7 +154,7 @@ export const ThousandEyes: React.FC<ThousandEyesProps> = ({ person, now, locatio
                 tabIndex={0}
                 aria-haspopup="dialog"
                 aria-expanded={isOpen}
-                aria-label={`${ind.label} (${ind.system}): ${st.text}. Open details`}
+                aria-label={`${ind.label} (${ind.system}${ind.sensor ? ', sensor ring, trend only' : ''}): ${st.text}. Open details`}
                 onClick={(e) => {
                   e.stopPropagation();
                   toggle();
@@ -125,15 +166,16 @@ export const ThousandEyes: React.FC<ThousandEyesProps> = ({ person, now, locatio
                   }
                 }}
               >
-                <circle r={HIT_R} fill="transparent" />
+                <circle r={ring.hitR} fill="transparent" />
                 <g transform={`rotate(${p.deg})`}>
                   <ellipse
                     className="te-eye-shape"
-                    rx={EYE_RX}
-                    ry={EYE_RY}
+                    rx={ring.rx}
+                    ry={ring.ry}
                     fill="#0A0E14"
                     stroke={isOpen ? '#e6edf3' : st.color}
                     strokeWidth={isOpen ? 2.5 : 1.8}
+                    strokeDasharray={research && !isOpen ? '3 2' : undefined}
                   />
                   <circle className={`te-pupil te-pulse-${i % 4}`} r={pupil} fill={st.color} />
                 </g>
@@ -141,7 +183,7 @@ export const ThousandEyes: React.FC<ThousandEyesProps> = ({ person, now, locatio
               <text
                 x={lx}
                 y={ly + 3}
-                fontSize={8.5}
+                fontSize={ring.fontSize}
                 fill={SYSTEM_COLORS[ind.system]}
                 textAnchor="middle"
                 pointerEvents="none"
