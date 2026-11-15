@@ -5,7 +5,7 @@
  */
 
 import React, { useRef } from 'react';
-import { Activity, Bot, Brain, Camera, Eye, LineChart, Siren, Telescope, UserCog, Users } from 'lucide-react';
+import { Activity, Bot, Brain, Camera, Eye, LineChart, Telescope, UserCog, Users } from 'lucide-react';
 import { HudTabId } from '../types/argus';
 import { useMission } from '../context/MissionContext';
 
@@ -30,7 +30,6 @@ export const HUD_TAB_DEFS: HudTabDef[] = [
   { id: 'eyes', label: 'Eyes', icon: <Eye className="w-4 h-4" /> },
   { id: 'ai', label: 'ARGUS AI', icon: <Bot className="w-4 h-4" /> },
   { id: 'cognition', label: 'Cognition', icon: <Brain className="w-4 h-4" /> },
-  { id: 'emergency', label: 'Emergency', icon: <Siren className="w-4 h-4" /> },
   { id: 'crew', label: 'Crew', icon: <Users className="w-4 h-4" />, needs: 'roster' },
   { id: 'users', label: 'Users', icon: <UserCog className="w-4 h-4" />, needs: 'users' },
   { id: 'photobooth', label: 'Photobooth', icon: <Camera className="w-4 h-4" /> },
@@ -109,17 +108,6 @@ export const TabBar: React.FC<{ access: TabAccess; activeTab: HudTabId }> = ({ a
               </button>
             );
           })}
-        </div>
-        <div className="flex items-center px-2 py-1.5 md:px-2 md:pb-4">
-          <button
-            type="button"
-            onClick={() => setActiveTab('emergency')}
-            className="hud-focus flex items-center justify-center gap-2 rounded-lg border border-red-500/60 bg-red-600/20 px-3 py-2 font-display text-xs font-bold tracking-widest text-red-200 transition-colors hover:bg-red-600/40 md:w-full"
-            aria-label="SOS: open emergency protocols"
-          >
-            <Siren className="h-4 w-4" aria-hidden="true" />
-            SOS
-          </button>
         </div>
       </div>
     </nav>

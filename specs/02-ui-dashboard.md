@@ -1,6 +1,6 @@
 # Spec 02: ARGUS Mission Control Bio-Twin Dashboard UI
 
-> Sprint 7 replaced the fixed 3-column single screen with a tabbed HUD. HUD v2 (§6) adds per-astronaut sign-in, a left tab rail, mission location + clock, Forecast, Eyes, ARGUS AI and Emergency tabs, and removes the Check-in tab. Ideas are ported from the ARGOS prototype (`ARGOS_The_Thousand_Eyes.html`). Design guidance: `.agents/skills/frontend-design`, `design-system`, `ux-copy`, `accessibility-review`.
+> Sprint 7 replaced the fixed 3-column single screen with a tabbed HUD. HUD v2 (§6) adds per-astronaut sign-in, a left tab rail, mission location + clock, Forecast, Eyes and ARGUS AI tabs (the Emergency tab was removed later), and removes the Check-in tab. Ideas are ported from the ARGOS prototype (`ARGOS_The_Thousand_Eyes.html`). Design guidance: `.agents/skills/frontend-design`, `design-system`, `ux-copy`, `accessibility-review`.
 
 ## 1. Layout
 
@@ -15,7 +15,6 @@
 │ Forecast     │                                                        │
 │ Eyes         │                                                        │
 │ ARGUS AI     │                                                        │
-│ Emergency    │                                                        │
 │ Crew · Users │  (admin only)                                          │
 └──────────────┴────────────────────────────────────────────────────────┘
 ```
@@ -34,7 +33,7 @@
   - Shows the sol indicator, routine status, streak and the readiness milestone shelf (`REQ-08`, `REQ-09`).
   - With the database connected, "quick log" only marks the routine as done; it never writes generated readings.
   - Data itself arrives from the watch and dosimeter (spec 05 §4).
-- **Tab rail (`TabBar.tsx`):** vertical `role="tablist"` (`aria-orientation="vertical"`) on the left from `md` up; a horizontal scroll bar on phones. Each tab: icon + short label + optional badge (red count on Bio-Twin when any zone is red). Up/Down (Left/Right on phones), Home/End move focus and selection. Admin-only tabs are hidden for crew users. The active tab persists in `localStorage` (`argus_active_tab_v1`; unknown stored ids fall back to `biotwin`). Type: `HudTabId = 'biotwin' | 'trends' | 'forecast' | 'eyes' | 'ai' | 'emergency' | 'crew' | 'users'`.
+- **Tab rail (`TabBar.tsx`):** vertical `role="tablist"` (`aria-orientation="vertical"`) on the left from `md` up; a horizontal scroll bar on phones. Each tab: icon + short label + optional badge (red count on Bio-Twin when any zone is red). Up/Down (Left/Right on phones), Home/End move focus and selection. Admin-only tabs are hidden for crew users. The active tab persists in `localStorage` (`argus_active_tab_v1`; unknown stored ids fall back to `biotwin`). Type: `HudTabId = 'biotwin' | 'trends' | 'forecast' | 'eyes' | 'ai' | 'cognition' | 'crew' | 'users' | …`.
 
 ## 2. Tabs
 
@@ -97,12 +96,6 @@ A readable version of the prototype's "Thousand Eyes" ring plus the full data/co
 - **Data table:** zone, metric, value + unit, status, personal baseline (mean ± SD), drift σ, nominal range, caution range, +3 day forecast.
 - **Configuration:** signed-in user + role, crew profile (baselines, notes), mission location (gravity, comm delay), scenario, threshold environment, AI provider chain.
 
-### 2.4c Emergency (`EmergencyTab.tsx`)
-- Banner: comm delay for the current location ("Act first, report as you act").
-- Protocol cards (`EMERGENCY_PROTOCOLS`): fire/smoke, rapid depressurisation, toxic atmosphere, crew medical emergency, solar particle event, high CO₂. Each step is a checkbox; starting a protocol records start time and step completion times.
-- `Notify Earth` queues an `immediate_emergency_packet` Earth packet with the protocol log.
-- A red **SOS** shortcut at the bottom of the tab rail opens this tab from anywhere.
-- Footer: "Generic training aid based on public ISS practice — follow your mission's flight rules."
 
 ### 2.7 Photobooth (`PhotoboothTab.tsx`, `src/features/photobooth/`)
 A fun camera booth so the crew can send photos home. Camera frames are processed on the device only (MediaPipe Tasks, Apache-2.0, gesture recogniser only; the 8 MB gesture model is downloaded to `public/models/vision` and the WASM copied to `public/vision/wasm` by `scripts/copy-vision-assets.mjs` before `dev`/`build` (online fallback if the download is missing); loaded only when the tab opens).
