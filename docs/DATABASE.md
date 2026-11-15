@@ -69,6 +69,8 @@ Never change the Azure schema by hand. Migrations are the only path.
 | `npm run db:sql -- "select count(*) from observations"` | Ad-hoc query |
 | `npm run db:studio` | Drizzle Studio (browse tables) for a `postgres://` URL |
 | `rm -rf .data/argus` | Reset the embedded local DB |
+| `npm run rag:ingest` | Build or refresh the AI knowledge base ([guide](AI_KNOWLEDGE_BASE.md)) |
+| `npm run rag:search -- "question"` | Try the AI knowledge-base search |
 
 ## The team server
 - **Server:** `argus-pg-a405de.postgres.database.azure.com`

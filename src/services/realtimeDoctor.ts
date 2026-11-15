@@ -22,6 +22,7 @@ import type {
   CrewContextRequest,
   EarthConsultUrgency,
   LiveTokenResponse,
+  RagHit,
   VoiceNodeLabel,
   VoicePipelineStage,
   VoiceSttResponse,
@@ -65,6 +66,7 @@ export interface VoiceConversationTurn {
   earthConsultUrgency: EarthConsultUrgency;
   toolCallsExecuted: VoiceToolCallResponse[];
   pipelineStagesCompleted: Array<'stt' | 'llm' | 'tts'>;
+  ragHits?: RagHit[];
 }
 
 export interface RealtimeDoctorState {
@@ -83,6 +85,7 @@ export interface RealtimeDoctorState {
   lastReplyText: string;
   turns: VoiceConversationTurn[];
   activeToolCalls: VoiceToolCallResponse[];
+  citedProtocols: RagHit[];
   error: string | null;
   disclaimer: string;
 }
@@ -108,7 +111,7 @@ export interface RealtimeDoctorApiAdapter {
     req: CrewContextRequest & {
       toolName: VoiceToolName;
       callId?: string;
-      args?: { zoneId?: BodyZoneId; metricId?: MetricId | string; value?: number; note?: string };
+      args?: { zoneId?: BodyZoneId; metricId?: MetricId | string; value?: number; note?: string; query?: string };
     },
     key?: string
   ) => Promise<{ result: VoiceToolCallResponse }>;
@@ -348,6 +351,27 @@ export function buildClientOfflineVoiceTurn(
     ? `Please stop and reach out right now: contact your Crew Medical Officer or a crewmate in person, and send an immediate priority packet to the Flight Surgeon and behavioral-health team on Earth. You do not have to carry this alone. ${coreReply}`
     : coreReply;
 
+  const offlineCitation: RagHit = {
+    chunkId: null,
+    documentId: `offline/${activeGuidance.zoneId}`,
+    sourceId: activeGuidance.zoneId === 'neuro' ? 'SRC-010' : 'SRC-004',
+    title: activeGuidance.headline,
+    kind: 'clinical_reference',
+    origin: 'NASA-STD-3001 / NASA HRP Onboard Cache',
+    zoneIds: [activeGuidance.zoneId],
+    heading: activeGuidance.headline,
+    content: [
+      activeGuidance.plainLanguageExplanation,
+      ...activeGuidance.guidedSteps.map(
+        (s) => `${s.stepNumber}. ${s.title} (${s.estimatedMinutes} min) — ${s.plainInstruction} [Hardware: ${s.hardwareRequired}]`
+      ),
+    ].join('\n'),
+    rank: 1,
+    score: 0.032,
+    keywordRank: 1,
+    vectorRank: 1,
+  };
+
   return {
     transcript,
     replyText,
@@ -368,6 +392,7 @@ export function buildClientOfflineVoiceTurn(
     },
     earthConsultUrgency: urgency,
     toolCallsExecuted: [],
+    ragHits: [offlineCitation],
     disclaimer: VOICE_HUD_DISCLAIMER,
   };
 }
@@ -447,13 +472,19 @@ export class RealtimeDoctorSession {
       lastReplyText: '',
       turns: [],
       activeToolCalls: [],
+      citedProtocols: [],
       error: null,
       disclaimer: VOICE_HUD_DISCLAIMER,
     };
   }
 
   public getState(): RealtimeDoctorState {
-    return { ...this.state, turns: [...this.state.turns], activeToolCalls: [...this.state.activeToolCalls] };
+    return {
+      ...this.state,
+      turns: [...this.state.turns],
+      activeToolCalls: [...this.state.activeToolCalls],
+      citedProtocols: [...this.state.citedProtocols],
+    };
   }
 
   private updateState(patch: Partial<RealtimeDoctorState>) {
@@ -814,7 +845,7 @@ export class RealtimeDoctorSession {
       }
     }
 
-    // 4. Asynchronous non-blocking tool calls (`get_crew_snapshot`, `log_checkin_reading`)
+    // 4. Asynchronous non-blocking tool calls (`get_crew_snapshot`, `log_checkin_reading`, `lookup_medical_protocol`)
     if (msg.toolCall?.functionCalls?.length) {
       this.updateState({ stage: 'tool_calling' });
       const functionResponses: Array<{ id: string; name: string; response: { result: unknown } }> = [];
@@ -827,6 +858,7 @@ export class RealtimeDoctorSession {
           metricId?: MetricId | string;
           value?: number;
           note?: string;
+          query?: string;
         };
 
         let toolResult: VoiceToolCallResponse;
@@ -866,6 +898,7 @@ export class RealtimeDoctorSession {
 
         this.updateState({
           activeToolCalls: [toolResult, ...this.state.activeToolCalls].slice(0, 8),
+          citedProtocols: toolResult.ragHits?.length ? toolResult.ragHits : this.state.citedProtocols,
         });
 
         functionResponses.push({
@@ -920,6 +953,7 @@ export class RealtimeDoctorSession {
         },
         this.runtimeApiKey
       );
+      const effectiveRagHits = result.ragHits?.length ? result.ragHits : this.state.citedProtocols;
       const turn: VoiceConversationTurn = {
         id: `vturn-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         timestampIso: new Date().toISOString(),
@@ -932,10 +966,12 @@ export class RealtimeDoctorSession {
         earthConsultUrgency: result.earthConsultUrgency,
         toolCallsExecuted: result.toolCallsExecuted,
         pipelineStagesCompleted: result.pipelineStagesCompleted,
+        ragHits: effectiveRagHits,
       };
       this.updateState({
         lastTranscript: turn.transcript,
         lastReplyText: turn.replyText,
+        citedProtocols: effectiveRagHits,
         turns: [turn, ...this.state.turns].slice(0, 20),
       });
     } catch {
@@ -951,6 +987,7 @@ export class RealtimeDoctorSession {
         earthConsultUrgency: 'routine_downlink',
         toolCallsExecuted: [],
         pipelineStagesCompleted: ['stt', 'llm', 'tts'],
+        ragHits: this.state.citedProtocols,
       };
       this.updateState({
         lastTranscript: transcript,
@@ -1072,10 +1109,12 @@ export class RealtimeDoctorSession {
     }
 
     // ── Stage 3: Speaking [TTS] ──────────────────────────────────────────────
+    const effectiveRagHits = turnResult.ragHits?.length ? turnResult.ragHits : this.state.citedProtocols;
     this.updateState({
       stage: 'speaking_tts',
       isSpeaking: true,
       lastReplyText: turnResult.replyText,
+      citedProtocols: effectiveRagHits,
     });
 
     try {
@@ -1105,6 +1144,7 @@ export class RealtimeDoctorSession {
       earthConsultUrgency: turnResult.earthConsultUrgency,
       toolCallsExecuted: turnResult.toolCallsExecuted ?? [],
       pipelineStagesCompleted: ['stt', 'llm', 'tts'],
+      ragHits: effectiveRagHits,
     };
 
     this.updateState({
@@ -1112,6 +1152,7 @@ export class RealtimeDoctorSession {
       interactionStatus: 'IDLE',
       isSpeaking: false,
       audioLevel: 0,
+      citedProtocols: effectiveRagHits,
       turns: [completedTurn, ...this.state.turns].slice(0, 20),
     });
 

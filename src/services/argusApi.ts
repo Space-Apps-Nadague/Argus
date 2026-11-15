@@ -26,6 +26,8 @@ import type {
   VoiceToolCallResponse,
   VoiceTurnRequest,
   VoiceTurnResponse,
+  RagSearchRequest,
+  RagSearchResponse,
 } from '../types/aiApi';
 import type { FlightSurgeonGuidance, VisualExamAnalysis } from '../types/argus';
 
@@ -104,6 +106,8 @@ export const argusApi = {
     postJson<VoiceToolCallResponse>('/api/ai/voice-tool', req, key, signal),
   voiceTurn: (req: VoiceTurnRequest, key?: string, signal?: AbortSignal) =>
     postJson<VoiceTurnResponse>('/api/ai/voice-turn', req, key, signal),
+  ragSearch: (req: RagSearchRequest, key?: string, signal?: AbortSignal) =>
+    postJson<RagSearchResponse>('/api/ai/rag/search', req, key, signal),
 };
 
 /**

@@ -16,6 +16,9 @@ import { COMPANION_PERSONA } from '../prompts';
 import { ChatRequestSchema } from '../schemas';
 import { getOrStartConversation, latestTriageEventId, logMessage } from '../db/chatLog';
 import type { AppEnv } from '../auth/types';
+import { logCitations } from '../rag/citations';
+import { searchKnowledge } from '../rag/retriever';
+import { formatKnowledgeForPrompt } from '../rag/tool';
 import { keyFromHeader, parseBody } from './util';
 
 export const chatRoutes = new Hono<AppEnv>();
@@ -80,10 +83,19 @@ chatRoutes.post('/chat', async (c) => {
   const crisis = detectCrisisLanguage(lastUser);
   const wellbeing = req.checkIns?.length ? computeWellbeing(req.checkIns, snapshot.zones) : null;
   const urgency: EarthConsultUrgency = crisis.crisis ? 'immediate_emergency_packet' : 'routine_downlink';
+  const db = c.get('db');
+  const matchedZone = ZONE_KEYWORDS.find(([, re]) => re.test(lastUser))?.[0];
+  const { hits: ragHits } = await searchKnowledge({
+    query: lastUser,
+    zoneId: matchedZone,
+    limit: 3,
+    db,
+  });
 
   const system = [
     COMPANION_PERSONA,
     `DATA\n${formatSnapshotForPrompt(snapshot)}`,
+    formatKnowledgeForPrompt(ragHits),
     wellbeing
       ? `Behavioral-health self-report model: risk ${wellbeing.riskScore}/100 (${wellbeing.status.toUpperCase()}), trend ${wellbeing.trend}.`
       : '',
@@ -100,7 +112,6 @@ chatRoutes.post('/chat', async (c) => {
   ];
 
   // AI chat link (spec 05 §3.5): store the question now, the reply when the stream ends.
-  const db = c.get('db');
   const user = c.get('user');
   const astronautId = req.crewMember?.id;
   let conversationId: string | null = null;
@@ -120,6 +131,7 @@ chatRoutes.post('/chat', async (c) => {
     zoneStatuses: snapshot.zoneStatuses,
     flaggedMetrics: snapshot.flaggedTrends.map((t) => ({ metricId: t.metricId, value: t.currentValue, status: t.status, z: t.zScore, level: t.level })),
     wellbeing: wellbeing ? { riskScore: wellbeing.riskScore, status: wellbeing.status, trend: wellbeing.trend } : null,
+    citations: ragHits.map((h) => ({ documentId: h.documentId, sourceId: h.sourceId, rank: h.rank })),
   };
 
   return streamSSE(c, async (stream) => {
@@ -135,7 +147,7 @@ chatRoutes.post('/chat', async (c) => {
     const sendMeta = async (meta: Extract<ChatStreamEvent, { type: 'meta' }>['meta']) => {
       if (metaSent) return;
       metaSent = true;
-      await send({ type: 'meta', meta, crisis: crisis.crisis, earthConsultUrgency: urgency });
+      await send({ type: 'meta', meta, crisis: crisis.crisis, earthConsultUrgency: urgency, ragHits });
       if (crisis.crisis) {
         await send({ type: 'delta', text: `${CRISIS_ESCALATION_MESSAGE}\n\n` });
       }
@@ -162,7 +174,7 @@ chatRoutes.post('/chat', async (c) => {
     }
     if (db && conversationId && astronautId && replyText) {
       try {
-        await logMessage(db, {
+        const assistantMessageId = await logMessage(db, {
           conversationId,
           role: 'assistant',
           content: replyText,
@@ -173,6 +185,15 @@ chatRoutes.post('/chat', async (c) => {
           triageEventId: await latestTriageEventId(db, astronautId),
           crisisFlag: crisis.crisis,
         });
+        if (ragHits.length > 0) {
+          await logCitations(db, {
+            mode: 'chat',
+            query: lastUser,
+            hits: ragHits,
+            astronautId,
+            messageId: assistantMessageId,
+          });
+        }
       } catch (err) {
         console.error('[ARGUS chat] could not store reply', err);
       }

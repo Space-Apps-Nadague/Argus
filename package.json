@@ -27,7 +27,9 @@
     "db:sql": "tsx scripts/db-sql.ts",
     "simulate": "tsx scripts/simulate-wearables.ts",
     "data:nasa": "tsx scripts/ingest/nasa.ts",
-    "data:export": "tsx scripts/export-data.ts"
+    "data:export": "tsx scripts/export-data.ts",
+    "rag:ingest": "tsx scripts/rag-ingest.ts",
+    "rag:search": "tsx scripts/rag-search.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.16",

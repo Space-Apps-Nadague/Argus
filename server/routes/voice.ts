@@ -28,6 +28,7 @@ import type {
   EarthConsultUrgency,
   LiveTokenRequest,
   LiveTokenResponse,
+  RagHit,
   VoiceNodeLabel,
   VoiceSttResponse,
   VoiceToolCallRequest,
@@ -55,6 +56,9 @@ import { getOrStartConversation, latestTriageEventId, logMessage } from '../db/c
 import { type CrewSnapshot, buildCrewSnapshot, formatSnapshotForPrompt } from '../models/crewSnapshot';
 import { CRISIS_ESCALATION_MESSAGE, detectCrisisLanguage } from '../models/wellbeingModel';
 import { ARGUS_PERSONA, jsonInstruction } from '../prompts';
+import { logCitations } from '../rag/citations';
+import { searchKnowledge } from '../rag/retriever';
+import { formatKnowledgeForPrompt, LOOKUP_MEDICAL_PROTOCOL_TOOL, lookupMedicalProtocol } from '../rag/tool';
 import {
   LiveTokenRequestSchema,
   UrgencySchema,
@@ -117,6 +121,7 @@ export const VOICE_TOOL_DECLARATIONS: VoiceToolDeclaration[] = [
       required: ['metricId', 'value'],
     },
   },
+  LOOKUP_MEDICAL_PROTOCOL_TOOL as VoiceToolDeclaration,
 ];
 
 const URGENCY_RANK: Record<EarthConsultUrgency, number> = {
@@ -191,11 +196,19 @@ export function resolveGeminiApiKey(
   return undefined;
 }
 
-export function buildVoiceSystemInstruction(snapshot: CrewSnapshot, mode: VoiceTransportMode): string {
+export function buildVoiceSystemInstruction(
+  snapshot: CrewSnapshot,
+  mode: VoiceTransportMode,
+  ragReferenceBlock?: string
+): string {
   const modeNote =
     mode === 'on-ship-pipeline'
       ? 'Operating in On-Ship Local Autonomous Mode (STT → Local LLM → TTS) during deep-space communications blackout.'
       : 'Operating in Real-Time Bidirectional Flight Surgeon Live Mode.';
+  const ragRule =
+    mode === 'live-api'
+      ? '- Before giving any procedure, checklist step, medication dose, or treatment, call `lookup_medical_protocol` and speak a concise 2 to 3 step plain-language summary while the HUD displays the full cited protocol card ([SRC-xxx]).'
+      : '- Ground procedural steps, countermeasures, and dosages in the verified REFERENCE chunks below (citing their [SRC-xxx] ID) and speak a concise 2 to 3 step plain-language summary while the HUD displays the full cited protocol card.';
   return [
     ARGUS_PERSONA,
     modeNote,
@@ -203,9 +216,13 @@ export function buildVoiceSystemInstruction(snapshot: CrewSnapshot, mode: VoiceT
     '- Respond in 2 to 4 concise spoken sentences suitable for immediate audio playback to an astronaut.',
     '- Do not use markdown tables, bullet lists, or code blocks.',
     '- Ground every number in the astronaut DATA below and never invent vital readings.',
+    ragRule,
     `- Clinical framing: ${VOICE_CLINICAL_DISCLAIMER}`,
     `DATA\n${formatSnapshotForPrompt(snapshot, { allMetrics: true })}`,
-  ].join('\n\n');
+    ragReferenceBlock ?? '',
+  ]
+    .filter(Boolean)
+    .join('\n\n');
 }
 
 /**
@@ -397,13 +414,28 @@ export function parseSpokenVitalLogCommand(
   return null;
 }
 
+const VOICE_ZONE_KEYWORDS: Array<[BodyZoneId, RegExp]> = [
+  ['neuro', /\b(eye|eyes|vision|blurry|head|headache|onsd|iop|pressure|brain|co2|carbon|sans|sumatriptan|acetaminophen)\b/i],
+  ['cardio', /\b(heart|pulse|hr|hrv|chest|oxygen|spo2|breath|breathing|cardiac|cpr|aed|epinephrine)\b/i],
+  ['musculo', /\b(bone|bones|muscle|muscles|back|ared|exercise|workout|strength|ibuprofen|strain)\b/i],
+  ['immune', /\b(radiation|dose|solar|storm|spe|alara|immune|infection|sick|fever|blood|rash|diphenhydramine)\b/i],
+  ['behavioral', /\b(sleep|tired|fatigue|stress|stressed|mood|sad|lonely|anxious|anxiety|focus|reaction|melatonin|zolpidem)\b/i],
+];
+
+export function inferVoiceZone(transcript: string, snapshot: CrewSnapshot): BodyZoneId | undefined {
+  const matched = VOICE_ZONE_KEYWORDS.find(([, re]) => re.test(transcript))?.[0];
+  if (matched) return matched;
+  return snapshot.flaggedTrends[0]?.zoneId;
+}
+
 /**
- * Deterministic spoken response fallback grounded in the astronaut's snapshot, symptom rules, and tool results.
+ * Deterministic spoken response fallback grounded in the astronaut's snapshot, symptom rules, RAG chunks, and tool results.
  */
 export function buildOfflineVoiceReply(
   snapshot: CrewSnapshot,
   transcript: string,
-  toolCalls: VoiceToolCallResponse[] = []
+  toolCalls: VoiceToolCallResponse[] = [],
+  ragHits: RagHit[] = []
 ): {
   replyText: string;
   triageStatus: TriageStatus;
@@ -412,6 +444,7 @@ export function buildOfflineVoiceReply(
   const callsign = snapshot.crewMember?.callsign ?? 'Crew';
   const baseStatus = worstZoneStatus(snapshot.zoneStatuses);
   const baseUrgency = urgencyFloorForStatus(baseStatus);
+  const topHit = ragHits[0];
 
   if (toolCalls.length > 0 && toolCalls[0].ok) {
     const tool = toolCalls[0];
@@ -442,10 +475,28 @@ export function buildOfflineVoiceReply(
     const firstStep = symptomMatch.guidedSteps[0];
     const combinedStatus = maxTriageStatus(baseStatus, symptomMatch.triageStatus);
     const combinedUrgency = maxUrgency(baseUrgency, symptomMatch.earthConsultUrgency);
+    const citeNote = topHit ? ` Cited protocol: ${topHit.title} [${topHit.sourceId ?? 'in-repo'}].` : '';
     return {
       replyText: `${callsign}, ${symptomMatch.plainLanguageExplanation}${
         firstStep ? ` First step: ${firstStep.title} — ${firstStep.plainInstruction}` : ''
-      } ${VOICE_CLINICAL_DISCLAIMER}`,
+      }${citeNote} ${VOICE_CLINICAL_DISCLAIMER}`,
+      triageStatus: combinedStatus,
+      earthConsultUrgency: combinedUrgency,
+    };
+  }
+
+  if (topHit) {
+    const conciseSteps = topHit.content
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0 && !l.startsWith('When:') && !l.startsWith('Steps:'))
+      .slice(0, 2)
+      .join(' ');
+    const isEmergency = topHit.kind === 'emergency_checklist';
+    const combinedStatus = isEmergency ? maxTriageStatus(baseStatus, 'red') : baseStatus;
+    const combinedUrgency = isEmergency ? maxUrgency(baseUrgency, 'immediate_emergency_packet') : baseUrgency;
+    return {
+      replyText: `${callsign}, per ${topHit.title} (${topHit.heading}) [${topHit.sourceId ?? 'in-repo'}]: ${conciseSteps} Full checklist is displayed on your HUD. ${VOICE_CLINICAL_DISCLAIMER}`,
       triageStatus: combinedStatus,
       earthConsultUrgency: combinedUrgency,
     };
@@ -801,6 +852,38 @@ voiceRoutes.post('/voice-tool', async (c) => {
   if (!body.ok) return body.response;
   const req = body.data;
 
+  if (req.toolName === 'lookup_medical_protocol') {
+    const snapshot = buildCrewSnapshot(req);
+    const worst = worstZoneStatus(snapshot.zoneStatuses);
+    const urgency = urgencyFloorForStatus(worst);
+    const callId = req.callId || `call-${Date.now()}`;
+    const query = (req.args?.query ?? '').trim();
+    const lookup = await lookupMedicalProtocol(
+      { query, zoneId: req.args?.zoneId },
+      { db: c.get('db'), astronautId: req.crewMember?.id ?? null, mode: 'live-api' }
+    );
+    const summary = lookup.found
+      ? `Retrieved ${lookup.chunks.length} verified protocol chunk${lookup.chunks.length === 1 ? '' : 's'}: ${lookup.chunks
+          .map((ch) => `${ch.title} — ${ch.heading} [${ch.sourceId}]`)
+          .join('; ')}.`
+      : lookup.note ?? `No verified protocol matched "${query}".`;
+    const result: VoiceToolCallResponse = {
+      callId,
+      toolName: 'lookup_medical_protocol',
+      ok: lookup.found,
+      summary,
+      readinessScore: snapshot.readinessScore,
+      zoneStatuses: snapshot.zoneStatuses,
+      earthConsultUrgency: urgency,
+      ragHits: lookup.hits,
+    };
+    const envelope: AiEnvelope<VoiceToolCallResponse> = {
+      result,
+      meta: OFFLINE_META,
+    };
+    return c.json(envelope);
+  }
+
   const result = executeVoiceToolCall(req);
   const envelope: AiEnvelope<VoiceToolCallResponse> = {
     result,
@@ -822,6 +905,7 @@ voiceRoutes.post('/voice-turn', async (c) => {
 
   const snapshot = buildCrewSnapshot(req);
   const crisis = detectCrisisLanguage(transcript);
+  const db = c.get('db');
 
   // Execute deterministic inline vital logging if spoken by the astronaut
   const toolCallsExecuted: VoiceToolCallResponse[] = [];
@@ -837,12 +921,22 @@ voiceRoutes.post('/voice-turn', async (c) => {
     );
   }
 
+  // Hybrid RAG retrieval (specs/04-ai-backend.md §4.2): retrieve verified clinical chunks for the spoken query
+  const ragResult = await searchKnowledge({
+    query: transcript,
+    zoneId: inferVoiceZone(transcript, snapshot),
+    limit: 3,
+    db,
+  });
+  const ragHits = ragResult.hits;
+  const ragReferenceBlock = formatKnowledgeForPrompt(ragHits);
+
   const effectiveZoneStatuses =
     toolCallsExecuted[0]?.ok ? toolCallsExecuted[0].zoneStatuses : snapshot.zoneStatuses;
   const effectiveReadinessScore =
     toolCallsExecuted[0]?.ok ? toolCallsExecuted[0].readinessScore : snapshot.readinessScore;
 
-  const offlineFallback = buildOfflineVoiceReply(snapshot, transcript, toolCallsExecuted);
+  const offlineFallback = buildOfflineVoiceReply(snapshot, transcript, toolCallsExecuted, ragHits);
   const deterministicStatus: TriageStatus = crisis.crisis
     ? 'red'
     : maxTriageStatus(worstZoneStatus(effectiveZoneStatuses), offlineFallback.triageStatus);
@@ -877,7 +971,7 @@ voiceRoutes.post('/voice-turn', async (c) => {
           }${jsonInstruction('{\n  "replyText": "2-4 spoken sentences",\n  "earthConsultUrgency": "routine_downlink | priority_packet | immediate_emergency_packet"\n}')}`;
 
     const messages: ChatMessage[] = [
-      { role: 'system', content: buildVoiceSystemInstruction(snapshot, mode) },
+      { role: 'system', content: buildVoiceSystemInstruction(snapshot, mode, ragReferenceBlock) },
       ...(req.history ?? []).slice(-6).map((m) => ({ role: m.role, content: m.content }) as ChatMessage),
       { role: 'user', content: userContent },
     ];
@@ -929,8 +1023,7 @@ voiceRoutes.post('/voice-turn', async (c) => {
     audioMimeType = 'audio/wav';
   }
 
-  // Audit & Persistence (specs/05-data-platform.md §3.5): log voice turns to Postgres when DATABASE_URL is active
-  const db = c.get('db');
+  // Audit & Persistence (specs/05-data-platform.md §3.5 & §3.6): log voice turns and RAG citations to Postgres when DATABASE_URL is active
   const user = c.get('user');
   const astronautId = req.crewMember?.id;
   if (db && astronautId && transcript) {
@@ -943,7 +1036,7 @@ voiceRoutes.post('/voice-turn', async (c) => {
         content: transcript,
         crisisFlag: crisis.crisis,
       });
-      await logMessage(db, {
+      const assistantMessageId = await logMessage(db, {
         conversationId,
         role: 'assistant',
         content: replyText,
@@ -962,10 +1055,24 @@ voiceRoutes.post('/voice-turn', async (c) => {
             ok: t.ok,
             loggedReading: t.loggedReading ?? null,
           })),
+          citations: ragHits.map((h) => ({
+            documentId: h.documentId,
+            sourceId: h.sourceId,
+            rank: h.rank,
+          })),
         },
         triageEventId: await latestTriageEventId(db, astronautId),
         crisisFlag: crisis.crisis,
       });
+      if (ragHits.length > 0) {
+        await logCitations(db, {
+          mode: mode === 'live-api' ? 'live-api' : 'on-ship-pipeline',
+          query: transcript,
+          hits: ragHits,
+          astronautId,
+          messageId: assistantMessageId,
+        });
+      }
     } catch (err) {
       console.error('[ARGUS Voice] could not store voice turn in database', err);
     }
@@ -987,6 +1094,7 @@ voiceRoutes.post('/voice-turn', async (c) => {
       zoneStatuses: effectiveZoneStatuses,
       earthConsultUrgency: deterministicUrgencyFloor,
       toolCallsExecuted,
+      ragHits,
       disclaimer: VOICE_CLINICAL_DISCLAIMER,
     },
     meta: llmMeta,

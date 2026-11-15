@@ -24,7 +24,7 @@ ARGUS stores crew health data in a shared **PostgreSQL** database instead of eac
 
   Azure's `Server=…;Database=…;User Id=…;Password=…` format is converted to a TLS URL. Values are server-only: never prefix them with `VITE_`.
 - **Production (argus-space.health):** web app `argus-space` uses the private database `argus-space-server` (reachable only through the app's private network). With `ARGUS_BOOTSTRAP_ON_START=1` the app seeds an empty database on first start, then generates 30 days of simulated history and loads the NASA reference CSVs. Every `ARGUS_SIMULATE_TOPUP_MIN` minutes (default 15) it extends the simulated history to the present (`server/jobs/bootstrap.ts`).
-- Extensions: `citext` (case-insensitive usernames) and `pgcrypto` (`gen_random_uuid`). `vector` is enabled but unused until RAG is added [SRC-062].
+- Extensions: `citext` (case-insensitive usernames) and `pgcrypto` (`gen_random_uuid`). `vector` is allowlisted on Azure [SRC-062] but **not required**: the AI knowledge base (§3.6) stores embeddings as `real[]` so the same migrations run on Azure, Docker and embedded PGlite (PGlite 0.5 ships no pgvector build).
 - Schema changes go **only** through Drizzle migrations (`server/db/migrations/`, `npm run db:migrate`). Nobody edits the Azure schema by hand.
 - Team access: one firewall rule per teammate IP, plus DB roles `argus_app` (the server) and `argus_analyst` (read-only, for notebooks). See `docs/DATABASE.md`.
 
@@ -72,12 +72,34 @@ Deleting an astronaut sets `archived_at` (a soft delete), which hides them and k
 | Reference | `ref_thresholds`, `ref_radiation_dose_rates`, `ref_osdr_studies`, `ref_osdr_lab_values` | Curated NASA reference data (§7). Every row has `source_id` and `ingest_run_id`. `ref_osdr_lab_values` is long-format (study, pseudonymous subject, timepoint, analyte, value, unit, reference range). |
 
 ### 3.5 AI chat link
-Stores what was said to the AI, which astronaut it was about, and the data the AI saw. That is all: no RAG, embeddings or chat analytics yet.
+Stores what was said to the AI, which astronaut it was about, and the data the AI saw. No chat analytics. Retrieved knowledge used in a reply is logged in `rag_citations` (§3.6).
 
 | Table | Columns |
 |---|---|
 | `conversations` | `id` uuid, `astronaut_id`, `started_by` (user), `started_at` |
 | `messages` | `id` uuid, `conversation_id`, `ts`, `role` (`user` \| `assistant`), `author_user_id` (null for assistant), `content`, `provider`, `model`, `source` (`ai` \| `offline_verified_cache`), `context_snapshot` jsonb (the zone statuses, flagged metrics and wellbeing summary sent with the prompt), `triage_event_id` (nullable: latest triage event at that time), `crisis_flag` bool |
+
+### 3.6 AI knowledge base (RAG)
+Verified reference text the AI looks up before giving clinical or procedural answers (issue #40). The AI never answers a protocol question from model weights alone: it cites a chunk, and every chunk traces to a `SRC-xxx` source.
+
+| Table | Columns | Notes |
+|---|---|---|
+| `rag_documents` | `id` text (stable slug, e.g. `emergency/fire`), `source_id` → `data_sources`, `title`, `kind` (`emergency_checklist` \| `countermeasure` \| `clinical_reference` \| `medication`), `origin` (repo file or corpus file it was built from), `url`, `zone_ids` text[] (body zones it applies to, empty = all), `content_hash`, `ingest_run_id`, `updated_at` | One row per source document. Re-ingest skips documents whose `content_hash` and embedding model are unchanged. |
+| `rag_chunks` | `id` uuid, `document_id` (cascade), `ordinal`, `heading`, `content`, `token_count`, `embedding` real[], `embedding_model`, `search_tsv` tsvector (generated from heading + content, GIN index) | One **clinical unit** per chunk: a whole checklist, a whole dosage with its contraindications, or a whole countermeasure. Chunks are split only at headings or between paragraphs, never inside a list or table. |
+| `rag_citations` | `id` bigserial, `ts`, `astronaut_id` (nullable), `message_id` → `messages` (nullable), `mode` (`search` \| `chat` \| `live-api` \| `on-ship-pipeline`), `query`, `chunk_id`, `document_id`, `source_id`, `rank`, `score` | Which chunks were shown to the AI for which turn. |
+
+**Corpus.** `npm run rag:ingest` (also run by the hosted bootstrap on every start; unchanged documents are skipped) builds documents from:
+1. in-repo content: `src/data/emergencyProtocols.ts` [SRC-004] and `server/models/countermeasureLibrary.ts` (no `SRC-xxx` yet, so its documents have `source_id = null` and cite their `origin` file until a primary source is registered);
+2. Markdown files in `server/rag/corpus/*.md` with front matter `id`, `title`, `source_id`, `kind`, optional `zones` ([SRC-004], [SRC-007], [SRC-008], [SRC-010]). A file without a `source_id` that exists in `SOURCES.md` is rejected (AGENTS.md §7).
+
+**Embeddings** (`AI_EMBEDDINGS`): `hash` (default, offline, deterministic 384-dim feature hashing of word unigrams + bigrams [SRC-083]), `local` (Ollama `/v1/embeddings` [SRC-085], default `nomic-embed-text`), `gemini` (OpenAI-compatible endpoint [SRC-086], default `gemini-embedding-001`) or `custom` (`AI_BASE_URL`). Only chunks embedded with the active model take part in vector scoring; changing the model means re-running `npm run rag:ingest`.
+
+**Retrieval** (`server/rag/retriever.ts`), target < 50 ms for a few thousand chunks:
+1. keyword: Postgres full-text search, `ts_rank_cd` over an OR query of the question's terms [SRC-084];
+2. vector: cosine similarity between the query embedding and cached chunk embeddings (in process);
+3. fusion: Reciprocal Rank Fusion with k = 60 [SRC-088]; optional `zoneId` boosts chunks for that zone.
+
+Without a database, the same corpus is indexed in memory (BM25 with k1 = 1.2, b = 0.75 [SRC-087] + hash embeddings), so offline and stateless modes still retrieve.
 
 ## 4. Passive Data: Assumed Kit (watch + dosimeter)
 No public dataset has per-astronaut, minute-level vitals. NASA LSDA and LSAH data are request-only or restricted [SRC-005, SRC-006]. **ARGUS assumes each astronaut wears exactly two devices: a smartwatch and a personal dosimeter.** Everything else arrives without typing. Data is simulated at realistic cadences until real devices are connected.
@@ -230,3 +252,4 @@ All routes are under `/api`. Every route except `health`, `auth/login` and `inge
 | `GET /astronauts/:id/export` | self, flight surgeon | JSON export |
 | `POST /ingest/readings` | a device (`Authorization: Bearer <device token>`) | Batched readings (§4) |
 | `POST /ai/*` | signed-in user who may read the astronaut | Existing AI endpoints (spec 04). `crewId` is checked against the session. |
+| `POST /ai/rag/search`, `GET /ai/rag/status` | any signed-in user | Knowledge-base retrieval (§3.6, spec 04 §4.2). Reference text only, no crew data. |

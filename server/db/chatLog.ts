@@ -41,8 +41,9 @@ export async function latestTriageEventId(db: Db, astronautId: string): Promise<
   return row?.id ?? null;
 }
 
-export async function logMessage(db: Db, values: typeof messages.$inferInsert): Promise<void> {
-  await db.insert(messages).values(values);
+export async function logMessage(db: Db, values: typeof messages.$inferInsert): Promise<string> {
+  const [row] = await db.insert(messages).values(values).returning({ id: messages.id });
+  return row.id;
 }
 
 export async function conversationMessages(db: Db, conversationId: string, limit = 200): Promise<CrewChatMessage[]> {
