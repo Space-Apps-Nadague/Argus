@@ -55,3 +55,13 @@ describe('vitalLimits', () => {
     expect(threats[0]).toMatchObject({ metricId: 'core_temp', value: 42, direction: 'high', limit: 40, key: 'crew-1|core_temp|42' });
   });
 });
+
+describe('fever alert', () => {
+  it('raises a yellow alert from 38.5 °C, red from 40 °C, nothing below', () => {
+    const at = (v: number) => findLifeThreats(zonesWith([reading('core_temp', [37, v])]), 'c');
+    expect(at(38.4)).toEqual([]);
+    expect(at(38.5)[0]).toMatchObject({ severity: 'yellow', limit: 38.5, value: 38.5 });
+    expect(at(39.6)[0].severity).toBe('yellow');
+    expect(at(40)[0]).toMatchObject({ severity: 'red', limit: 40 });
+  });
+});

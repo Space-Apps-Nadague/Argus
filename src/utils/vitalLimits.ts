@@ -39,6 +39,13 @@ export const LIFE_THREAT_LIMITS: Partial<Record<MetricId, LifeThreatLimit>> = {
   rad_dose: { high: 700, action: 'Go to the storm shelter now and report the dosimeter reading to the flight surgeon.' },
 };
 
+/**
+ * Fever: not immediately life-threatening, but it needs action now, so it raises a yellow
+ * alert (same alert card, amber). 40 °C and above is the red life-threat alert (heat stroke).
+ */
+export const FEVER_LIMIT_C = 38.5;
+export const FEVER_ACTION = 'Stop strenuous work, drink water, recheck your temperature in 30 minutes and tell the crew medical officer.';
+
 export type ReadingClass = 'impossible' | 'life_threat' | 'ok';
 
 /** Classifies one value: physically impossible, immediately dangerous, or neither. */
@@ -62,6 +69,8 @@ export interface LifeThreat {
   direction: 'low' | 'high';
   limit: number;
   action: string;
+  /** red: immediately life-threatening. yellow: needs action now (fever ≥ 38.5 °C). */
+  severity: 'red' | 'yellow';
   /** Stable id: a new value for the same metric is a new alarm. */
   key: string;
 }
@@ -100,7 +109,24 @@ export function findLifeThreats(zones: Record<BodyZoneId, VitalSignReading[]>, c
   const threats: LifeThreat[] = [];
   for (const zoneId of Object.keys(zones) as BodyZoneId[]) {
     for (const r of zones[zoneId]) {
-      if (!isMetricId(r.metricId) || classifyReading(r.metricId, r.currentValue) !== 'life_threat') continue;
+      if (!isMetricId(r.metricId)) continue;
+      const cls = classifyReading(r.metricId, r.currentValue);
+      if (cls === 'ok' && r.metricId === 'core_temp' && r.currentValue >= FEVER_LIMIT_C) {
+        threats.push({
+          zoneId,
+          metricId: r.metricId,
+          label: r.label,
+          unit: r.unit,
+          value: r.currentValue,
+          direction: 'high',
+          limit: FEVER_LIMIT_C,
+          action: FEVER_ACTION,
+          severity: 'yellow',
+          key: `${crewId}|${r.metricId}|${r.currentValue}`,
+        });
+        continue;
+      }
+      if (cls !== 'life_threat') continue;
       const lim = LIFE_THREAT_LIMITS[r.metricId]!;
       const direction: 'low' | 'high' = lim.low !== undefined && r.currentValue <= lim.low ? 'low' : 'high';
       threats.push({
@@ -112,6 +138,7 @@ export function findLifeThreats(zones: Record<BodyZoneId, VitalSignReading[]>, c
         direction,
         limit: direction === 'low' ? lim.low! : lim.high!,
         action: lim.action,
+        severity: 'red',
         key: `${crewId}|${r.metricId}|${r.currentValue}`,
       });
     }
