@@ -42,11 +42,22 @@ export const LocationIdSchema = z.enum([
   'rover',
 ]);
 
+export const CheckInEntrySchema = z.object({
+  id: text(100),
+  crewId: text(100),
+  missionDay: z.number().int().min(1).max(5000),
+  timestampIso: text(40),
+  values: z.record(z.string(), num()),
+  note: text(1000).optional(),
+  scenarioId: ScenarioIdSchema.optional(),
+});
+
 export const CrewContextSchema = z.object({
   crewMember: CrewMemberSchema.optional(),
   scenarioId: ScenarioIdSchema,
   environment: EnvironmentSchema.optional(),
   locationId: LocationIdSchema.optional(),
+  telemetryCheckIns: z.array(CheckInEntrySchema).max(200).optional(),
 });
 
 export const GuidanceRequestSchema = CrewContextSchema.extend({
@@ -94,6 +105,56 @@ export const ChatRequestSchema = CrewContextSchema.extend({
     .min(1)
     .max(40),
   checkIns: z.array(WellbeingCheckInSchema).max(60).optional(),
+});
+
+export const VoiceTransportModeSchema = z.enum(['live-api', 'on-ship-pipeline']);
+
+export const LiveTokenRequestSchema = CrewContextSchema.extend({
+  forceOffline: z.boolean().optional(),
+  enableVideo: z.boolean().optional(),
+});
+
+export const VoiceSttRequestSchema = CrewContextSchema.extend({
+  audioBase64: z.string().max(14_000_000).optional(),
+  mimeType: text(120).optional(),
+  fallbackTranscript: text(4000).optional(),
+  mode: VoiceTransportModeSchema.optional(),
+  languageCode: text(40).optional(),
+});
+
+export const VoiceTtsRequestSchema = z.object({
+  text: z.string().min(1).max(4000),
+  voice: text(80).optional(),
+  style: text(200).optional(),
+  mode: VoiceTransportModeSchema.optional(),
+});
+
+export const VoiceToolCallRequestSchema = CrewContextSchema.extend({
+  toolName: z.enum(['get_crew_snapshot', 'log_checkin_reading']),
+  callId: text(120).optional(),
+  args: z
+    .object({
+      zoneId: ZoneIdSchema.optional(),
+      metricId: text(80).optional(),
+      value: num().optional(),
+      note: text(1000).optional(),
+    })
+    .optional(),
+});
+
+export const VoiceTurnRequestSchema = CrewContextSchema.extend({
+  transcript: text(4000),
+  existingReplyText: text(6000).optional(),
+  audioBase64: z.string().max(14_000_000).optional(),
+  audioMimeType: text(120).optional(),
+  imageBase64: z.string().max(14_000_000).optional(),
+  imageMimeType: text(120).optional(),
+  mode: VoiceTransportModeSchema.optional(),
+  synthesizeAudio: z.boolean().optional(),
+  history: z
+    .array(z.object({ role: z.enum(['user', 'assistant']), content: text(4000), timestampIso: text(40).optional() }))
+    .max(20)
+    .optional(),
 });
 
 // ── LLM output schemas ───────────────────────────────────────────────────────

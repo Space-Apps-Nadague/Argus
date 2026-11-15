@@ -16,6 +16,16 @@ import type {
   WellbeingRequest,
   GuidanceRequest,
   VisionRequest,
+  LiveTokenRequest,
+  LiveTokenResponse,
+  VoiceSttRequest,
+  VoiceSttResponse,
+  VoiceTtsRequest,
+  VoiceTtsResponse,
+  VoiceToolCallRequest,
+  VoiceToolCallResponse,
+  VoiceTurnRequest,
+  VoiceTurnResponse,
 } from '../types/aiApi';
 import type { FlightSurgeonGuidance, VisualExamAnalysis } from '../types/argus';
 
@@ -84,6 +94,16 @@ export const argusApi = {
     postJson<CountermeasurePlan>('/api/ai/recommendations', req, key, signal),
   wellbeing: (req: WellbeingRequest, key?: string, signal?: AbortSignal) =>
     postJson<WellbeingAssessment>('/api/ai/wellbeing', req, key, signal),
+  liveToken: (req: LiveTokenRequest, key?: string, signal?: AbortSignal) =>
+    postJson<LiveTokenResponse>('/api/ai/live-token', req, key, signal),
+  voiceStt: (req: VoiceSttRequest, key?: string, signal?: AbortSignal) =>
+    postJson<VoiceSttResponse>('/api/ai/stt', req, key, signal),
+  voiceTts: (req: VoiceTtsRequest, key?: string, signal?: AbortSignal) =>
+    postJson<VoiceTtsResponse>('/api/ai/tts', req, key, signal),
+  voiceTool: (req: VoiceToolCallRequest, key?: string, signal?: AbortSignal) =>
+    postJson<VoiceToolCallResponse>('/api/ai/voice-tool', req, key, signal),
+  voiceTurn: (req: VoiceTurnRequest, key?: string, signal?: AbortSignal) =>
+    postJson<VoiceTurnResponse>('/api/ai/voice-turn', req, key, signal),
 };
 
 /**

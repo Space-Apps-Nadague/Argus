@@ -85,12 +85,13 @@ const Hud: React.FC = () => {
 
 /** Remounts the mission state per signed-in user so crew users are locked to their own astronaut. */
 const SignedInApp: React.FC = () => {
-  const { currentUser, removeAccountsForCrew, lockedCrewId, mode } = useAuth();
+  const { currentUser, removeAccountsForCrew, lockedCrewId, canViewHealth, mode } = useAuth();
   if (!currentUser) return null;
   return (
     <MissionProvider
       key={currentUser.id}
       lockedCrewId={lockedCrewId}
+      canViewHealth={canViewHealth}
       serverBacked={mode === 'server'}
       onCrewDeleted={removeAccountsForCrew}
     >

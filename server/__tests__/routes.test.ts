@@ -3,6 +3,8 @@
  * offline result (no network calls are made).
  */
 
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 import type {
   AiProviderStatus,
@@ -79,6 +81,27 @@ describe('AI routes (offline)', () => {
     expect(body.result.hypotheses[0].id).toBe('sans');
     expect(body.result.earthConsultUrgency).toBe('immediate_emergency_packet');
     expect(body.result.disclaimer).toMatch(/not a diagnosis/i);
+  });
+
+  it('POST /api/ai/diagnostics applies telemetryCheckIns before triage and trends', async () => {
+    const res = await post('/api/ai/diagnostics', {
+      scenarioId: 'nominal',
+      crewMember,
+      telemetryCheckIns: [
+        {
+          id: 'ci-route-1',
+          crewId: crewMember.id,
+          missionDay: 30,
+          timestampIso: '2026-11-14T10:00:00.000Z',
+          values: { onsd: 6.4 },
+        },
+      ],
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as DiagnosticsResponse;
+    expect(body.result.zoneStatuses.neuro).toBe('red');
+    expect(body.result.earthConsultUrgency).toBe('immediate_emergency_packet');
+    expect(body.result.trends.find((t) => t.metricId === 'onsd')?.currentValue).toBe(6.4);
   });
 
   it('POST /api/ai/recommendations returns a library plan', async () => {
@@ -158,5 +181,19 @@ describe('AI routes (offline)', () => {
     const res = await app.request('/api/does-not-exist');
     expect(res.status).toBe(404);
     expect(await res.json()).toEqual({ error: 'Not found' });
+  });
+
+  it('serves favicon.svg and favicon.ico from dist when built (Azure App Service static)', async () => {
+    expect(existsSync(resolve(process.cwd(), 'public', 'favicon.svg'))).toBe(true);
+    expect(existsSync(resolve(process.cwd(), 'public', 'favicon.ico'))).toBe(true);
+    if (!existsSync(resolve(process.cwd(), 'dist', 'index.html'))) return;
+
+    const svgRes = await app.request('/favicon.svg');
+    expect(svgRes.status).toBe(200);
+    expect(svgRes.headers.get('content-type')).toMatch(/image\/svg\+xml/);
+
+    const icoRes = await app.request('/favicon.ico');
+    expect(icoRes.status).toBe(200);
+    expect(icoRes.headers.get('content-type')).toMatch(/image\/(x-icon|vnd\.microsoft\.icon)/);
   });
 });

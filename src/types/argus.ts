@@ -291,6 +291,8 @@ export interface CheckInEntry {
   timestampIso: string;
   values: Partial<Record<MetricId, number>>;
   note?: string;
+  /** Scenario active when logged; absent on legacy entries (= crew default scenario). */
+  scenarioId?: ScenarioId;
 }
 
 /** Scheduled Mission Routine & Gamification Milestones (specs/01-data-schema.md §8) */

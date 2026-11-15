@@ -2,6 +2,12 @@
 
 Canonical design: [`specs/05-data-platform.md`](../specs/05-data-platform.md). This page covers how to use it day to day.
 
+## Production (argus-space.health)
+- **Database:** `argus-space-server`, reachable only from the web app's private network.
+- **Connection:** the app reads `AZURE_POSTGRESQL_CONNECTIONSTRING` from App Service → Configuration → Connection strings.
+- **Data:** the app seeds and fills the database itself (`ARGUS_BOOTSTRAP_ON_START=1`), so nothing has to be loaded from a laptop.
+- **Ad-hoc queries:** use the App Service SSH console: `npm run db:sql -- "select count(*) from observations"`.
+
 ## Pick a database (`DATABASE_URL` in `.env`)
 
 | Option | `DATABASE_URL` | Use it for |

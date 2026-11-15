@@ -5,29 +5,44 @@
  * Long explanations live behind ⓘ / "More" to keep the HUD low-text.
  */
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Activity,
   AlertTriangle,
   Camera,
   CheckCircle2,
   ChevronDown,
   Circle,
   Clock,
+  Cpu,
   Download,
   FileCheck2,
   ListChecks,
   MessageSquare,
+  Mic,
+  MicOff,
+  Radio,
   RefreshCw,
   Send,
   ShieldAlert,
   Sparkles,
+  Square,
   Upload,
+  Video,
   VideoOff,
+  Volume2,
+  WifiOff,
   Wrench,
   X,
 } from 'lucide-react';
 import { useMission } from '../context/MissionContext';
 import { VISUAL_EXAM_SAMPLES } from '../data/telemetryScenarios';
+import {
+  createRealtimeDoctorSession,
+  RealtimeDoctorSession,
+  RealtimeDoctorState,
+  VOICE_HUD_DISCLAIMER,
+} from '../services/realtimeDoctor';
 import { ENVIRONMENT_META } from '../utils/triageEngine';
 import { formatCommDelay } from '../data/spaceLocations';
 import { InfoTip } from './InfoTip';
@@ -49,9 +64,35 @@ const SYMPTOM_PRESETS = [
   { label: 'Insomnia & Fatigue', text: 'Severe insomnia, fragmented sleep, and morning cognitive brain fog' },
 ];
 
+const VOICE_QUICK_UTTERANCES = [
+  {
+    label: 'Check readiness & vitals',
+    utterance: 'Check my current readiness score and zone vitals.',
+    syncSymptoms: false,
+  },
+  {
+    label: 'Blurry vision & headache',
+    utterance: 'I have a throbbing headache behind my eyes and blurry near vision.',
+    syncSymptoms: true,
+  },
+  {
+    label: 'Log HR 68 bpm',
+    utterance: 'Log resting heart rate 68 bpm.',
+    syncSymptoms: false,
+  },
+  {
+    label: 'High CO₂ & air hunger',
+    utterance: 'Cabin air feels stuffy with frontal headache and shortness of breath.',
+    syncSymptoms: true,
+  },
+];
+
 export const FlightSurgeonPanel: React.FC = () => {
   const {
+    activeCrewMember,
+    scenarioId,
     environment,
+    spaceLocationId,
     guidance,
     completedStepIds,
     toggleStepCompleted,
@@ -65,10 +106,12 @@ export const FlightSurgeonPanel: React.FC = () => {
     clearVisualExam,
     queuedPackets,
     queueEarthPacket,
-    activeCheckIns,
+    scenarioCheckIns,
     crewSymptoms,
     setCrewSymptoms,
     consultFlightSurgeon,
+    runtimeApiKey,
+    logVitalReading,
     spaceLocation,
   } = useMission();
 
@@ -78,6 +121,208 @@ export const FlightSurgeonPanel: React.FC = () => {
   const [openStep, setOpenStep] = useState<string | null>(null);
   const [showMore, setShowMore] = useState(false);
   const envMeta = ENVIRONMENT_META[environment];
+
+  // ── Real-Time Voice & Video AI Flight Surgeon session (specs/04-ai-backend.md §4.1) ──
+  const doctorContext = useMemo(
+    () => ({
+      crewMember: activeCrewMember,
+      scenarioId,
+      environment,
+      spaceLocationId,
+      checkIns: scenarioCheckIns,
+      completedStepsCount: completedStepIds.length,
+    }),
+    [activeCrewMember, scenarioId, environment, spaceLocationId, scenarioCheckIns, completedStepIds.length]
+  );
+
+  const sessionRef = useRef<RealtimeDoctorSession | null>(null);
+  if (!sessionRef.current) {
+    sessionRef.current = createRealtimeDoctorSession({
+      context: doctorContext,
+      runtimeApiKey,
+      onStateChange: (next) => setDoctorState(next),
+      onVitalLogged: (reading) => {
+        void logVitalReading(reading.zoneId, reading.metricId, reading.value);
+      },
+    });
+  }
+  const [doctorState, setDoctorState] = useState<RealtimeDoctorState>(() =>
+    sessionRef.current!.getState()
+  );
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const micStreamRef = useRef<MediaStream | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const speechRecRef = useRef<{ stop: () => void } | null>(null);
+  const [voiceDraft, setVoiceDraft] = useState('');
+
+  useEffect(() => {
+    sessionRef.current?.updateContext(doctorContext, runtimeApiKey);
+  }, [doctorContext, runtimeApiKey]);
+
+  useEffect(() => {
+    void sessionRef.current?.syncConnectivity();
+    return () => {
+      sessionRef.current?.interrupt();
+      sessionRef.current?.disconnectWebSocket();
+      if (micStreamRef.current) {
+        micStreamRef.current.getTracks().forEach((t) => t.stop());
+        micStreamRef.current = null;
+      }
+    };
+  }, []);
+
+  const handleToggleOfflineOverride = useCallback(async () => {
+    if (!sessionRef.current) return;
+    await sessionRef.current.setManualOfflineOverride(!doctorState.manualOfflineOverride);
+  }, [doctorState.manualOfflineOverride]);
+
+  const handleRunVoiceUtterance = useCallback(
+    async (utterance: string, syncSymptoms = false) => {
+      if (!sessionRef.current || !utterance.trim()) return;
+      const clean = utterance.trim();
+      if (syncSymptoms) {
+        setSymptomInput(clean);
+        void consultFlightSurgeon(clean);
+      }
+      await sessionRef.current.runVoiceTurn({ fallbackTranscript: clean });
+    },
+    [consultFlightSurgeon]
+  );
+
+  const stopMicrophoneRecording = useCallback(async () => {
+    speechRecRef.current?.stop();
+    speechRecRef.current = null;
+
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      const recorder = mediaRecorderRef.current;
+      mediaRecorderRef.current = null;
+      await new Promise<void>((resolve) => {
+        recorder.onstop = () => resolve();
+        recorder.stop();
+      });
+    }
+    if (micStreamRef.current) {
+      micStreamRef.current.getTracks().forEach((t) => t.stop());
+      micStreamRef.current = null;
+    }
+
+    sessionRef.current?.endAudioStream();
+
+    let audioBase64: string | undefined;
+    let audioMimeType = 'audio/webm';
+    if (recordedChunksRef.current.length > 0) {
+      const blob = new Blob(recordedChunksRef.current, {
+        type: recordedChunksRef.current[0]?.type || 'audio/webm',
+      });
+      audioMimeType = blob.type || 'audio/webm';
+      recordedChunksRef.current = [];
+      try {
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result));
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+        audioBase64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
+      } catch {
+        audioBase64 = undefined;
+      }
+    }
+
+    const spokenText =
+      voiceDraft.trim() ||
+      doctorState.interimTranscript.trim() ||
+      'Check my current readiness score and zone vitals.';
+    setVoiceDraft('');
+    await sessionRef.current?.runVoiceTurn({
+      audioBase64,
+      audioMimeType,
+      fallbackTranscript: spokenText,
+    });
+  }, [voiceDraft, doctorState.interimTranscript]);
+
+  const startMicrophoneRecording = useCallback(async () => {
+    sessionRef.current?.interrupt();
+    recordedChunksRef.current = [];
+
+    // Optional browser SpeechRecognition for instant interim captions
+    const win = window as unknown as {
+      SpeechRecognition?: new () => {
+        continuous: boolean;
+        interimResults: boolean;
+        lang: string;
+        onresult: ((ev: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+        start: () => void;
+        stop: () => void;
+      };
+      webkitSpeechRecognition?: new () => {
+        continuous: boolean;
+        interimResults: boolean;
+        lang: string;
+        onresult: ((ev: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+        start: () => void;
+        stop: () => void;
+      };
+    };
+    const SpeechRec = win.SpeechRecognition || win.webkitSpeechRecognition;
+    if (SpeechRec) {
+      try {
+        const rec = new SpeechRec();
+        rec.continuous = false;
+        rec.interimResults = true;
+        rec.lang = 'en-US';
+        rec.onresult = (ev) => {
+          const parts: string[] = [];
+          for (let i = 0; i < ev.results.length; i++) {
+            parts.push(ev.results[i][0]?.transcript || '');
+          }
+          const combined = parts.join(' ').trim();
+          if (combined) setVoiceDraft(combined);
+        };
+        rec.start();
+        speechRecRef.current = rec;
+      } catch {
+        // Ignore SpeechRecognition errors in unsupported browsers
+      }
+    }
+
+    if (navigator.mediaDevices?.getUserMedia && typeof MediaRecorder !== 'undefined') {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        micStreamRef.current = stream;
+        const recorder = new MediaRecorder(stream);
+        recorder.ondataavailable = (ev) => {
+          if (ev.data && ev.data.size > 0) {
+            recordedChunksRef.current.push(ev.data);
+          }
+        };
+        recorder.start(250);
+        mediaRecorderRef.current = recorder;
+        sessionRef.current?.sendAudioChunk(new Float32Array([0.15, -0.15, 0.2, -0.2]));
+        return;
+      } catch {
+        // Fall through if microphone permission is denied in automated/headless browser
+      }
+    }
+
+    // If hardware mic isn't available, run the draft or default voice check-in immediately
+    await handleRunVoiceUtterance(
+      voiceDraft.trim() || 'Check my current readiness score and zone vitals.'
+    );
+  }, [voiceDraft, handleRunVoiceUtterance]);
+
+  const streamCurrentCameraFrameToSurgeon = useCallback(() => {
+    if (!videoRef.current || !sessionRef.current) return;
+    const video = videoRef.current;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+    sessionRef.current.sendVideoFrame(jpegDataUrl);
+  }, []);
 
   // Symptom Q&A input state
   const [symptomInput, setSymptomInput] = useState(crewSymptoms);
@@ -231,11 +476,282 @@ export const FlightSurgeonPanel: React.FC = () => {
 
   const done = completedStepIds.length;
   const total = guidance.guidedSteps.length;
+  const isOfflinePipeline = doctorState.mode === 'on-ship-pipeline';
+  const latestVoiceTurn = doctorState.turns[0] || null;
 
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-      {/* LEFT: context + symptoms + checklist */}
+      {/* LEFT: Voice & Video Flight Surgeon + Situation + symptoms + checklist */}
       <div className="flex flex-col gap-4 min-w-0">
+        {/* Real-Time Voice & Video AI Flight Surgeon Card (specs/02-ui-dashboard.md §2.4 & specs/04-ai-backend.md §4.1) */}
+        <Card
+          icon={isOfflinePipeline ? <Cpu className="h-4 w-4" /> : <Radio className="h-4 w-4" />}
+          title="Voice & video flight surgeon"
+          actions={
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span
+                className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-mono text-[11px] ${
+                  isOfflinePipeline
+                    ? 'border-status-yellow/50 bg-status-yellow/10 text-status-yellow'
+                    : 'border-hud-accent/50 bg-hud-accent/10 text-hud-accent'
+                }`}
+                aria-label={`Active voice mode: ${
+                  isOfflinePipeline
+                    ? 'On-Ship Local Flight Surgeon (Autonomous Mode)'
+                    : 'Gemini Live API Bidirectional'
+                }`}
+              >
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${
+                    isOfflinePipeline ? 'bg-status-yellow' : 'bg-status-green animate-pulse'
+                  }`}
+                  aria-hidden="true"
+                />
+                {isOfflinePipeline
+                  ? 'On-Ship Local Flight Surgeon (Autonomous Mode)'
+                  : 'Gemini Live API · Bidirectional'}
+              </span>
+              <span className="rounded border border-hud-line bg-hud-bg/80 px-1.5 py-0.5 font-mono text-[10px] text-hud-muted">
+                {doctorState.nodeLabel}
+              </span>
+              <InfoTip label="About voice & video consults" align="right">
+                {isOfflinePipeline
+                  ? 'Autonomous deep-space mode (on-ship-local): runs a 3-stage sequential pipeline — 1. Listening [STT] → 2. Thinking [Local LLM] → 3. Speaking [TTS]. Deterministic triage and crisis protocols always hold.'
+                  : 'Online duplex mode (gemini-live): streams 16 kHz PCM audio and optional JPEG webcam frames over a short-lived ephemeral WebSocket token with barge-in interruption and non-blocking vital tool calls.'}
+              </InfoTip>
+            </div>
+          }
+          bodyClassName="px-4 pb-4 space-y-3"
+        >
+          {/* Simulated Comm Blackout / Offline Mode Switch */}
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-hud-line bg-hud-bg/60 px-3 py-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <WifiOff
+                className={`h-4 w-4 shrink-0 ${
+                  doctorState.manualOfflineOverride ? 'text-status-yellow' : 'text-hud-muted'
+                }`}
+                aria-hidden="true"
+              />
+              <div className="min-w-0">
+                <span className="block text-xs font-medium text-hud-text">
+                  Simulated Comm Blackout / Offline Mode
+                </span>
+                <span className="block text-[11px] text-hud-muted">
+                  {doctorState.manualOfflineOverride
+                    ? 'Forced On-Ship STT → Local LLM → TTS pipeline (no cloud branding)'
+                    : 'Auto-detects Live API vs On-Ship autonomous pipeline'}
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={doctorState.manualOfflineOverride}
+              aria-label="Simulated Comm Blackout / Offline Mode"
+              onClick={handleToggleOfflineOverride}
+              className={`hud-focus relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border transition-colors ${
+                doctorState.manualOfflineOverride
+                  ? 'border-status-yellow bg-status-yellow/30'
+                  : 'border-hud-line bg-hud-panel'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full transition-transform ${
+                  doctorState.manualOfflineOverride
+                    ? 'translate-x-5 bg-status-yellow'
+                    : 'translate-x-1 bg-hud-muted'
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* 3-Stage Pipeline Indicator (STT → Local LLM → TTS) / Duplex Indicator */}
+          <div
+            className="grid grid-cols-3 gap-1.5"
+            role="status"
+            aria-label="Voice consultation pipeline stage"
+          >
+            {[
+              {
+                key: 'listening_stt',
+                label: isOfflinePipeline ? '1. Listening [STT]' : '1. Audio In [16kHz]',
+                active:
+                  doctorState.stage === 'listening_stt' ||
+                  doctorState.stage === 'live_streaming' ||
+                  doctorState.isMicActive,
+              },
+              {
+                key: 'thinking_llm',
+                label: isOfflinePipeline ? '2. Thinking [Local LLM]' : '2. Triage & Tools',
+                active:
+                  doctorState.stage === 'thinking_llm' || doctorState.stage === 'tool_calling',
+              },
+              {
+                key: 'speaking_tts',
+                label: isOfflinePipeline ? '3. Speaking [TTS]' : '3. Audio Out [24kHz]',
+                active: doctorState.stage === 'speaking_tts' || doctorState.isSpeaking,
+              },
+            ].map((step) => (
+              <div
+                key={step.key}
+                className={`flex items-center justify-center gap-1.5 rounded-md border px-2 py-1.5 text-center font-mono text-[11px] transition-colors ${
+                  step.active
+                    ? 'border-hud-accent bg-hud-accent/15 text-hud-accent font-semibold'
+                    : 'border-hud-line bg-hud-bg/40 text-hud-muted'
+                }`}
+              >
+                <span
+                  className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                    step.active ? 'bg-hud-accent animate-pulse' : 'bg-hud-line'
+                  }`}
+                  aria-hidden="true"
+                />
+                <span className="truncate">{step.label}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Primary Voice & Video Controls */}
+          <div className="flex flex-wrap items-center gap-2">
+            {doctorState.isMicActive ? (
+              <button
+                type="button"
+                onClick={stopMicrophoneRecording}
+                className="hud-btn border-status-red/60 bg-status-red/20 text-red-200 hover:bg-status-red/30"
+              >
+                <MicOff className="h-3.5 w-3.5 text-status-red" aria-hidden="true" />
+                Stop & Send Audio
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={startMicrophoneRecording}
+                disabled={
+                  doctorState.stage === 'listening_stt' || doctorState.stage === 'thinking_llm'
+                }
+                className="hud-btn-primary text-xs"
+              >
+                <Mic className="h-3.5 w-3.5" aria-hidden="true" />
+                Speak to Surgeon
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => sessionRef.current?.interrupt()}
+              disabled={!doctorState.isSpeaking && doctorState.interactionStatus === 'IDLE'}
+              aria-label="Interrupt Flight Surgeon speech (barge-in)"
+              className="hud-btn text-xs disabled:opacity-40"
+            >
+              <Square className="h-3.5 w-3.5" aria-hidden="true" />
+              Barge-in / Stop
+            </button>
+
+            <button
+              type="button"
+              onClick={async () => {
+                if (!isCameraActive) {
+                  await startCamera();
+                } else {
+                  streamCurrentCameraFrameToSurgeon();
+                }
+              }}
+              className="hud-btn text-xs"
+              title="Stream live camera frame to the Voice Flight Surgeon for visual triage"
+            >
+              <Video className="h-3.5 w-3.5 text-hud-accent" aria-hidden="true" />
+              {isCameraActive ? 'Send Camera Frame' : 'Video Consult'}
+            </button>
+
+            <span className="ml-auto flex items-center gap-1 font-mono text-[11px] text-hud-muted">
+              <Activity className="h-3.5 w-3.5 text-hud-accent" aria-hidden="true" />
+              {doctorState.stage === 'idle' ? 'READY' : doctorState.stage.toUpperCase()}
+            </span>
+          </div>
+
+          {/* Quick One-Click Spoken Utterances for Hands-Free / Demo Verification */}
+          <div className="space-y-1.5">
+            <span className="block text-[11px] text-hud-muted">
+              Quick voice turns (1-click spoken consult or vital check-in):
+            </span>
+            <div
+              className="flex flex-wrap gap-1.5"
+              role="group"
+              aria-label="Quick voice consult utterances"
+            >
+              {VOICE_QUICK_UTTERANCES.map((preset) => (
+                <button
+                  key={preset.label}
+                  type="button"
+                  onClick={() => handleRunVoiceUtterance(preset.utterance, preset.syncSymptoms)}
+                  disabled={
+                    doctorState.stage === 'listening_stt' || doctorState.stage === 'thinking_llm'
+                  }
+                  className="hud-focus rounded border border-hud-line bg-hud-panel px-2 py-1 text-[11px] text-hud-muted transition-colors hover:border-hud-accent hover:text-hud-accent disabled:opacity-50"
+                >
+                  “{preset.label}”
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Active Tool Calls Pill Strip (`get_crew_snapshot`, `log_checkin_reading`) */}
+          {doctorState.activeToolCalls.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+              <span className="font-mono text-hud-muted">Tools:</span>
+              {doctorState.activeToolCalls.slice(0, 3).map((tc) => (
+                <span
+                  key={tc.callId}
+                  className="inline-flex items-center gap-1 rounded border border-hud-accent/40 bg-hud-accent/10 px-2 py-0.5 font-mono text-[10px] text-hud-accent"
+                >
+                  {tc.toolName}
+                  {tc.loggedReading
+                    ? ` (${tc.loggedReading.metricId}=${tc.loggedReading.value})`
+                    : ''}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Latest Voice Transcript & Spoken Response */}
+          {(doctorState.lastTranscript || doctorState.lastReplyText || latestVoiceTurn) && (
+            <div
+              className="space-y-2 rounded-lg border border-hud-line bg-hud-bg/70 p-3 text-xs"
+              role="status"
+              aria-live="polite"
+            >
+              {(doctorState.lastTranscript || latestVoiceTurn?.transcript) && (
+                <p className="text-hud-muted">
+                  <span className="font-mono font-semibold text-hud-text">Crew: </span>“
+                  {doctorState.lastTranscript || latestVoiceTurn?.transcript}”
+                </p>
+              )}
+              {(doctorState.lastReplyText || latestVoiceTurn?.replyText) && (
+                <div className="space-y-1.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="inline-flex items-center gap-1.5 font-mono font-semibold text-hud-accent">
+                      <Volume2 className="h-3.5 w-3.5" aria-hidden="true" />
+                      {isOfflinePipeline ? 'On-Ship Local Surgeon' : 'Flight Surgeon Live'}:
+                    </span>
+                    {latestVoiceTurn && <StatusPill status={latestVoiceTurn.triageStatus} />}
+                  </div>
+                  <p className="leading-relaxed text-hud-text">
+                    {doctorState.lastReplyText || latestVoiceTurn?.replyText}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Required Clinical Framing Guardrail */}
+          <p className="flex items-center justify-between text-[11px] text-hud-muted">
+            <span>{VOICE_HUD_DISCLAIMER}</span>
+            <span className="font-mono text-[10px]">
+              Deterministic triage · {envMeta.shortLabel}
+            </span>
+          </p>
+        </Card>
+
         <Card
           icon={<ShieldAlert className="h-4 w-4" />}
           title="Situation"
@@ -496,9 +1012,17 @@ export const FlightSurgeonPanel: React.FC = () => {
                   LIVE OPTICAL FEED
                 </div>
               </div>
-              <div className="flex items-center justify-end gap-2">
+              <div className="flex flex-wrap items-center justify-end gap-2">
                 <button type="button" onClick={stopCamera} className="hud-btn">
                   Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={streamCurrentCameraFrameToSurgeon}
+                  className="hud-btn text-hud-accent hover:text-white"
+                >
+                  <Video className="h-3.5 w-3.5" aria-hidden="true" />
+                  Stream to Voice Surgeon
                 </button>
                 <button type="button" onClick={captureSnapshot} className="hud-btn-primary">
                   <Camera className="h-3.5 w-3.5" aria-hidden="true" />
@@ -583,7 +1107,7 @@ export const FlightSurgeonPanel: React.FC = () => {
           <ul className="flex flex-wrap gap-2 text-xs text-hud-muted">
             <li className="rounded-full border border-hud-line px-2.5 py-1">{done} steps</li>
             <li className="rounded-full border border-hud-line px-2.5 py-1">{visualExamAnalysis ? '1 exam' : 'No exam'}</li>
-            <li className="rounded-full border border-hud-line px-2.5 py-1">{Math.min(activeCheckIns.length, 5)} check-ins</li>
+            <li className="rounded-full border border-hud-line px-2.5 py-1">{Math.min(scenarioCheckIns.length, 5)} check-ins</li>
           </ul>
 
           <div className="space-y-1.5">

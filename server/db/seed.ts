@@ -7,6 +7,7 @@
  */
 
 import { sql } from 'drizzle-orm';
+import { resolveDatabaseUrl } from './connectionString';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { DEFAULT_CREW_ROSTER } from '../../src/data/telemetryScenarios';
@@ -149,7 +150,7 @@ if (isCli) {
   const { loadEnv } = await import('../env');
   const { openDb } = await import('./client');
   loadEnv();
-  const url = process.env.DATABASE_URL;
+  const url = resolveDatabaseUrl();
   if (!url) {
     console.error('DATABASE_URL is not set (see .env.example).');
     process.exit(1);

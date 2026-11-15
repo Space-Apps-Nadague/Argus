@@ -18,7 +18,7 @@ export const CHAT_STORAGE_KEY = 'argus_chat_v1';
 const SUGGESTIONS = ['How am I doing today?', 'Why is my readiness lower?', 'I feel stressed and tired', 'What should I do about my eyes?'];
 
 export const ChatPanel: React.FC = () => {
-  const { activeCrewMember, runtimeApiKey, serverBacked } = useMission();
+  const { activeCrewMember, runtimeApiKey, serverBacked, canReadActiveCrew } = useMission();
   const ctx = useCrewContextRequest();
   const [localMessages, setLocalMessages] = usePerCrewList<CrewChatMessage>(CHAT_STORAGE_KEY, activeCrewMember.id);
   const [serverMessages, setServerMessages] = useState<CrewChatMessage[]>([]);
@@ -28,8 +28,9 @@ export const ChatPanel: React.FC = () => {
     : setLocalMessages;
 
   useEffect(() => {
-    if (!serverBacked) return;
+    if (!serverBacked || !canReadActiveCrew) return;
     let alive = true;
+    setError(null);
     setServerMessages([]);
     chatHistoryApi
       .latest(activeCrewMember.id)
@@ -38,10 +39,11 @@ export const ChatPanel: React.FC = () => {
     return () => {
       alive = false;
     };
-  }, [serverBacked, activeCrewMember.id]);
+  }, [serverBacked, canReadActiveCrew, activeCrewMember.id]);
 
   const clearChat = () => {
     if (serverBacked) {
+      if (!canReadActiveCrew) return;
       chatHistoryApi
         .startNew(activeCrewMember.id)
         .then(() => setServerMessages([]))

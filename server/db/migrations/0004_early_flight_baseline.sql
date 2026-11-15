@@ -1,0 +1,1 @@
+ALTER TYPE "public"."baseline_kind" ADD VALUE 'early_flight';

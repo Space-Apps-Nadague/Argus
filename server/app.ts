@@ -17,6 +17,7 @@ import { guidanceRoutes } from './routes/guidance';
 import { healthRoutes } from './routes/health';
 import { recommendationsRoutes } from './routes/recommendations';
 import { visionRoutes } from './routes/vision';
+import { voiceRoutes } from './routes/voice';
 import { wellbeingRoutes } from './routes/wellbeing';
 
 /** Hono app factory (also used directly by tests via `app.request`). */
@@ -44,6 +45,7 @@ export function createApp(): Hono<AppEnv> {
   ai.route('/', recommendationsRoutes);
   ai.route('/', wellbeingRoutes);
   ai.route('/', chatRoutes);
+  ai.route('/', voiceRoutes);
   app.route('/api/ai', ai);
 
   app.all('/api/*', (c) => c.json({ error: 'Not found' }, 404));

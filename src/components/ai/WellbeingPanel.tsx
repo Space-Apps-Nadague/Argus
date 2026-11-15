@@ -26,7 +26,13 @@ const SCALES: Array<{ id: Scale; label: string; low: string; high: string }> = [
 
 const TREND_WORD = { improving: 'Improving', stable: 'Stable', worsening: 'Worsening' } as const;
 
+/** Keyed by crew member so a half-filled check-in (scales, note, result) never carries over to someone else. */
 export const WellbeingPanel: React.FC = () => {
+  const { activeCrewMember } = useMission();
+  return <WellbeingForm key={activeCrewMember.id} />;
+};
+
+const WellbeingForm: React.FC = () => {
   const { activeCrewMember, latestDay, runtimeApiKey } = useMission();
   const ctx = useCrewContextRequest();
   const [history, addCheckIn] = useWellbeingHistory(activeCrewMember.id);

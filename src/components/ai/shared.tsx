@@ -12,8 +12,14 @@ import type { WellbeingCheckIn } from '../../types/aiApi';
 
 /** Crew context sent with every AI request. */
 export function useCrewContextRequest(): CrewContextRequest {
-  const { activeCrewMember, scenarioId, environment, spaceLocationId } = useMission();
-  return { crewMember: activeCrewMember, scenarioId, environment, locationId: spaceLocationId };
+  const { activeCrewMember, scenarioId, environment, spaceLocationId, scenarioCheckIns } = useMission();
+  return {
+    crewMember: activeCrewMember,
+    scenarioId,
+    environment,
+    locationId: spaceLocationId,
+    telemetryCheckIns: scenarioCheckIns,
+  };
 }
 
 /** `Record<crewId, T[]>` persisted in localStorage, scoped to the active crew member. */
@@ -51,15 +57,15 @@ export function usePerCrewList<T>(storageKey: string, crewId: string, max = 50):
   return [items, update];
 }
 
-export function useAiStatus(): { status: AiProviderStatus | null; checked: boolean; refresh: () => void } {
+export function useAiStatus(runtimeApiKey?: string): { status: AiProviderStatus | null; checked: boolean; refresh: () => void } {
   const [status, setStatus] = useState<AiProviderStatus | null>(null);
   const [checked, setChecked] = useState(false);
   const refresh = useCallback(() => {
-    fetchAiStatus().then((s) => {
+    fetchAiStatus({ runtimeApiKey }).then((s) => {
       setStatus(s);
       setChecked(true);
     });
-  }, []);
+  }, [runtimeApiKey]);
   useEffect(refresh, [refresh]);
   return { status, checked, refresh };
 }
@@ -116,12 +122,12 @@ export const WELLBEING_STORAGE_KEY = 'argus_wellbeing_v1';
  * (specs/05-data-platform.md §3.4); offline demo: this browser.
  */
 export function useWellbeingHistory(crewId: string): [WellbeingCheckIn[], (entry: WellbeingCheckIn) => Promise<WellbeingCheckIn[]>] {
-  const { serverBacked } = useMission();
+  const { serverBacked, canReadActiveCrew } = useMission();
   const [local, setLocal] = usePerCrewList<WellbeingCheckIn>(WELLBEING_STORAGE_KEY, crewId, 60);
   const [remote, setRemote] = useState<WellbeingCheckIn[]>([]);
 
   useEffect(() => {
-    if (!serverBacked) return;
+    if (!serverBacked || !canReadActiveCrew) return;
     let alive = true;
     setRemote([]);
     wellbeingApi
@@ -131,7 +137,7 @@ export function useWellbeingHistory(crewId: string): [WellbeingCheckIn[], (entry
     return () => {
       alive = false;
     };
-  }, [serverBacked, crewId]);
+  }, [serverBacked, canReadActiveCrew, crewId]);
 
   const add = useCallback(
     async (entry: WellbeingCheckIn) => {

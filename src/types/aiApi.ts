@@ -8,9 +8,11 @@
 
 import type {
   BodyZoneId,
+  CheckInEntry,
   CrewMemberProfile,
   FlightSurgeonGuidance,
   GravityEnvironment,
+  MetricId,
   ScenarioId,
   SpaceLocationId,
   TriageStatus,
@@ -75,6 +77,8 @@ export interface CrewContextRequest {
   environment?: GravityEnvironment;
   /** Mission location (specs/01-data-schema.md §8); added to prompts. */
   locationId?: SpaceLocationId;
+  /** Sprint 7 vital check-ins (specs/01-data-schema.md §6); overlaid via `applyCheckIns` before triage/trends. */
+  telemetryCheckIns?: CheckInEntry[];
 }
 
 export interface GuidanceRequest extends CrewContextRequest {
@@ -254,3 +258,157 @@ export type ChatStreamEvent =
   | { type: 'delta'; text: string }
   | { type: 'done' }
   | { type: 'error'; message: string };
+
+// ── Real-Time Voice & Video Flight Surgeon (specs/04-ai-backend.md §4.1) ─────
+
+export type VoiceTransportMode = 'live-api' | 'on-ship-pipeline';
+
+export type VoiceNodeLabel = 'gemini-live' | 'on-ship-local';
+
+export type VoicePipelineStage =
+  | 'idle'
+  | 'connecting'
+  | 'listening_stt'
+  | 'thinking_llm'
+  | 'speaking_tts'
+  | 'live_streaming'
+  | 'tool_calling'
+  | 'error';
+
+export type VoiceToolName = 'get_crew_snapshot' | 'log_checkin_reading';
+
+export interface VoiceToolDeclaration {
+  name: VoiceToolName;
+  description: string;
+  behavior: 'NON_BLOCKING';
+  parameters: Record<string, unknown>;
+}
+
+export interface LiveTokenRequest extends CrewContextRequest {
+  /** Manual Simulated Comm Blackout / Offline Mode override from the HUD. */
+  forceOffline?: boolean;
+  /** Whether live webcam frame streaming is enabled for the session. */
+  enableVideo?: boolean;
+}
+
+export interface LiveTokenResponse {
+  available: boolean;
+  mode: VoiceTransportMode;
+  nodeLabel: VoiceNodeLabel;
+  recommendedMode?: VoiceTransportMode;
+  token?: string;
+  wsUrl?: string;
+  model?: string;
+  expiresAtIso?: string;
+  systemInstruction: string;
+  tools: VoiceToolDeclaration[];
+  snapshotSummary?: {
+    readinessScore: number;
+    zoneStatuses: Record<BodyZoneId, TriageStatus>;
+    earthConsultUrgency: EarthConsultUrgency;
+  };
+  disclaimer?: string;
+}
+
+export type LiveTokenEnvelope = AiEnvelope<LiveTokenResponse>;
+
+export interface VoiceSttRequest extends CrewContextRequest {
+  audioBase64?: string;
+  mimeType?: string;
+  fallbackTranscript?: string;
+  mode?: VoiceTransportMode;
+  languageCode?: string;
+}
+
+export interface VoiceSttResponse {
+  transcript: string;
+  mode: VoiceTransportMode;
+  nodeLabel: VoiceNodeLabel;
+  pipelineStage: 'stt';
+  crisisFlag: boolean;
+  earthConsultUrgency: EarthConsultUrgency;
+  confidence: number;
+}
+
+export type VoiceSttEnvelope = AiEnvelope<VoiceSttResponse>;
+
+export interface VoiceTtsRequest {
+  text: string;
+  voice?: string;
+  style?: string;
+  mode?: VoiceTransportMode;
+}
+
+export interface VoiceTtsResponse {
+  audioBase64: string;
+  mimeType: string;
+  mode: VoiceTransportMode;
+  nodeLabel: VoiceNodeLabel;
+  pipelineStage: 'tts';
+  useBrowserSpeechFallback: boolean;
+  durationEstimateMs: number;
+}
+
+export type VoiceTtsEnvelope = AiEnvelope<VoiceTtsResponse>;
+
+export interface VoiceToolCallRequest extends CrewContextRequest {
+  toolName: VoiceToolName;
+  callId?: string;
+  args?: {
+    zoneId?: BodyZoneId;
+    metricId?: MetricId | string;
+    value?: number;
+    note?: string;
+  };
+}
+
+export interface VoiceToolCallResponse {
+  callId: string;
+  toolName: VoiceToolName;
+  ok: boolean;
+  summary: string;
+  readinessScore: number;
+  zoneStatuses: Record<BodyZoneId, TriageStatus>;
+  loggedReading?: {
+    zoneId: BodyZoneId;
+    metricId: MetricId;
+    value: number;
+    status: TriageStatus;
+  };
+  earthConsultUrgency: EarthConsultUrgency;
+}
+
+export type VoiceToolCallEnvelope = AiEnvelope<VoiceToolCallResponse>;
+
+export interface VoiceTurnRequest extends CrewContextRequest {
+  transcript: string;
+  /** Optional pre-synthesized reply from a Live API WebSocket turn (persisted & checked for guardrails). */
+  existingReplyText?: string;
+  audioBase64?: string;
+  audioMimeType?: string;
+  imageBase64?: string;
+  imageMimeType?: string;
+  mode?: VoiceTransportMode;
+  synthesizeAudio?: boolean;
+  history?: CrewChatMessage[];
+}
+
+export interface VoiceTurnResponse {
+  transcript: string;
+  replyText: string;
+  mode: VoiceTransportMode;
+  nodeLabel: VoiceNodeLabel;
+  pipelineStagesCompleted: Array<'stt' | 'llm' | 'tts'>;
+  audioBase64?: string;
+  audioMimeType?: string;
+  useBrowserSpeechFallback: boolean;
+  crisisFlag: boolean;
+  triageStatus: TriageStatus;
+  readinessScore: number;
+  zoneStatuses: Record<BodyZoneId, TriageStatus>;
+  earthConsultUrgency: EarthConsultUrgency;
+  toolCallsExecuted: VoiceToolCallResponse[];
+  disclaimer: string;
+}
+
+export type VoiceTurnEnvelope = AiEnvelope<VoiceTurnResponse>;

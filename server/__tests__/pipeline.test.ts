@@ -95,11 +95,11 @@ describe('simulator → database pipeline', () => {
     await h.migrate();
     await seedDatabase(h.db, { missionStart, demoPassword: 'demo-password-123' });
     setDbHandle(h);
-    const batch = simulate({ crew: solaris, scenarioId: 'solar_storm', from: missionStart, to: now, templateStart: missionStart, seed: 7, secondaryEveryMin: 30 });
+    const batch = simulate({ crew: solaris, scenarioId: 'solar_storm', from: new Date(missionStart.getTime() - 10 * 86_400_000), to: now, templateStart: missionStart, seed: 7, secondaryEveryMin: 30 });
     for (const [, readings] of batch) {
       await ingestReadings(h.db, { astronautId: solaris.id, readings, origin: 'simulated', kind: 'simulator_backfill', keepRaw: false, rollup: false });
     }
-    await rollupDays(h.db, solaris.id, missionStart, now);
+    await rollupDays(h.db, solaris.id, new Date(missionStart.getTime() - 10 * 86_400_000), now);
     await evaluateTriage(h.db, solaris.id);
     await runAnalytics(h.db, solaris.id);
   }, 120_000);
@@ -124,7 +124,10 @@ describe('simulator → database pipeline', () => {
 
   it('stores personal baselines and flags radiation drift', async () => {
     const base = await h.db.select().from(baselines).where(eq(baselines.astronautId, solaris.id));
-    expect(base.some((b) => b.kind === 'preflight' && b.metricId === 'resting_hr')).toBe(true);
+    const pre = base.find((b) => b.kind === 'preflight' && b.metricId === 'resting_hr')!;
+    expect(pre.windowEnd.getTime()).toBeLessThan(missionStart.getTime()); // measured on Earth
+    expect(Math.abs(pre.mean - solaris.restingHrBaselineBpm)).toBeLessThan(2);
+    expect(base.some((b) => b.kind === 'early_flight' && b.metricId === 'resting_hr')).toBe(true);
     expect(base.some((b) => b.kind === 'hour_of_day' && b.metricId === 'heart_rate')).toBe(true);
     const found = await h.db.select().from(anomalies).where(eq(anomalies.astronautId, solaris.id));
     expect(found.some((a) => a.metricId === 'rad_dose' && a.severity === 'drifting')).toBe(true);
@@ -167,5 +170,27 @@ describe('simulator → database pipeline', () => {
     });
     expect(ok.status).toBe(201);
     expect(await ok.json()).toMatchObject({ inserted: 1, flagged: 0 });
+  });
+});
+
+describe('Earth pre-flight baseline (spec 05 §5.2)', () => {
+  it('baselinePoints prefers Earth days, except for exposure metrics', async () => {
+    const { baselinePoints } = await import('../../shared/analytics');
+    const series = [-2, -1, 0, 1, 2, 3].map((missionDay) => ({ missionDay, value: missionDay }));
+    expect(baselinePoints('resting_hr', series).map((p) => p.missionDay)).toEqual([-2, -1, 0]);
+    expect(baselinePoints('rad_dose', series).map((p) => p.missionDay)).toEqual([1, 2, 3]);
+    expect(baselinePoints('resting_hr', series.slice(3)).map((p) => p.missionDay)).toEqual([1, 2, 3]);
+  });
+
+  it('simulates Earth days with the crew member’s pre-flight values and Earth radiation', () => {
+    const crew = DEFAULT_CREW_ROSTER[1];
+    const start = new Date('2026-11-01T00:00:00Z');
+    const batch = simulate({ crew, scenarioId: 'sans_alert', from: new Date(start.getTime() - 7 * 86_400_000), to: start, templateStart: start });
+    const all = [...batch.values()].flat();
+    const rest = all.filter((r) => r.metric === 'resting_hr').map((r) => r.value);
+    expect(Math.abs(rest.reduce((a, b) => a + b, 0) / rest.length - crew.restingHrBaselineBpm)).toBeLessThan(2);
+    const dose = all.filter((r) => r.metric === 'dose_rate').map((r) => r.value);
+    expect(Math.max(...dose)).toBeLessThan(1); // µGy/h on Earth, vs ~25+ in flight
+    expect(all.some((r) => r.metric === 'cabin_co2' || r.metric === 'ared_load')).toBe(false);
   });
 });

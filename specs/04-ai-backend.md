@@ -24,6 +24,7 @@ A small Node/TypeScript server (`server/`) hosts every AI feature so that:
 | `server/models/countermeasureLibrary.ts` | Deterministic countermeasure library (offline fallback) |
 | `server/models/wellbeingModel.ts` | Behavioral-health risk score + crisis-language detector |
 | `server/models/crewSnapshot.ts` | Builds the crew/telemetry/triage context given to prompts |
+| `server/routes/voice.ts` | Real-Time Voice/Video Flight Surgeon (`live-token`, `stt`, `tts`, `voice-tool`, `voice-turn`) |
 | `server/routes/*.ts` | One file per endpoint |
 
 ## 3. Providers & Fallback Chain
@@ -44,7 +45,7 @@ Env vars are **server-only** (never `VITE_`). See `.env.example`.
 - Vision requests use `<PROVIDER>_VISION_MODEL` (OpenRouter defaults to `openrouter/free`, Gemini to its chat model); providers without a vision model are skipped.
 
 ## 4. Endpoints
-Every request may include `locationId` (`SpaceLocationId`, spec 01 §8); the server adds the mission location (gravity, comm delay) to prompts.
+Every request may include `locationId` (`SpaceLocationId`, spec 01 §8) and `telemetryCheckIns` (`CheckInEntry[]`, spec 01 §6); the server adds the mission location (gravity, comm delay) to prompts and runs `applyCheckIns` before triage, readiness, and trend models.
 
 All JSON endpoints return `AiEnvelope<T> = { result: T, meta: { source, provider?, model?, latencyMs? } }` (types in `src/types/aiApi.ts`).
 
@@ -57,6 +58,25 @@ All JSON endpoints return `AiEnvelope<T> = { result: T, meta: { source, provider
 | `POST /api/ai/recommendations` | `CrewContextRequest` | `CountermeasurePlan` | library baseline per flagged metric | personalization, ordering |
 | `POST /api/ai/wellbeing` | `WellbeingRequest` | `WellbeingAssessment` | risk score, status, trend, factors, crisis flag, urgency | supportive message, suggested actions |
 | `POST /api/ai/chat` | `ChatRequest` | SSE `ChatStreamEvent`s | crisis detection + escalation preamble, offline intent replies | companion reply grounded in the crew snapshot |
+| `POST /api/ai/live-token` | `LiveTokenRequest` | `LiveTokenResponse` | crew snapshot, deterministic urgency floor, tool schemas | short-lived Gemini Live API ephemeral token (`v1beta/auth_tokens`) |
+| `POST /api/ai/stt` | `VoiceSttRequest` | `VoiceSttResponse` | crisis language detection on transcript, offline fallback | speech-to-text transcription (Gemini multimodal / local Whisper) |
+| `POST /api/ai/tts` | `VoiceTtsRequest` | `VoiceTtsResponse` | deterministic WAV fallback + browser speech flag | speech synthesis (`gemini-3.8-flash-lite-tts` / local TTS) |
+| `POST /api/ai/voice-tool` | `VoiceToolCallRequest` | `VoiceToolCallResponse` | `get_crew_snapshot` & `log_checkin_reading` validation + triage | — |
+| `POST /api/ai/voice-turn` | `VoiceTurnRequest` | `VoiceTurnResponse` | crisis & red-flag escalation, urgency floor, DB chat/voice audit | concise spoken clinical guidance grounded in `CrewSnapshot` |
+
+### 4.1 Real-Time Voice & Video Flight Surgeon (`live-api` vs `on-ship-pipeline`)
+The Voice & Video Flight Surgeon (`server/routes/voice.ts`, `src/services/realtimeDoctor.ts`) supports two seamless transport modes:
+1. **Online Mode (`live-api`):**
+   - `POST /api/ai/live-token` mints a single-use, short-lived ephemeral token via `POST https://generativelanguage.googleapis.com/v1beta/auth_tokens` using the server's `GEMINI_API_KEY` (or `X-AI-Key` override) so no long-lived API key ever ships to the browser.
+   - The client opens a bidirectional WebSocket session to `BidiGenerateContentConstrained?access_token=<token>` (`gemini-3.8-live`) streaming 16 kHz PCM microphone audio (`audio/pcm;rate=16000`) and optional JPEG webcam frames (`image/jpeg`), receiving 24 kHz PCM audio and input/output transcriptions.
+   - Supports **barge-in** (interrupting active playback on `serverContent.interrupted` or crew interruption) and non-blocking tool calls (`behavior: "NON_BLOCKING"`) executed against `POST /api/ai/voice-tool`:
+     - `get_crew_snapshot`: returns deterministic 5-zone triage statuses, readiness score, personal baselines, and flagged drift trends.
+     - `log_checkin_reading`: validates a vital reading against `METRIC_INPUT_RANGES`, evaluates deterministic Green/Yellow/Red triage, and logs the check-in.
+2. **Offline / Deep-Space Blackout Mode (`on-ship-pipeline`):**
+   - Runs a sequential **STT → Regular LLM → TTS** pipeline (`Listening [STT]` → `Thinking [Local LLM]` → `Speaking [TTS]`).
+   - **Simulated-Local Demo & True Offline Fallback:** Because the web demo runs on Earth rather than an isolated spacecraft, `/api/ai/stt`, `/api/ai/voice-turn`, and `/api/ai/tts` may use standard non-Live Gemini endpoints behind the scenes when internet is available while presenting and behaving in telemetry and HUD metadata as the **On-Ship Local Flight Surgeon** (`nodeLabel: 'on-ship-local'`, no cloud/Gemini branding). When `AI_PROVIDERS=local` (Ollama) is configured or the client is truly disconnected, the pipeline routes to Ollama / deterministic offline protocols and browser Web Speech / local WAV synthesis.
+3. **Audit & Persistence:**
+   - When `DATABASE_URL` is configured, `POST /api/ai/voice-turn` logs both the crew transcript and assistant spoken response to PostgreSQL (`conversations` and `messages` tables, `specs/05-data-platform.md` §3.5) with `contextSnapshot.voiceMode` (`'live-api'` or `'on-ship-pipeline'`) linked to the active `crewId`.
 
 Guardrails enforced in code:
 - LLM-returned metric ids are filtered to known `METRIC_THRESHOLDS` keys; LLM urgency can raise but never lower the deterministic urgency floor.

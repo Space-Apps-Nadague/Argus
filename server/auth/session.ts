@@ -8,7 +8,7 @@ import { and, eq, gt, isNull } from 'drizzle-orm';
 import type { Context, MiddlewareHandler } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { getDb, type Db } from '../db/client';
-import { sessions, users } from '../db/schema';
+import { faceLogins, sessions, users } from '../db/schema';
 import { clientIp } from './audit';
 import type { AppEnv, Role, SessionUser } from './types';
 
@@ -57,8 +57,10 @@ export async function destroySession(c: Context<AppEnv>, db: Db): Promise<void> 
   deleteCookie(c, SESSION_COOKIE, { path: '/' });
 }
 
+/** Signs the user out everywhere: sessions and Face ID device tokens (password reset, account disabled). */
 export async function revokeUserSessions(db: Db, userId: string): Promise<void> {
   await db.delete(sessions).where(eq(sessions.userId, userId));
+  await db.delete(faceLogins).where(eq(faceLogins.userId, userId));
 }
 
 /** Puts the database (or null in stateless mode) on the context. */

@@ -55,6 +55,10 @@ export const authApi = {
   setup: (username: string, password: string) => apiJson<{ user: UserAccount }>('/api/auth/setup', { body: { username, password } }),
   login: (username: string, password: string) => apiJson<{ user: UserAccount }>('/api/auth/login', { body: { username, password } }),
   logout: () => apiJson<{ ok: true }>('/api/auth/logout', { body: {} }),
+  /** Face ID: issues a device sign-in token for the signed-in user (only its hash is stored). */
+  faceEnroll: () => apiJson<{ token: string }>('/api/auth/face/enroll', { body: {} }),
+  faceLogin: (token: string) => apiJson<{ user: UserAccount }>('/api/auth/face/login', { body: { token } }),
+  faceRemove: (token: string) => apiJson<{ ok: true }>('/api/auth/face/remove', { body: { token } }),
 };
 
 export const adminApi = {
@@ -88,7 +92,9 @@ export interface AnalyticsResponse {
     metricId: string;
     day: string;
     value: number;
-    preflight: { mean: number; sd: number; n: number } | null;
+    /** Measured on Earth before launch (falls back to early flight when no Earth data). */
+    preflight: { mean: number; sd: number; n: number; windowStart: string; windowEnd: string } | null;
+    earlyFlight: { mean: number; sd: number; n: number } | null;
     normal: { median: number; p05: number; p95: number; mean: number; n: number } | null;
     zVsPreflight: number | null;
   }>;

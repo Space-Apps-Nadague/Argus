@@ -9,11 +9,13 @@ import { useMission } from '../context/MissionContext';
 import { useAuth } from '../context/AuthContext';
 import { formatCommDelay, SPACE_LOCATION_ORDER, SPACE_LOCATIONS } from '../data/spaceLocations';
 import { MissionClock } from './MissionClock';
+import { FaceIdSettings } from '../features/faceId/FaceIdSettings';
 import { ScenarioId, SpaceLocationId, TriageStatus, UserRole } from '../types/argus';
 import { getCrewAdjustedZones, TELEMETRY_SCENARIOS } from '../data/telemetryScenarios';
-import { applyCheckIns } from '../utils/checkIns';
+import { applyCheckIns, entriesForScenario } from '../utils/checkIns';
 import { evaluateAllZones } from '../utils/triageEngine';
 import { hasConfiguredAiKey } from '../services/flightSurgeonAi';
+import { ProviderBadge, useAiStatus } from './ai/shared';
 import { StatusIcon, STATUS_WORD } from './ui/StatusPill';
 
 const SCENARIO_ORDER: ScenarioId[] = ['nominal', 'sans_alert', 'high_co2', 'solar_storm'];
@@ -59,6 +61,7 @@ export const TopMissionBar: React.FC = () => {
   const { currentUser, isAdmin, seesAllCrew, canViewHealth, logout } = useAuth();
 
   const [showKeyInput, setShowKeyInput] = useState(false);
+  const { status: aiStatus, checked: aiChecked } = useAiStatus(runtimeApiKey);
   const hasKey = hasConfiguredAiKey(runtimeApiKey);
   const rStatus = readinessStatus(readinessScore);
   const streak = countermeasureStreakSols + (completedStepIds.length > 0 ? 1 : 0);
@@ -151,6 +154,10 @@ export const TopMissionBar: React.FC = () => {
             </select>
           </label>
 
+          <div className="hidden xl:inline-flex">
+            <ProviderBadge status={aiStatus} checked={aiChecked} />
+          </div>
+
           <div className="relative">
             <button
               type="button"
@@ -180,6 +187,9 @@ export const TopMissionBar: React.FC = () => {
                   </button>
                 </div>
                 <p className="mb-2 text-[11px] text-hud-muted">Optional. ARGUS works fully offline.</p>
+                <div className="mb-2">
+                  <ProviderBadge status={aiStatus} checked={aiChecked} />
+                </div>
                 <input
                   type="password"
                   value={runtimeApiKey}
@@ -214,6 +224,7 @@ export const TopMissionBar: React.FC = () => {
               <div className="text-xs font-semibold text-hud-text">{currentUser?.username}</div>
               <div className="text-[10px] text-hud-muted">{ROLE_LABELS[currentUser?.role ?? 'astronaut']}</div>
             </div>
+            <FaceIdSettings />
             <button
               type="button"
               onClick={logout}
@@ -235,7 +246,7 @@ export const TopMissionBar: React.FC = () => {
             {crewRoster.map((member) => {
               const isSelected = member.id === activeCrewMember.id;
               const sc = isSelected ? scenarioId : member.defaultScenarioId;
-              const zones = zonesForCrew(member, sc) ?? applyCheckIns(getCrewAdjustedZones(sc, member), checkIns[member.id] || []);
+              const zones = zonesForCrew(member, sc) ?? applyCheckIns(getCrewAdjustedZones(sc, member), entriesForScenario(checkIns[member.id] || [], sc, member.defaultScenarioId));
               const st = Object.values(evaluateAllZones(zones, environment));
               const worst: TriageStatus = st.includes('red') ? 'red' : st.includes('yellow') ? 'yellow' : 'green';
               return (

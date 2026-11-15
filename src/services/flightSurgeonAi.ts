@@ -12,10 +12,12 @@
 
 import {
   BodyZoneId,
+  CheckInEntry,
   CrewMemberProfile,
   FlightSurgeonGuidance,
   GravityEnvironment,
   ScenarioId,
+  SpaceLocationId,
   VisualExamAnalysis,
   VisualExamSample,
 } from '../types/argus';
@@ -41,18 +43,20 @@ export async function synthesizeFlightSurgeonGuidance(params: {
   scenarioId: ScenarioId;
   zoneId: BodyZoneId;
   environment: GravityEnvironment;
+  locationId?: SpaceLocationId;
   crewMember?: CrewMemberProfile;
+  telemetryCheckIns?: CheckInEntry[];
   runtimeApiKey?: string;
   forceLiveAi?: boolean;
   crewSymptoms?: string;
 }): Promise<FlightSurgeonGuidance> {
-  const { scenarioId, zoneId, environment, crewMember, runtimeApiKey, forceLiveAi, crewSymptoms } = params;
+  const { scenarioId, zoneId, environment, locationId, crewMember, telemetryCheckIns, runtimeApiKey, forceLiveAi, crewSymptoms } = params;
   const offline = getOfflineFlightSurgeonGuidance(scenarioId, zoneId, environment, crewMember, crewSymptoms);
   if (!forceLiveAi) return offline;
 
   try {
     const { result } = await argusApi.guidance(
-      { scenarioId, zoneId, environment, crewMember, crewSymptoms },
+      { scenarioId, zoneId, environment, locationId, crewMember, telemetryCheckIns, crewSymptoms },
       runtimeApiKey
     );
     return result;

@@ -203,12 +203,14 @@ dataRoutes.get('/astronauts/:id/analytics', async (c) => {
   );
   const current = latest.map((l) => {
     const pre = base.find((b) => b.metricId === l.metric_id && b.kind === 'preflight');
+    const early = base.find((b) => b.metricId === l.metric_id && b.kind === 'early_flight');
     const roll = base.find((b) => b.metricId === l.metric_id && b.kind === 'rolling_14d');
     return {
       metricId: l.metric_id,
       day: l.day,
       value: l.value,
-      preflight: pre ? { mean: pre.mean, sd: pre.sd, n: pre.n } : null,
+      preflight: pre ? { mean: pre.mean, sd: pre.sd, n: pre.n, windowStart: pre.windowStart.toISOString(), windowEnd: pre.windowEnd.toISOString() } : null,
+      earlyFlight: early ? { mean: early.mean, sd: early.sd, n: early.n } : null,
       normal: roll ? { median: roll.median, p05: roll.p05, p95: roll.p95, mean: roll.mean, n: roll.n } : null,
       zVsPreflight: pre ? Math.round(((l.value - pre.mean) / pre.sd) * 100) / 100 : null,
     };

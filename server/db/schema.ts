@@ -56,7 +56,7 @@ export const ingestKind = pgEnum('ingest_kind', [
   'seed',
 ]);
 export const ingestStatus = pgEnum('ingest_status', ['running', 'succeeded', 'failed']);
-export const baselineKind = pgEnum('baseline_kind', ['preflight', 'rolling_14d', 'hour_of_day']);
+export const baselineKind = pgEnum('baseline_kind', ['preflight', 'rolling_14d', 'hour_of_day', 'early_flight']);
 export const anomalyDetector = pgEnum('anomaly_detector', ['robust_z', 'ewma', 'cusum']);
 export const anomalySeverity = pgEnum('anomaly_severity', ['watch', 'drifting']);
 export const triageStatus = pgEnum('triage_status', ['green', 'yellow', 'red']);
@@ -150,6 +150,22 @@ export const sessions = pgTable(
     userAgent: text('user_agent'),
   },
   (t) => [index('sessions_user_idx').on(t.userId)]
+);
+
+/** Face ID device sign-in tokens (spec 05 §6). The face template stays on the device; only the token hash is here. */
+export const faceLogins = pgTable(
+  'face_logins',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    tokenHash: text('token_hash').notNull().unique(),
+    createdAt: tsz('created_at').notNull().defaultNow(),
+    lastUsedAt: tsz('last_used_at'),
+    userAgent: text('user_agent'),
+  },
+  (t) => [index('face_logins_user_idx').on(t.userId)]
 );
 
 export const auditLog = pgTable(
