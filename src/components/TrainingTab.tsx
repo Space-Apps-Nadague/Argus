@@ -1,14 +1,15 @@
 /**
  * ARGUS — Training tab (specs/02-ui-dashboard.md §2.6)
  * Tells the crew member whether today's metrics call for training, which exercises to do and how:
- * an animated 3-D figure, an AI illustration of the start and end positions, steps and common mistakes.
+ * an animated 3-D astronaut, steps and common mistakes. In microgravity the exercises use the
+ * ISS devices (ARED, treadmill with harness, cycle ergometer); with gravity, body-weight exercises.
  */
 
 import React, { Suspense, lazy, useEffect, useMemo, useState } from 'react';
-import { AlertOctagon, CheckCircle2, Dumbbell, ImageIcon, Pause, Play, Rotate3D } from 'lucide-react';
+import { AlertOctagon, CheckCircle2, Dumbbell, Orbit, Pause, Play } from 'lucide-react';
 import { useMission } from '../context/MissionContext';
 import { Card } from './ui/Card';
-import { EXERCISE_ORDER, EXERCISES, type ExerciseId } from '../features/training/exercises';
+import { EXERCISES, exercisesFor, settingNote, type ExerciseId } from '../features/training/exercises';
 import { recommendTraining } from '../features/training/recommend';
 
 const ExerciseFigure3D = lazy(() =>
@@ -21,18 +22,18 @@ const prefersReducedMotion = () =>
 export const TrainingTab: React.FC = () => {
   const { zones, zoneStatuses, environment, activeCrewMember } = useMission();
   const plan = useMemo(() => recommendTraining(zones, zoneStatuses, environment), [zones, zoneStatuses, environment]);
-  const ordered = useMemo(
-    () => [...plan.exercises, ...EXERCISE_ORDER.filter((id) => !plan.exercises.includes(id))],
-    [plan.exercises]
-  );
+  const ordered = useMemo(() => {
+    const library = exercisesFor(environment);
+    return [...plan.exercises, ...library.filter((id) => !plan.exercises.includes(id))];
+  }, [plan.exercises, environment]);
   const [selected, setSelected] = useState<ExerciseId>(ordered[0]);
-  const exercise = EXERCISES[selected];
-  const [view, setView] = useState<'ai' | '3d'>(exercise.image ? 'ai' : '3d');
   const [playing, setPlaying] = useState(() => !prefersReducedMotion());
 
+  // Moving between microgravity and gravity changes the library: keep the selection valid.
   useEffect(() => {
-    setView(EXERCISES[selected].image ? 'ai' : '3d');
-  }, [selected]);
+    if (!ordered.includes(selected)) setSelected(ordered[0]);
+  }, [ordered, selected]);
+  const exercise = EXERCISES[ordered.includes(selected) ? selected : ordered[0]];
 
   const banner =
     plan.state === 'unsafe' ? (
@@ -72,6 +73,10 @@ export const TrainingTab: React.FC = () => {
   return (
     <div className="space-y-3">
       {banner}
+      <p className="flex items-start gap-2 rounded-lg border border-hud-line bg-hud-panel/60 px-3 py-2 text-xs text-hud-muted">
+        <Orbit className="mt-0.5 h-4 w-4 shrink-0 text-hud-accent" aria-hidden="true" />
+        {settingNote(environment)}
+      </p>
 
       <div className="grid gap-3 lg:grid-cols-[260px_minmax(0,1fr)]">
         <Card title="Exercises" icon={<Dumbbell className="h-4 w-4" />} bodyClassName="p-2">
@@ -110,47 +115,14 @@ export const TrainingTab: React.FC = () => {
         <Card
           title={exercise.name}
           icon={<Dumbbell className="h-4 w-4" />}
-          actions={
-            <div className="flex gap-1" role="group" aria-label="How to show the exercise">
-              {exercise.image && (
-                <button
-                  type="button"
-                  onClick={() => setView('ai')}
-                  aria-pressed={view === 'ai'}
-                  className={`hud-btn !px-2 !py-1 text-xs ${view === 'ai' ? 'ring-1 ring-hud-accent' : ''}`}
-                >
-                  <ImageIcon className="h-3.5 w-3.5" aria-hidden="true" />
-                  AI illustration
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => setView('3d')}
-                aria-pressed={view === '3d'}
-                className={`hud-btn !px-2 !py-1 text-xs ${view === '3d' ? 'ring-1 ring-hud-accent' : ''}`}
-              >
-                <Rotate3D className="h-3.5 w-3.5" aria-hidden="true" />
-                3-D figure
-              </button>
-            </div>
-          }
         >
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
             <div className="space-y-2">
               <div className="relative aspect-video overflow-hidden rounded-xl border border-hud-line bg-[#0b1220]">
-                {view === 'ai' && exercise.image ? (
-                  <img
-                    src={exercise.image}
-                    alt={`${exercise.name}: start position (1) and end position (2)`}
-                    className="h-full w-full object-contain"
-                  />
-                ) : (
-                  <Suspense fallback={<div className="flex h-full items-center justify-center text-xs text-hud-muted">Loading 3-D figure…</div>}>
-                    <ExerciseFigure3D exerciseId={exercise.id} playing={playing} />
-                  </Suspense>
-                )}
-                {view === '3d' && (
-                  <button
+                <Suspense fallback={<div className="flex h-full items-center justify-center text-xs text-hud-muted">Loading 3-D astronaut…</div>}>
+                  <ExerciseFigure3D exerciseId={exercise.id} playing={playing} />
+                </Suspense>
+                <button
                     type="button"
                     onClick={() => setPlaying((p) => !p)}
                     className="hud-btn absolute bottom-2 right-2 !px-2 !py-1 text-xs"
@@ -158,14 +130,9 @@ export const TrainingTab: React.FC = () => {
                   >
                     {playing ? <Pause className="h-3.5 w-3.5" aria-hidden="true" /> : <Play className="h-3.5 w-3.5" aria-hidden="true" />}
                     {playing ? 'Pause' : 'Play'}
-                  </button>
-                )}
+                </button>
               </div>
-              <p className="text-[11px] text-hud-muted">
-                {view === 'ai'
-                  ? 'AI-generated illustration: 1 = start, 2 = end position. Switch to the 3-D figure to see the full movement.'
-                  : 'Drag to turn the figure, scroll to zoom.'}
-              </p>
+              <p className="text-[11px] text-hud-muted">Drag to turn the astronaut, scroll to zoom.</p>
             </div>
 
             <div className="space-y-3 text-sm">
@@ -174,6 +141,12 @@ export const TrainingTab: React.FC = () => {
                 <dd className="font-medium text-hud-text">{exercise.dose}</dd>
                 <dt className="text-hud-muted">Works</dt>
                 <dd className="text-hud-text">{exercise.targets}</dd>
+                {exercise.equipment && (
+                  <>
+                    <dt className="text-hud-muted">Device</dt>
+                    <dd className="text-hud-text">{exercise.equipment}</dd>
+                  </>
+                )}
               </dl>
               <p className="text-hud-muted">{exercise.why}</p>
               <div>
@@ -193,8 +166,8 @@ export const TrainingTab: React.FC = () => {
                 </ul>
               </div>
               <p className="rounded-lg border border-hud-line bg-hud-panel/60 p-2 text-xs text-hud-muted">
-                <span className="font-semibold text-hud-text">In microgravity: </span>
-                {exercise.microgravity}
+                <span className="font-semibold text-hud-text">Tip: </span>
+                {exercise.note}
               </p>
             </div>
           </div>

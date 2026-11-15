@@ -1,14 +1,25 @@
 /**
  * ARGUS — Training exercise library (specs/02-ui-dashboard.md §2.6 Training)
- * Plain-language instructions for non-physician crew. Each exercise has an animated 3-D figure
- * (mannequin.ts) and, where generated, an AI illustration of the start and end positions.
+ * Plain-language instructions for non-physician crew, each shown by an animated 3-D astronaut
+ * (mannequin.ts). Two sets, because body weight is useless without gravity:
+ *  - microgravity (ISS, Mars transit): the ISS countermeasure devices — ARED (resistance),
+ *    T2 treadmill with a bungee harness, CEVIS cycle ergometer;
+ *  - gravity (Moon, Mars, Earth): body-weight exercises.
  */
 
-import pushupsImg from './media/pushups.webp';
-import crunchesImg from './media/crunches.webp';
-import squatsImg from './media/squats.webp';
+import type { GravityEnvironment } from '../../types/argus';
 
-export type ExerciseId = 'squats' | 'pushups' | 'lunges' | 'plank' | 'crunches';
+export type ExerciseId =
+  | 'aredSquat'
+  | 'aredDeadlift'
+  | 'aredHeelRaise'
+  | 'treadmill'
+  | 'cycle'
+  | 'squats'
+  | 'pushups'
+  | 'lunges'
+  | 'plank'
+  | 'crunches';
 
 export interface Exercise {
   id: ExerciseId;
@@ -19,13 +30,93 @@ export interface Exercise {
   why: string;
   steps: string[];
   mistakes: string[];
-  /** How to do it without gravity. */
-  microgravity: string;
-  /** AI-generated two-panel illustration (start → end position), if available. */
-  image?: string;
+  /** Practical note for this setting (microgravity device tips, or weighted vest on Moon/Mars). */
+  note: string;
+  /** Equipment needed, if any. */
+  equipment?: string;
 }
 
 export const EXERCISES: Record<ExerciseId, Exercise> = {
+  aredSquat: {
+    id: 'aredSquat',
+    name: 'ARED squat',
+    dose: '3 sets × 8–10 reps at your prescribed load',
+    targets: 'Thighs, glutes, hip and spine bone loading',
+    equipment: 'ARED (Advanced Resistive Exercise Device)',
+    why: 'Without gravity your own weight loads nothing. The ARED vacuum cylinders pull the bar down with up to 272 kg, replacing body weight, and are the main defence against 1–1.5 % monthly hip and spine bone loss.',
+    steps: [
+      'Set the load on the ARED and stand on the platform with feet shoulder-width apart.',
+      'Get under the padded bar so it rests across your upper back; hold the handles.',
+      'Brace your stomach and squat until your thighs are parallel to the platform. Heels stay down.',
+      'Drive up through your heels to standing. Breathe out on the way up.',
+    ],
+    mistakes: ['Heels lifting off the platform', 'Knees caving inward', 'Rounding the lower back under load'],
+    note: 'Your feet are in the platform foot loops; the cylinders, not gravity, keep you on the platform.',
+  },
+  aredDeadlift: {
+    id: 'aredDeadlift',
+    name: 'ARED deadlift',
+    dose: '3 sets × 8 reps at your prescribed load',
+    targets: 'Back, glutes, hamstrings, spine bone loading',
+    equipment: 'ARED',
+    why: 'Spinal muscles shrink and the spine lengthens in microgravity; back pain is common. Deadlifts load the spine and the muscles that protect it.',
+    steps: [
+      'Stand on the platform, feet hip-width apart, bar over the middle of your feet.',
+      'Push your hips back, keep your back flat and grip the bar just outside your knees.',
+      'Stand up by driving your hips forward. Keep the bar close to your legs.',
+      'Lower the same way: hips back first, flat back, slowly.',
+    ],
+    mistakes: ['Rounding the back', 'Bar drifting away from the legs', 'Jerking the bar off the bottom'],
+    note: 'Start light after a long rest day; the ARED load is the same at the top and bottom of the lift.',
+  },
+  aredHeelRaise: {
+    id: 'aredHeelRaise',
+    name: 'ARED heel raise',
+    dose: '3 sets × 15 reps',
+    targets: 'Calves, ankle and heel bone',
+    equipment: 'ARED',
+    why: 'Calf muscles lose the most mass of any muscle in spaceflight; heel raises under load keep them and the heel bone strong.',
+    steps: [
+      'Bar across your upper back, balls of your feet on the platform, heels free.',
+      'Rise onto your toes as high as you can in about 1 second.',
+      'Hold the top for 1 second.',
+      'Lower slowly for 2 seconds until your heels are just below the toes.',
+    ],
+    mistakes: ['Bouncing at the bottom', 'Bending the knees', 'Rolling onto the outside of the feet'],
+    note: 'Keep the load moderate and the movement slow; the calves fatigue fast.',
+  },
+  treadmill: {
+    id: 'treadmill',
+    name: 'Treadmill run with harness',
+    dose: '20–30 min at your prescribed speed',
+    targets: 'Heart and lungs, leg bones (impact)',
+    equipment: 'T2 treadmill + bungee harness',
+    why: 'Running gives the leg and hip bones impact loading and keeps the heart and leg muscles fit. The harness and bungees pull you onto the belt, because without them you would float off.',
+    steps: [
+      'Put on the harness over your shoulders and waist.',
+      'Clip the bungee cords to both sides of the treadmill. Start at about 60 % of your body weight and build to 70–80 %.',
+      'Start walking, then run at the prescribed speed. Land on the middle of your foot.',
+      'Finish with 3–5 minutes of walking, then unclip.',
+    ],
+    mistakes: ['Loading the bungees too lightly (no bone benefit)', 'Overstriding and landing on the heel', 'Skipping the cool-down'],
+    note: 'Harness pressure on the hips and shoulders is normal; adjust the pads if it becomes painful.',
+  },
+  cycle: {
+    id: 'cycle',
+    name: 'Cycle ergometer',
+    dose: '30 min in your heart-rate zone',
+    targets: 'Heart and lungs (aerobic fitness)',
+    equipment: 'CEVIS cycle ergometer',
+    why: 'Aerobic fitness and heart size drop in microgravity. Cycling trains the heart with no impact, so it is safe even on days when the legs are sore.',
+    steps: [
+      'Clip your shoes into the pedals. There is no seat: hold the handlebar and use the waist strap if needed.',
+      'Set the resistance and warm up for 5 minutes at an easy pace.',
+      'Pedal smooth circles and keep your heart rate in the prescribed zone.',
+      'Cool down for 5 minutes at an easy pace.',
+    ],
+    mistakes: ['Pushing only down instead of pedalling round', 'Starting hard without a warm-up', 'Not watching the heart-rate zone'],
+    note: 'In microgravity you float above the pedals; your legs push against the handlebar instead of a seat.',
+  },
   squats: {
     id: 'squats',
     name: 'Squats',
@@ -39,8 +130,7 @@ export const EXERCISES: Record<ExerciseId, Exercise> = {
       'Drive up through your heels to standing. Breathe out on the way up.',
     ],
     mistakes: ['Heels lifting off the floor', 'Knees caving inward', 'Rounding the lower back'],
-    microgravity: 'In flight, do them on the ARED with the bar on your shoulders for load.',
-    image: squatsImg,
+    note: 'On the Moon or Mars, wear the weighted vest so the squat still loads your hips and spine.',
   },
   pushups: {
     id: 'pushups',
@@ -55,8 +145,7 @@ export const EXERCISES: Record<ExerciseId, Exercise> = {
       'Stop just above the floor, then press back up in 1 second without locking your elbows.',
     ],
     mistakes: ['Hips sagging or piking up', 'Elbows flared straight out', 'Half repetitions'],
-    microgravity: 'In flight, use the ARED bench press or a bungee harness that pulls you to the floor.',
-    image: pushupsImg,
+    note: 'On the Moon or Mars, wear the weighted vest: at 1/6 g a push-up is very light.',
   },
   lunges: {
     id: 'lunges',
@@ -71,7 +160,7 @@ export const EXERCISES: Record<ExerciseId, Exercise> = {
       'Push through the front heel and bring the back leg forward to standing. Switch legs.',
     ],
     mistakes: ['Front knee drifting inward or past the toes', 'Leaning the torso forward', 'Too short a step'],
-    microgravity: 'Best during post-flight rehabilitation on Earth or on the Moon or Mars; in 0 g use the ARED.',
+    note: 'Good for balance after landing and on the Moon or Mars, where the weighted vest adds load.',
   },
   plank: {
     id: 'plank',
@@ -86,7 +175,7 @@ export const EXERCISES: Record<ExerciseId, Exercise> = {
       'Brace your stomach, breathe normally and hold.',
     ],
     mistakes: ['Hips sagging toward the floor', 'Hips raised too high', 'Holding your breath'],
-    microgravity: 'In flight, wear the bungee harness so your body has something to push against.',
+    note: 'On the Moon or Mars, add the weighted vest to make the hold harder.',
   },
   crunches: {
     id: 'crunches',
@@ -101,9 +190,28 @@ export const EXERCISES: Record<ExerciseId, Exercise> = {
       'Pause for 1 second, then lower slowly for 2 seconds.',
     ],
     mistakes: ['Pulling the neck with your hands', 'Sitting all the way up', 'Holding your breath'],
-    microgravity: 'In flight, hook your feet under a foot restraint so you do not float away.',
-    image: crunchesImg,
+    note: 'Keep the movement small and slow: the curl does the work, not sitting all the way up.',
   },
 };
 
-export const EXERCISE_ORDER: ExerciseId[] = ['squats', 'pushups', 'lunges', 'plank', 'crunches'];
+/** Exercises for microgravity (body weight loads nothing) and for gravity (Moon, Mars, Earth). */
+export const MICROGRAVITY_EXERCISES: ExerciseId[] = ['aredSquat', 'aredDeadlift', 'aredHeelRaise', 'treadmill', 'cycle'];
+export const GRAVITY_EXERCISES: ExerciseId[] = ['squats', 'pushups', 'lunges', 'plank', 'crunches'];
+
+export function isMicrogravity(env: GravityEnvironment): boolean {
+  return env === 'iss_leo' || env === '0g_transit';
+}
+
+export function exercisesFor(env: GravityEnvironment): ExerciseId[] {
+  return isMicrogravity(env) ? MICROGRAVITY_EXERCISES : GRAVITY_EXERCISES;
+}
+
+/** One line shown above the library explaining why these exercises. */
+export function settingNote(env: GravityEnvironment): string {
+  if (isMicrogravity(env)) {
+    return 'You are in microgravity: push-ups and squats with body weight load nothing, so training uses the ARED for resistance, the treadmill with a bungee harness and the cycle ergometer.';
+  }
+  if (env === 'lunar_base') return 'On the Moon you weigh about 1/6 of your Earth weight: wear the weighted vest for body-weight exercises.';
+  if (env === 'mars_base') return 'On Mars you weigh about 3/8 of your Earth weight: wear the weighted vest for body-weight exercises.';
+  return 'On Earth: body-weight exercises, used for pre-flight conditioning and post-flight rehabilitation.';
+}

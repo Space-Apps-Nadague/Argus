@@ -43,6 +43,12 @@ export interface Pose {
 export type Anchor =
   /** Left ankle planted on the floor at z = 0 (squat, lunge). */
   | 'feet'
+  /** Left toe planted at z = 0; the heel lifts (heel raise). */
+  | 'toes'
+  /** Pelvis at z = 0, lowest foot touching the treadmill belt (running). */
+  | 'lowestFoot'
+  /** Pelvis held at a fixed point; feet on rotating pedals (cycle ergometer). */
+  | 'cycle'
   /** Lying on the back, pelvis on the floor (crunch). */
   | 'back'
   /** Toes and hands (or forearms) on the floor; body pitch is solved (push-up, plank). */
@@ -56,6 +62,8 @@ export interface Rig {
   contact?: 'hand' | 'elbow';
   /** Hands fixed on the floor at this z (push-up): elbows are solved with 2-link IK. */
   handTargetZ?: number;
+  /** Cycle ergometer geometry (anchor `cycle`). */
+  cycle?: { pelvis: P2; crank: P2; radius: number; handlebar: P2 };
 }
 
 export interface P2 {
@@ -171,6 +179,52 @@ export function solveElbow(shoulder: P2, hand: P2): P2 {
   return c1.z < c2.z ? c1 : c2;
 }
 
+/** Knee of a 2-link leg reaching from hip to ankle; bends forward (larger z). */
+export function solveKnee(hip: P2, ankle: P2): P2 {
+  const a = SEG.thigh;
+  const b = SEG.shin;
+  const dy = ankle.y - hip.y;
+  const dz = ankle.z - hip.z;
+  const d = Math.min(a + b - 1e-6, Math.max(Math.abs(a - b) + 1e-6, Math.hypot(dy, dz)));
+  const base = Math.atan2(dz, dy);
+  const alpha = Math.acos((a * a + d * d - b * b) / (2 * a * d));
+  const c1 = { y: hip.y + a * Math.cos(base + alpha), z: hip.z + a * Math.sin(base + alpha) };
+  const c2 = { y: hip.y + a * Math.cos(base - alpha), z: hip.z + a * Math.sin(base - alpha) };
+  return c1.z > c2.z ? c1 : c2;
+}
+
+/** Pedal positions for a crank angle (radians, 0 = top). Left and right are opposite. */
+export function pedalPoints(crank: P2, radius: number, angle: number): { left: P2; right: P2 } {
+  const at = (a: number) => ({ y: crank.y + radius * Math.cos(a), z: crank.z + radius * Math.sin(a) });
+  return { left: at(angle), right: at(angle + Math.PI) };
+}
+
+/** Cycle ergometer: upper body from the pose, legs solved onto the pedals, hands on the handlebar. */
+export function placeCycling(pose: Pose, rig: Rig, angle: number): Skeleton {
+  const c = rig.cycle!;
+  const raw = forwardKinematics(pose, pose.pitch ?? 0, false);
+  const s = translate(raw, { y: c.pelvis.y - raw.pelvis.y, z: c.pelvis.z - raw.pelvis.z });
+  const { left, right } = pedalPoints(c.crank, c.radius, angle);
+  const lift = { y: 0.04, z: -0.03 }; // ankle sits just above and behind the pedal axle
+  const ankleL = add(left, lift);
+  const ankleR = add(right, lift);
+  const toe = (a: P2) => add(a, { y: -0.03, z: SEG.foot });
+  const elbow = solveElbow(s.shoulder, c.handlebar);
+  return {
+    ...s,
+    kneeL: solveKnee(s.pelvis, ankleL),
+    ankleL,
+    toeL: toe(ankleL),
+    kneeR: solveKnee(s.pelvis, ankleR),
+    ankleR,
+    toeR: toe(ankleR),
+    elbowL: elbow,
+    handL: c.handlebar,
+    elbowR: elbow,
+    handR: c.handlebar,
+  };
+}
+
 /** World-space skeleton: anchored so feet, back or hands rest on the floor (y = 0). */
 export function placeSkeleton(pose: Pose, rig: Rig): Skeleton {
   if (rig.anchor === 'floor') {
@@ -184,8 +238,11 @@ export function placeSkeleton(pose: Pose, rig: Rig): Skeleton {
     }
     return s;
   }
+  if (rig.anchor === 'cycle') return placeCycling(pose, rig, 0);
   const s = forwardKinematics(pose, pose.pitch ?? 0, rig.armsWorld);
   if (rig.anchor === 'back') return translate(s, { y: 0.12, z: 0 });
+  if (rig.anchor === 'toes') return translate(s, { y: CONTACT_HEIGHT - s.toeL.y, z: SEG.foot - s.toeL.z });
+  if (rig.anchor === 'lowestFoot') return translate(s, { y: ANKLE_HEIGHT - Math.min(s.ankleL.y, s.ankleR.y), z: 0 });
   return translate(s, { y: ANKLE_HEIGHT - s.ankleL.y, z: -s.ankleL.z });
 }
 
@@ -209,12 +266,37 @@ export function repetitionPhase(timeS: number, periodS: number): number {
 
 const STAND: Pose = { pitch: 0, spine: 0, neck: 0, shoulderL: 5, elbowL: -10, shoulderR: 5, elbowR: -10, hipL: 0, kneeL: 0, ankleL: 0, hipR: 0, kneeR: 0, ankleR: 0 };
 
+export type Equipment =
+  /** ARED: platform, a bar and the two load cables pulling it toward the platform. */
+  | { kind: 'ared'; barAt: 'shoulders' | 'hands' }
+  /** T2 treadmill belt plus the bungee harness holding the runner down. */
+  | { kind: 'treadmill' }
+  /** CEVIS cycle ergometer: crank, pedals and handlebar. */
+  | { kind: 'cycle' };
+
 export interface ExerciseMotion {
   rig: Rig;
   from: Pose;
   to: Pose;
-  /** Seconds per repetition. */
+  /** Seconds per repetition (or per pedal turn). */
   period: number;
+  /** `rotate`: continuous crank rotation (cycling). Default: back-and-forth repetition. */
+  kind?: 'oscillate' | 'rotate';
+  equipment?: Equipment;
+}
+
+/** The figure at a moment in time (seconds): the single entry point for drawing and tests. */
+export function skeletonAt(motion: ExerciseMotion, timeS: number): Skeleton {
+  if (motion.kind === 'rotate') {
+    const angle = ((timeS % motion.period) / motion.period) * Math.PI * 2;
+    return placeCycling(motion.from, motion.rig, angle);
+  }
+  return placeSkeleton(lerpPose(motion.from, motion.to, repetitionPhase(timeS, motion.period)), motion.rig);
+}
+
+/** Where the ARED bar is for a skeleton (z), so the bar and its load cables can be drawn. */
+export function aredBar(s: Skeleton, barAt: 'shoulders' | 'hands'): P2 {
+  return barAt === 'hands' ? s.handL : add(s.shoulder, { y: 0.02, z: -0.08 });
 }
 
 /** Push-up: top pose with straight vertical arms; the hands then stay where they are and the elbows bend. */
@@ -247,6 +329,42 @@ export const EXERCISE_MOTIONS: Record<string, ExerciseMotion> = {
     period: 4,
     from: { spine: 0, neck: -10, shoulderL: 0, elbowL: -90, shoulderR: 0, elbowR: -90, hipL: 0, kneeL: 0, ankleL: 5, hipR: 0, kneeR: 0, ankleR: 5 },
     to: { spine: 2, neck: -12, shoulderL: 0, elbowL: -90, shoulderR: 0, elbowR: -90, hipL: -2, kneeL: 0, ankleL: 5, hipR: -2, kneeR: 0, ankleR: 5 },
+  },
+  aredSquat: {
+    rig: { anchor: 'feet' },
+    period: 3.4,
+    equipment: { kind: 'ared', barAt: 'shoulders' },
+    from: { ...STAND, shoulderL: 40, elbowL: -170, shoulderR: 40, elbowR: -170 },
+    to: { pitch: 0, spine: 28, neck: -20, shoulderL: 40, elbowL: -170, shoulderR: 40, elbowR: -170, hipL: -90, kneeL: 110, ankleL: -20, hipR: -90, kneeR: 110, ankleR: -20 },
+  },
+  aredDeadlift: {
+    rig: { anchor: 'feet', armsWorld: true },
+    period: 3.6,
+    equipment: { kind: 'ared', barAt: 'hands' },
+    from: { ...STAND, shoulderL: 0, elbowL: 0, shoulderR: 0, elbowR: 0 },
+    to: { pitch: 0, spine: 75, neck: -45, shoulderL: 0, elbowL: 0, shoulderR: 0, elbowR: 0, hipL: -25, kneeL: 35, ankleL: -10, hipR: -25, kneeR: 35, ankleR: -10 },
+  },
+  aredHeelRaise: {
+    rig: { anchor: 'toes' },
+    period: 2.4,
+    equipment: { kind: 'ared', barAt: 'shoulders' },
+    from: { ...STAND, shoulderL: 40, elbowL: -170, shoulderR: 40, elbowR: -170 },
+    to: { ...STAND, shoulderL: 40, elbowL: -170, shoulderR: 40, elbowR: -170, ankleL: 32, ankleR: 32 },
+  },
+  treadmill: {
+    rig: { anchor: 'lowestFoot' },
+    period: 0.8,
+    equipment: { kind: 'treadmill' },
+    from: { pitch: 0, spine: 8, neck: -8, shoulderL: 30, elbowL: -90, shoulderR: -40, elbowR: -90, hipL: -35, kneeL: 20, ankleL: 0, hipR: 25, kneeR: 55, ankleR: 15 },
+    to: { pitch: 0, spine: 8, neck: -8, shoulderL: -40, elbowL: -90, shoulderR: 30, elbowR: -90, hipL: 25, kneeL: 55, ankleL: 15, hipR: -35, kneeR: 20, ankleR: 0 },
+  },
+  cycle: {
+    rig: { anchor: 'cycle', cycle: { pelvis: { y: 0.95, z: 0 }, crank: { y: 0.3, z: 0.38 }, radius: 0.17, handlebar: { y: 1.08, z: 0.58 } } },
+    period: 1.1,
+    kind: 'rotate',
+    equipment: { kind: 'cycle' },
+    from: { ...STAND, spine: 18, neck: -12 },
+    to: { ...STAND, spine: 18, neck: -12 },
   },
   crunches: {
     rig: { anchor: 'back' },

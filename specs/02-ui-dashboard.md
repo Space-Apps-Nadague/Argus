@@ -104,14 +104,18 @@ A readable version of the prototype's "Thousand Eyes" ring plus the full data/co
 - Footer: "Generic training aid based on public ISS practice — follow your mission's flight rules."
 
 ### 2.6 Training (`TrainingTab.tsx`, `src/features/training/`)
+- **Two exercise sets, by location (`exercises.ts`):** without gravity body weight loads nothing, so:
+  - **Microgravity** (ISS, Mars transit): the ISS countermeasure devices: **ARED** squat, deadlift and heel raise (vacuum cylinders give up to 272 kg of load), **treadmill with a bungee harness** (70–80 % of body weight pulls the runner onto the belt) and the **cycle ergometer** (no seat; feet clipped in, hands on the bar).
+  - **Gravity** (Moon, Mars, Earth): squats, push-ups, reverse lunges, forearm plank, crunches. On the Moon and Mars the tab says to wear the weighted vest (1/6 g, 3/8 g).
 - **When training is needed (`recommend.ts`):** deterministic rules on the latest readings with the same gravity-specific thresholds as triage.
-  - `bmd_delta` below its nominal range → squats, lunges, push-ups (load the hips and spine).
-  - `ared_load` below its nominal range → squats, push-ups, plank.
-  - Musculoskeletal zone not green → plank, crunches, squats.
+  - `bmd_delta` below its nominal range → bone loading (micro: ARED squat, deadlift, heel raise, treadmill; gravity: squats, lunges, push-ups).
+  - `ared_load` below its nominal range → resistance (micro: ARED squat, deadlift, heel raise; gravity: squats, push-ups, plank).
+  - Musculoskeletal zone not green → spine-protecting work (micro: ARED deadlift, squat; gravity: plank, crunches, squats).
+  - Microgravity only: `resting_hr` above or `hrv_rmssd` below range → aerobic (cycle ergometer, treadmill).
   - **Safety first:** with a cardiovascular alert, body temperature ≥ 38 °C or SpO₂ < 93 % the tab says **Do not exercise now** and recommends nothing.
-- **Banner:** *Training required today* (amber, with the reasons), *No extra training needed* (green), or *Do not exercise now* (red). The tab rail shows an amber or red **!** badge for the first and last.
-- **Exercise library (`exercises.ts`):** squats, push-ups, reverse lunges, forearm plank, crunches. Recommended ones are listed first with a **Today** chip. Each has a dose, what it works, why it matters in spaceflight, numbered steps, common mistakes and how to do it in microgravity.
-- **How it is shown:** an animated **3-D figure** (`ExerciseFigure3D.tsx`, three.js) that performs the exercise in a loop. `mannequin.ts` keeps feet, back or hands on the floor (push-up hands are fixed with 2-link IK). You can drag to turn, scroll to zoom, and pause; reduced motion starts paused. Where available, an **AI illustration** (start → end position, generated with ElevenLabs / `gpt-image-2`) can be shown instead: push-ups, crunches and squats. Lunges and plank use the 3-D figure only.
+- **Banner:** *Training required today* (amber, with the reasons), *No extra training needed* (green), or *Do not exercise now* (red), plus one line explaining the exercise set for the location. The tab rail shows an amber or red **!** badge for the first and last.
+- **Each exercise:** dose, what it works, device, why it matters in spaceflight, numbered steps, common mistakes and a tip. Recommended ones are listed first with a **Today** chip.
+- **3-D astronaut (`ExerciseFigure3D.tsx`, three.js):** a white-suited astronaut with helmet, gold visor and life-support pack performs every exercise in a loop, with its equipment (ARED platform, bar and load cables; treadmill belt and harness bungees; ergometer crank, pedals and handlebar). `mannequin.ts` keeps feet, toes, back or hands on the floor and solves elbows (push-up) and knees (pedalling) with 2-link IK. Drag to turn, scroll to zoom, pause; reduced motion starts paused.
 
 ### 2.5 Crew (`CrewTab.tsx`) — admin only
 - Grid of crew cards: callsign, name, role, sex icon, readiness (computed for that member's `defaultScenarioId`, or the active scenario for the active member), 5-dot zone status row, check-in streak, `Set active` button. Custom crew can be deleted.
