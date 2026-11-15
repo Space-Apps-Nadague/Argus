@@ -1017,7 +1017,16 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
         note: `Interactive vital reading: ${metricKey} = ${value}`,
         scenarioId: state.scenarioId,
       };
-      dispatch({ type: 'ADD_CHECK_IN', payload: entry });
+      if (serverBacked) {
+        await dataApi.checkIn(
+          entry.crewId,
+          entry.values as Record<string, number>,
+          entry.note
+        );
+        await refreshServerZones([entry.crewId]);
+      } else {
+        dispatch({ type: 'ADD_CHECK_IN', payload: entry });
+      }
       dispatch({ type: 'SET_SELECTED_ZONE', payload: zoneId });
       dispatch({ type: 'SET_SELECTED_METRIC', payload: metricKey });
 
@@ -1048,6 +1057,8 @@ export const MissionProvider: React.FC<MissionProviderProps> = ({
       state.scenarioId,
       state.environment,
       state.runtimeApiKey,
+      serverBacked,
+      refreshServerZones,
     ]
   );
 
