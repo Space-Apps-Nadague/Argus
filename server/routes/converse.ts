@@ -73,6 +73,14 @@ function formatDuration(sec: number): string {
   return `${Math.round(sec / 60)} minutes`;
 }
 
+function secondEmotion(o: VisualObservation): string {
+  if (!o.emotion) return '';
+  const second = Object.entries(o.emotion.scores)
+    .filter(([label]) => label !== o.emotion!.label && label !== 'neutral')
+    .sort((a, b) => b[1] - a[1])[0];
+  return second && second[1] >= 0.15 ? `, with some ${second[0]} (${Math.round(second[1] * 100)}%)` : '';
+}
+
 export function describeObservation(o: VisualObservation): string {
   if (!o.facePresent) return 'They are not in frame right now.';
   const lines = [
@@ -80,6 +88,9 @@ export function describeObservation(o: VisualObservation): string {
     o.blinkRatePerMin != null ? `Blink rate: ${Math.round(o.blinkRatePerMin)}/min` : '',
     o.perclos != null ? `Eyes mostly closed ${Math.round(o.perclos * 100)}% of the time` : '',
     o.yawnsPerMin ? `Yawns: ${o.yawnsPerMin.toFixed(1)}/min` : '',
+    o.emotion && o.emotion.confidence >= 0.35
+      ? `Facial emotion: mostly ${o.emotion.label} (${Math.round(o.emotion.confidence * 100)}% of the time)${secondEmotion(o)}`
+      : '',
     o.affect !== 'unknown' ? `Expression: ${o.affect}` : '',
     o.posture !== 'unknown' ? `Posture: ${o.posture}` : '',
     o.restlessness ? `Restlessness: ${o.restlessness}` : '',

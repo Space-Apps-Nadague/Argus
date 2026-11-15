@@ -84,6 +84,20 @@ export type ObservedLevel = 'low' | 'moderate' | 'high';
 export type ObservedAffect = 'neutral' | 'positive' | 'tense' | 'flat' | 'unknown';
 export type ObservedPosture = 'upright' | 'slumped' | 'leaning' | 'unknown';
 
+/** Facial-expression emotion classes recognised on-device [SRC-092]. */
+export type EmotionLabel = 'neutral' | 'happy' | 'sad' | 'angry' | 'fearful' | 'surprised' | 'disgusted';
+
+export const EMOTION_LABELS: EmotionLabel[] = ['neutral', 'happy', 'sad', 'angry', 'fearful', 'surprised', 'disgusted'];
+
+/** What the face shows, averaged over the window. An expression, not a claim about what they feel. */
+export interface ObservedEmotion {
+  label: EmotionLabel;
+  /** 0–1 share of the dominant emotion. */
+  confidence: number;
+  /** Share of each emotion over the window, summing to ~1. */
+  scores: Record<EmotionLabel, number>;
+}
+
 /** Rolling summary of what the camera sees (specs/04-ai-backend.md §4.3). */
 export interface VisualObservation {
   capturedAtIso: string;
@@ -97,6 +111,8 @@ export interface VisualObservation {
   perclos: number | null;
   yawnsPerMin: number | null;
   affect: ObservedAffect;
+  /** Emotion read from facial expression; null when no face or too little data. */
+  emotion: ObservedEmotion | null;
   fatigue: ObservedLevel | null;
   posture: ObservedPosture;
   /** Head movement: fidgeting vs still. */

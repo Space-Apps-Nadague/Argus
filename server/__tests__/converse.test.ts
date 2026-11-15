@@ -123,7 +123,7 @@ describe('POST /api/ai/converse (offline)', () => {
       messages: [{ role: 'user', content: 'I am fine' }],
       observation: {
         capturedAtIso: new Date().toISOString(), windowSec: 30, facePresent: true, presenceRatio: 1, blinkRatePerMin: 30, perclos: 0.25,
-        yawnsPerMin: 2, affect: 'flat', fatigue: 'high', posture: 'slumped', restlessness: 'low', pulseBpmEstimate: 72, pulseConfidence: 0.7, notes: [],
+        yawnsPerMin: 2, affect: 'flat', emotion: null, fatigue: 'high', posture: 'slumped', restlessness: 'low', pulseBpmEstimate: 72, pulseConfidence: 0.7, notes: [],
       },
     });
     const a = (events.find((e) => e.type === 'assessment') as Extract<ConverseEvent, { type: 'assessment' }>).assessment;

@@ -235,6 +235,7 @@ export const WellbeingLlmSchema = z.object({
 export const CommTierSchema = z.enum(['live', 'relay', 'autonomous']);
 const LevelSchema = z.enum(['low', 'moderate', 'high']);
 const ratio = () => z.number().min(0).max(1);
+const EmotionLabelSchema = z.enum(['neutral', 'happy', 'sad', 'angry', 'fearful', 'surprised', 'disgusted']);
 
 export const VisualObservationSchema = z.object({
   capturedAtIso: text(40),
@@ -245,6 +246,14 @@ export const VisualObservationSchema = z.object({
   perclos: ratio().nullable(),
   yawnsPerMin: z.number().min(0).max(30).nullable(),
   affect: z.enum(['neutral', 'positive', 'tense', 'flat', 'unknown']),
+  emotion: z
+    .object({
+      label: EmotionLabelSchema,
+      confidence: ratio(),
+      scores: z.record(EmotionLabelSchema, ratio()),
+    })
+    .nullable()
+    .optional(),
   fatigue: LevelSchema.nullable(),
   posture: z.enum(['upright', 'slumped', 'leaning', 'unknown']),
   restlessness: LevelSchema.nullable(),

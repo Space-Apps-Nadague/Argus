@@ -5,7 +5,7 @@ import { combineAssessment, extractCuesFromText, mergeCues, reportTimingFor, sho
 
 const tired: VisualObservation = {
   capturedAtIso: '2026-11-15T10:00:00Z', windowSec: 30, facePresent: true, presenceRatio: 1, blinkRatePerMin: 28, perclos: 0.22,
-  yawnsPerMin: 2, affect: 'flat', fatigue: 'high', posture: 'slumped', restlessness: 'low', pulseBpmEstimate: null, pulseConfidence: null, notes: [],
+  yawnsPerMin: 2, affect: 'flat', emotion: null, fatigue: 'high', posture: 'slumped', restlessness: 'low', pulseBpmEstimate: null, pulseConfidence: null, notes: [],
 };
 
 describe('mental state', () => {

@@ -206,6 +206,23 @@ export function cuesFromObservation(obs: VisualObservation | null | undefined): 
     cues.lowMood = 1;
     evidence.push({ source: 'camera', text: 'Flat expression' });
   }
+  // Facial emotion over the window: a sustained expression is a mild cue, never a strong one.
+  const emotion = obs.emotion;
+  if (emotion) {
+    const pct = (n: number) => `${Math.round(n * 100)}%`;
+    if (emotion.scores.sad >= 0.35) {
+      cues.lowMood = Math.max(cues.lowMood ?? 0, emotion.scores.sad >= 0.6 ? 2 : 1);
+      evidence.push({ source: 'camera', text: `Sad expression ${pct(emotion.scores.sad)} of the time` });
+    }
+    if (emotion.scores.fearful >= 0.3) {
+      cues.anxiety = Math.max(cues.anxiety ?? 0, emotion.scores.fearful >= 0.55 ? 2 : 1);
+      evidence.push({ source: 'camera', text: `Fearful expression ${pct(emotion.scores.fearful)} of the time` });
+    }
+    if (emotion.scores.angry + emotion.scores.disgusted >= 0.35) {
+      cues.stress = Math.max(cues.stress ?? 0, emotion.scores.angry + emotion.scores.disgusted >= 0.6 ? 2 : 1);
+      evidence.push({ source: 'camera', text: `Angry or tense expression ${pct(emotion.scores.angry + emotion.scores.disgusted)} of the time` });
+    }
+  }
   if (obs.restlessness === 'high') {
     cues.anxiety = 1;
     evidence.push({ source: 'camera', text: 'Restless, moving a lot' });

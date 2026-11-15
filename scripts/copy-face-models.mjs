@@ -1,4 +1,4 @@
-// Copies the three Face ID models from @vladmandic/face-api into public/models/face
+// Copies the Face ID and facial-expression models from @vladmandic/face-api into public/models/face
 // so Vite serves them (offline, no CDN). Runs before `dev` and `build`.
 import { copyFileSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const src = join(root, 'node_modules', '@vladmandic', 'face-api', 'model');
 const dest = join(root, 'public', 'models', 'face');
-const MODELS = ['tiny_face_detector_model', 'face_landmark_68_model', 'face_recognition_model'];
+const MODELS = ['tiny_face_detector_model', 'face_landmark_68_model', 'face_recognition_model', 'face_expression_model'];
 
 if (!existsSync(src)) {
   console.warn('[face-models] @vladmandic/face-api not installed; Face ID will be unavailable.');
