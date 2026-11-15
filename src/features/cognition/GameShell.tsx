@@ -17,13 +17,15 @@ interface Props {
   def: CognitionGameDef;
   seed: number;
   isRetest: boolean;
+  /** Played from the "All games" list. */
+  practice?: boolean;
   /** Camera health check during the game. */
   camera: boolean;
   onFinish: (r: GameResult, face: FaceVitalsSummary | null) => void;
   onCancel: () => void;
 }
 
-export const GameShell: React.FC<Props> = ({ def, seed, isRetest, camera, onFinish, onCancel }) => {
+export const GameShell: React.FC<Props> = ({ def, seed, isRetest, practice = false, camera, onFinish, onCancel }) => {
   const [phase, setPhase] = useState<'intro' | 'count' | 'play'>('intro');
   const [count, setCount] = useState(3);
   const [hud, setHud] = useState<GameProgress>({ points: 0, progress: 0 });
@@ -52,7 +54,7 @@ export const GameShell: React.FC<Props> = ({ def, seed, isRetest, camera, onFini
       <div className="mb-4 flex items-center gap-3">
         <div className="min-w-0">
           <p className="font-display text-xs tracking-[0.2em] text-hud-muted">
-            {isRetest ? 'RETEST' : 'TODAY’S GAME'} · {def.nasaTest.toUpperCase()}
+            {practice ? 'PRACTICE' : isRetest ? 'RETEST' : 'TODAY’S GAME'} · {def.nasaTest.toUpperCase()}
           </p>
           <h3 className="font-display text-xl font-bold text-hud-text">{def.title}</h3>
         </div>

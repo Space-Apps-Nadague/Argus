@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { mulberry32 } from '../rng';
 import {
   compareFace,
+  faceAlertDecision,
   countBlinks,
   estimateHeartRate,
   gazeJitter,
@@ -94,5 +95,28 @@ describe('camera health check', () => {
     expect(f.faceWidthRatio.flag).toBe('changed');
     expect(f.heartRate.flag).toBe('usual');
     expect(f.gazeJitter.flag).toBe('usual');
+    const alert = faceAlertDecision(compareFace(today, [base, base, base]))!;
+    expect(alert.severity).toBe('yellow');
+    expect(alert.reasons).toHaveLength(2);
+    expect(alert.notifyEarth).toBe(false);
+  });
+
+  it('alerts from the first game when a sign is past an absolute limit', () => {
+    const s: FaceVitalsSummary = { seconds: 180, faceSeenPct: 95, blinkRate: 12, eyesClosedPct: 34, gazeJitter: 0.5, skinL: 60, skinA: 14, faceWidthRatio: 1.6, heartRate: 128, heartRateQuality: 0.6 };
+    const f = Object.fromEntries(compareFace(s, []).map((x) => [x.key, x]));
+    expect(f.heartRate.flag).toBe('out_of_range');
+    expect(f.eyesClosedPct.flag).toBe('out_of_range');
+    expect(f.skinA.flag).toBeNull(); // colour needs a baseline
+    const a = faceAlertDecision(compareFace(s, []))!;
+    expect(a.severity).toBe('yellow');
+    expect(a.onboardSteps.join(' ')).toContain('watch or finger oximeter');
+    const red = faceAlertDecision(compareFace({ ...s, heartRate: 150 }, []))!;
+    expect(red.severity).toBe('red');
+    expect(red.notifyEarth).toBe(true);
+  });
+
+  it('no alert when everything is fine', () => {
+    const s: FaceVitalsSummary = { seconds: 180, faceSeenPct: 95, blinkRate: 12, eyesClosedPct: 3, gazeJitter: 0.5, skinL: 60, skinA: 14, faceWidthRatio: 1.6, heartRate: 72, heartRateQuality: 0.6 };
+    expect(faceAlertDecision(compareFace(s, []))).toBeNull();
   });
 });

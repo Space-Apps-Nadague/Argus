@@ -57,6 +57,8 @@ export interface CognitionSession extends GameResult {
   timestampIso: string;
   /** False for a retest after an alert: does not count as the daily game. */
   daily: boolean;
+  /** Played from the "All games" list (practice), not the daily rotation. */
+  practice?: boolean;
 }
 
 export type CognitionStatus = TriageStatus | 'calibrating';

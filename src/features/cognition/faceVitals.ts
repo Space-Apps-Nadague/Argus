@@ -13,6 +13,8 @@
  *    each heartbeat. Only reported when the signal is clean enough.
  */
 
+import type { CareDecision } from './types';
+
 export interface FaceFrame {
   /** ms */
   t: number;
@@ -201,10 +203,26 @@ export interface FaceFinding {
   value: number | null;
   unit: string;
   baseline: number | null;
-  /** null while calibrating or without a value. */
-  flag: 'usual' | 'changed' | null;
+  /**
+   * out_of_range: past an absolute limit (works from the first game). changed: differs from the
+   * personal baseline. usual: neither. null: no value, or calibrating and within the limits.
+   */
+  flag: 'usual' | 'changed' | 'out_of_range' | null;
+  severity?: 'yellow' | 'red';
   note: string;
 }
+
+/**
+ * Absolute limits that raise an alert even before a baseline exists (ARGUS screening heuristics for
+ * a seated 3-minute game, not clinical cut-offs). Pallor and face fullness have no absolute limit:
+ * they depend on the camera and light, so they are only compared with the baseline.
+ */
+export const FACE_ABSOLUTE: Partial<Record<FaceMetricKey, { low?: number; high?: number; red?: { low?: number; high?: number }; note: string }>> = {
+  heartRate: { low: 45, high: 120, red: { low: 40, high: 140 }, note: 'Heart rate outside the usual resting range while seated.' },
+  eyesClosedPct: { high: 30, red: { high: 50 }, note: 'Eyes closed for a large part of the game: strong fatigue sign.' },
+  blinkRate: { high: 40, note: 'Very frequent blinking (eye irritation or fatigue).' },
+  gazeJitter: { high: 3, note: 'Gaze very unsteady during the game.' },
+};
 
 /** Sessions needed before a baseline is used. */
 export const FACE_BASELINE_MIN = 3;
@@ -228,11 +246,51 @@ export function compareFace(current: FaceVitalsSummary, history: FaceVitalsSumma
     const past = history.map((h) => h[r.key]).filter((x): x is number => x !== null).slice(-7);
     const baseline = past.length >= FACE_BASELINE_MIN ? median(past) : null;
     if (value === null) return { key: r.key, label: r.label, value, unit: r.unit, baseline, flag: null, note: 'Not enough clean video this time.' };
+    const abs = FACE_ABSOLUTE[r.key];
+    if (abs && ((abs.high !== undefined && value >= abs.high) || (abs.low !== undefined && value <= abs.low))) {
+      const red = abs.red && ((abs.red.high !== undefined && value >= abs.red.high) || (abs.red.low !== undefined && value <= abs.red.low));
+      return { key: r.key, label: r.label, value, unit: r.unit, baseline: baseline === null ? null : round(baseline, 3), flag: 'out_of_range', severity: red ? 'red' : 'yellow', note: abs.note };
+    }
     if (baseline === null)
       return { key: r.key, label: r.label, value, unit: r.unit, baseline, flag: null, note: `Calibrating ${past.length}/${FACE_BASELINE_MIN}` };
     const changed = r.changed(value, baseline);
-    return { key: r.key, label: r.label, value, unit: r.unit, baseline: round(baseline, 3), flag: changed ? 'changed' : 'usual', note: changed ? r.note : r.usual };
+    return {
+      key: r.key,
+      label: r.label,
+      value,
+      unit: r.unit,
+      baseline: round(baseline, 3),
+      flag: changed ? 'changed' : 'usual',
+      severity: changed ? 'yellow' : undefined,
+      note: changed ? r.note : r.usual,
+    };
   });
+}
+
+const fmtValue = (f: FaceFinding) => `${f.value}${f.unit ? ` ${f.unit}` : ''}${f.baseline !== null ? ` (usual ${f.baseline})` : ''}`;
+
+/** Alert after a game when a camera sign is out of range or changed from the baseline; null when all is well. */
+export function faceAlertDecision(findings: FaceFinding[]): CareDecision | null {
+  const hits = findings.filter((f) => f.flag === 'out_of_range' || f.flag === 'changed');
+  if (!hits.length) return null;
+  const red = hits.some((f) => f.severity === 'red');
+  const steps = [
+    'Stop the current task and rest for 10 minutes.',
+    'Check again: play another game with the health check on, facing the camera in even light.',
+    'If it repeats or you feel unwell, tell the Crew Medical Officer.',
+  ];
+  if (hits.some((f) => f.key === 'heartRate')) steps.splice(1, 0, 'Measure heart rate with the watch or finger oximeter now.');
+  if (hits.some((f) => f.key === 'skinA')) steps.splice(1, 0, 'Look for other signs of blood loss or low blood pressure: dizziness, cold sweat, fast pulse.');
+  if (hits.some((f) => f.key === 'faceWidthRatio')) steps.splice(1, 0, 'Note headache, blurred vision or nasal congestion (fluid shift); log it in a check-in.');
+  return {
+    route: 'onboard',
+    severity: red ? 'red' : 'yellow',
+    headline: red ? 'Camera health check: sign out of the safe range' : 'Camera health check: sign different from usual',
+    reasons: hits.map((f) => `${f.label}: ${fmtValue(f)}. ${f.note}`),
+    onboardSteps: steps,
+    notifyEarth: red,
+    openMedicalProtocol: red,
+  };
 }
 
 // ── Storage (this device) ────────────────────────────────────────────────────

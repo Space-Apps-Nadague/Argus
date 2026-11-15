@@ -11,7 +11,7 @@ import { formatCommDelay } from '../data/spaceLocations';
 import { Card } from './ui/Card';
 import { StatusPill } from './ui/StatusPill';
 import { InfoTip } from './InfoTip';
-import { GAME_BY_ID } from '../features/cognition/catalog';
+import { COGNITION_GAMES, GAME_BY_ID } from '../features/cognition/catalog';
 import { dateKeyOf, gameOfTheDay } from '../features/cognition/schedule';
 import { dailyStreak, evaluateSession, leaderboard, personalBest } from '../features/cognition/scoring';
 import { decideCare, earthPacketNote } from '../features/cognition/routing';
@@ -21,7 +21,7 @@ import { isGameMuted, setGameMuted } from '../features/cognition/sfx';
 import { GameShell } from '../features/cognition/GameShell';
 import { CognitionAlert } from '../features/cognition/CognitionAlert';
 import { FaceVitalsCard } from '../features/cognition/FaceVitalsCard';
-import { compareFace, loadFaceHistory, saveFaceSummary, type FaceFinding, type FaceVitalsSummary } from '../features/cognition/faceVitals';
+import { compareFace, faceAlertDecision, loadFaceHistory, saveFaceSummary, type FaceFinding, type FaceVitalsSummary } from '../features/cognition/faceVitals';
 import type { CareDecision, CognitionEvaluation, CognitionGameId, CognitionSession, GameResult } from '../features/cognition/types';
 
 interface LastRun {
@@ -29,7 +29,7 @@ interface LastRun {
   evaluation: CognitionEvaluation;
   decision: CareDecision;
   newBest: boolean;
-  face?: { summary: FaceVitalsSummary; findings: FaceFinding[] };
+  face?: { summary: FaceVitalsSummary; findings: FaceFinding[]; decision: CareDecision | null };
 }
 
 const CAMERA_KEY = 'argus.cognition.camera';
@@ -47,9 +47,11 @@ const statusLabel = (e: CognitionEvaluation) =>
 export const CognitionTab: React.FC = () => {
   const { activeCrewMember, crewRoster, zoneStatuses, queueEarthPacket, addCheckIn, latestDay, spaceLocation, setActiveTab } = useMission();
   const { byCrew, addSession } = useCognitionStore();
-  const [playing, setPlaying] = useState<{ gameId: CognitionGameId; retest: boolean } | null>(null);
+  const [playing, setPlaying] = useState<{ gameId: CognitionGameId; retest: boolean; practice?: boolean } | null>(null);
   const [last, setLast] = useState<LastRun | null>(null);
   const [alertOpen, setAlertOpen] = useState(false);
+  const [healthAlertOpen, setHealthAlertOpen] = useState(false);
+  const [healthPacket, setHealthPacket] = useState<{ id: string; delay: string } | null>(null);
   const [packet, setPacket] = useState<{ id: string; delay: string } | null>(null);
   const [muted, setMuted] = useState(isGameMuted());
   const [cameraOn, setCameraOn] = useState(loadCameraOn);
@@ -68,7 +70,7 @@ export const CognitionTab: React.FC = () => {
   );
   const nameOf = (id: string) => crewRoster.find((c) => c.id === id)?.callsign ?? id;
 
-  const finish = (gameId: CognitionGameId, retest: boolean, r: GameResult, faceSummary: FaceVitalsSummary | null) => {
+  const finish = (gameId: CognitionGameId, retest: boolean, r: GameResult, faceSummary: FaceVitalsSummary | null, practice = false) => {
     const nowIso = new Date().toISOString();
     const session: CognitionSession = {
       ...r,
@@ -78,6 +80,7 @@ export const CognitionTab: React.FC = () => {
       dateKey: todayKey,
       timestampIso: nowIso,
       daily: !retest,
+      ...(practice ? { practice: true } : {}),
     };
     const prevBest = personalBest(history, gameId);
     const evaluation = evaluateSession(session, history);
@@ -113,13 +116,21 @@ export const CognitionTab: React.FC = () => {
       setPacket({ id: pkt.packetId, delay: formatCommDelay(spaceLocation) });
     }
     let face: LastRun['face'];
+    setHealthPacket(null);
     if (faceSummary) {
       const findings = compareFace(faceSummary, loadFaceHistory(crewId));
       if (faceSummary.faceSeenPct >= 50) saveFaceSummary({ ...faceSummary, crewId, sessionId: session.id, timestampIso: nowIso });
-      face = { summary: faceSummary, findings };
+      const faceDecision = faceAlertDecision(findings);
+      if (faceDecision?.notifyEarth) {
+        const pkt = queueEarthPacket(`ARGUS camera health check (${activeCrewMember.callsign}): ${faceDecision.reasons.join(' ')}`);
+        setHealthPacket({ id: pkt.packetId, delay: formatCommDelay(spaceLocation) });
+      }
+      face = { summary: faceSummary, findings, decision: faceDecision };
     }
     setLast({ session, evaluation, decision, newBest: history.some((s) => s.gameId === gameId) && r.points > prevBest, face });
     setAlertOpen(decision.route !== 'none');
+    // The health check alert shows after the cognition alert is closed (or straight away).
+    setHealthAlertOpen(decision.route === 'none' && Boolean(face?.decision));
     setPlaying(null);
   };
 
@@ -176,8 +187,9 @@ export const CognitionTab: React.FC = () => {
           def={GAME_BY_ID[playing.gameId]}
           seed={seedFor(playing.gameId, playing.retest)}
           isRetest={playing.retest}
+          practice={playing.practice}
           camera={cameraOn}
-          onFinish={(r, face) => finish(playing.gameId, playing.retest, r, face)}
+          onFinish={(r, face) => finish(playing.gameId, playing.retest, r, face, playing.practice)}
           onCancel={() => setPlaying(null)}
         />
       ) : (
@@ -259,9 +271,30 @@ export const CognitionTab: React.FC = () => {
 
           {last?.face && (
             <div className="lg:col-span-3">
-              <FaceVitalsCard summary={last.face.summary} findings={last.face.findings} />
+              <FaceVitalsCard
+                summary={last.face.summary}
+                findings={last.face.findings}
+                onViewAlert={last.face.decision ? () => setHealthAlertOpen(true) : undefined}
+              />
             </div>
           )}
+
+          <Card title="All games · practice" icon={<Brain className="h-4 w-4" />} className="lg:col-span-3">
+            <p className="mb-3 text-xs text-hud-muted">Play any game, any time. Practice does not replace today’s game; results still count toward your baseline.</p>
+            <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {COGNITION_GAMES.map((g) => (
+                <li key={g.id} className="flex items-center gap-3 rounded-xl border border-hud-line bg-hud-bg/60 p-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-display text-sm font-bold text-hud-text">{g.title}</p>
+                    <p className="truncate text-xs text-hud-muted">{g.nasaTest} · 3 min</p>
+                  </div>
+                  <button type="button" className="hud-btn" onClick={() => setPlaying({ gameId: g.id, retest: true, practice: true })} aria-label={`Play ${g.title}`}>
+                    <Play className="h-3.5 w-3.5" aria-hidden="true" /> Play
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </Card>
 
           <Card title="Your recent games" className="lg:col-span-3">
             {recent.length === 0 ? (
@@ -287,7 +320,7 @@ export const CognitionTab: React.FC = () => {
                           <td className="py-1.5 pr-3 font-mono text-xs text-hud-muted">{s.dateKey}</td>
                           <td className="py-1.5 pr-3">
                             {def.title}
-                            {!s.daily && <span className="ml-1 text-xs text-hud-muted">(retest)</span>}
+                            {!s.daily && <span className="ml-1 text-xs text-hud-muted">({s.practice ? 'practice' : 'retest'})</span>}
                           </td>
                           <td className="py-1.5 pr-3 font-mono">{s.points}</td>
                           <td className="py-1.5 pr-3 font-mono text-xs">
@@ -320,7 +353,27 @@ export const CognitionTab: React.FC = () => {
             setAlertOpen(false);
             setActiveTab('emergency');
           }}
-          onClose={() => setAlertOpen(false)}
+          onClose={() => {
+            setAlertOpen(false);
+            if (last.face?.decision) setHealthAlertOpen(true);
+          }}
+        />
+      )}
+      {healthAlertOpen && !alertOpen && last?.face?.decision && (
+        <CognitionAlert
+          kind="health"
+          decision={last.face.decision}
+          gameTitle={GAME_BY_ID[last.session.gameId].title}
+          earthPacket={healthPacket}
+          onRetest={() => {
+            setHealthAlertOpen(false);
+            setPlaying({ gameId: last.session.gameId, retest: true, practice: true });
+          }}
+          onOpenEmergency={() => {
+            setHealthAlertOpen(false);
+            setActiveTab('emergency');
+          }}
+          onClose={() => setHealthAlertOpen(false)}
         />
       )}
       {!playing && last?.decision.route !== 'none' && last && !alertOpen && (

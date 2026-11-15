@@ -13,9 +13,11 @@ interface Props {
   onRetest: () => void;
   onOpenEmergency: () => void;
   onClose: () => void;
+  /** health: camera health check alert (same layout, different label). */
+  kind?: 'cognition' | 'health';
 }
 
-export const CognitionAlert: React.FC<Props> = ({ decision, gameTitle, earthPacket, onRetest, onOpenEmergency, onClose }) => {
+export const CognitionAlert: React.FC<Props> = ({ decision, gameTitle, earthPacket, onRetest, onOpenEmergency, onClose, kind = 'cognition' }) => {
   const [done, setDone] = useState<Record<number, boolean>>({});
   const ref = useRef<HTMLDivElement>(null);
   const red = decision.severity === 'red';
@@ -40,7 +42,7 @@ export const CognitionAlert: React.FC<Props> = ({ decision, gameTitle, earthPack
         <div className={`flex items-center gap-4 rounded-t-2xl px-5 py-4 ${red ? 'bg-status-red' : 'bg-status-yellow'}`}>
           <AlertTriangle className="h-12 w-12 shrink-0 text-hud-bg" aria-hidden="true" />
           <div className="text-hud-bg">
-            <p className="font-display text-xs font-bold tracking-[0.25em]">{red ? 'COGNITIVE ALERT' : 'COGNITIVE CAUTION'}</p>
+            <p className="font-display text-xs font-bold tracking-[0.25em]">{kind === 'health' ? (red ? 'HEALTH CHECK ALERT' : 'HEALTH CHECK CAUTION') : red ? 'COGNITIVE ALERT' : 'COGNITIVE CAUTION'}</p>
             <h2 id="cog-alert-title" className="font-display text-2xl font-bold">
               {red ? 'Take action now' : 'Check in before your next task'}
             </h2>
