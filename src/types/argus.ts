@@ -23,7 +23,15 @@ export type AnatomicalLayer = 'all' | 'dermal' | 'skeletal' | 'organs';
 
 export type TriageStatus = 'green' | 'yellow' | 'red';
 
-export type ScenarioId = 'nominal' | 'unexplained_fatigue' | 'sans_alert' | 'high_co2' | 'solar_storm';
+export type ScenarioId =
+  | 'nominal'
+  | 'unexplained_fatigue'
+  | 'sans_alert'
+  | 'high_co2'
+  | 'solar_storm'
+  | 'dehydration'
+  | 'sleep_loss'
+  | 'deconditioning';
 
 export type MetricId =
   | 'onsd'
@@ -44,7 +52,19 @@ export type MetricId =
   | 'sleep_eff'
   | 'pvt_lapses'
   | 'daily_sleep_hours'
-  | 'mood_index';
+  | 'mood_index'
+  | 'diastolic_bp'
+  | 'sleep_resp_rate'
+  | 'vo2_max'
+  | 'hemoglobin'
+  | 'urine_sg'
+  | 'grip_strength'
+  | 'body_mass_delta'
+  | 'crp'
+  | 'cortisol'
+  | 'reaction_time'
+  | 'headache_severity'
+  | 'hyperopic_shift';
 
 export type HudTabId =
   | 'biotwin'
@@ -90,24 +110,6 @@ export interface UserAccount {
   crewId?: string;
   createdAtIso: string;
   disabled?: boolean;
-}
-
-/** Emergency protocols (specs/01-data-schema.md §10) */
-export type EmergencyProtocolId = 'fire' | 'depress' | 'toxic' | 'medical' | 'radiation' | 'co2';
-
-export interface EmergencyProtocol {
-  id: EmergencyProtocolId;
-  title: string;
-  icon: string;
-  trigger: string;
-  steps: string[];
-}
-
-export interface EmergencyRun {
-  protocolId: EmergencyProtocolId;
-  crewId: string;
-  startedAtIso: string;
-  completed: Record<number, string>;
 }
 
 export type BloodType = 'O+' | 'O-' | 'A+' | 'A-' | 'B+' | 'B-' | 'AB+' | 'AB-';

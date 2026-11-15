@@ -1,9 +1,17 @@
 /**
- * ARGUS — Emergency protocols (specs/01-data-schema.md §10, specs/02-ui-dashboard.md §2.4c)
+ * ARGUS — Emergency protocols, run inside the ARGUS console (specs/02-ui-dashboard.md §2.4).
  * Generic training aid based on public ISS practice — not a substitute for mission flight rules.
  */
 
-import type { EmergencyProtocol } from '../types/argus';
+export type EmergencyProtocolId = 'fire' | 'depress' | 'toxic' | 'medical' | 'radiation' | 'co2';
+
+export interface EmergencyProtocol {
+  id: EmergencyProtocolId;
+  title: string;
+  icon: string;
+  trigger: string;
+  steps: string[];
+}
 
 export const EMERGENCY_PROTOCOLS: EmergencyProtocol[] = [
   {

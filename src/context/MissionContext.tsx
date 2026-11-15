@@ -70,7 +70,7 @@ import {
 } from '../services/flightSurgeonAi';
 
 const CREW_STORAGE_KEY = 'argus_crew_roster_v1';
-const GUIDANCE_SCENARIO_ORDER: ScenarioId[] = ['nominal', 'unexplained_fatigue', 'sans_alert', 'high_co2', 'solar_storm'];
+const GUIDANCE_SCENARIO_ORDER: ScenarioId[] = ['nominal', 'unexplained_fatigue', 'sans_alert', 'high_co2', 'solar_storm', 'dehydration', 'sleep_loss', 'deconditioning'];
 
 const URGENCY_RANK: Record<FlightSurgeonGuidance['earthConsultUrgency'], number> = {
   routine_downlink: 0,

@@ -19,7 +19,7 @@ import { hasConfiguredAiKey } from '../services/flightSurgeonAi';
 import { ProviderBadge, useAiStatus } from './ai/shared';
 import { StatusIcon, STATUS_WORD } from './ui/StatusPill';
 
-const SCENARIO_ORDER: ScenarioId[] = ['nominal', 'unexplained_fatigue', 'sans_alert', 'high_co2', 'solar_storm'];
+const SCENARIO_ORDER: ScenarioId[] = ['nominal', 'unexplained_fatigue', 'sans_alert', 'high_co2', 'solar_storm', 'dehydration', 'sleep_loss', 'deconditioning'];
 
 export const readinessStatus = (score: number): TriageStatus =>
   score >= 85 ? 'green' : score >= 70 ? 'yellow' : 'red';

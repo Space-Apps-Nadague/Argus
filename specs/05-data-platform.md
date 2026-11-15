@@ -114,11 +114,11 @@ No public dataset has per-astronaut, minute-level vitals. NASA LSDA and LSAH dat
 | Kind | Worn? | Streams | Cadence stored |
 |---|---|---|---|
 | `smartwatch` | worn | `heart_rate`, `activity`, `sleep_state` | every 1 min |
-| | | `spo2`, `resp_rate` | every 5 min |
-| | | `resting_hr`, `hrv_rmssd`, `sleep_eff`, `wrist_temp`, `wrist_temp_dev` | nightly, at wake-up |
+| | | `spo2`, `resp_rate`, `skin_temp` | every 2 min (`DEFAULT_SECONDARY_EVERY_MIN`; `--full` = 1 min) |
+| | | `resting_hr`, `hrv_rmssd`, `sleep_eff`, `wrist_temp`, `wrist_temp_dev`, `sleep_resp_rate` | nightly, at wake-up |
 | | | `bp_sys`, `bp_dia` | 3 spot readings a day while seated. Cuff calibration every 28 days [SRC-075] |
-| | | `pvt_lapses` (reaction-time app) | daily |
-| | | wellbeing tap-survey | daily |
+| | | `pvt_lapses`, `reaction_time` (PVT app) | daily |
+| | | wellbeing tap-survey (`mood_index`, `headache_severity`) | daily |
 | `dosimeter` | worn | `dose_rate` (µGy/h); the daily `rad_dose` is derived from it | every 1 min |
 | `cgm` | worn | `blood_glucose` (interstitial mg/dL, trend, Time-in-Range) [SRC-028, SRC-072, SRC-073] | every 5 min |
 | `habitat_sensor` | no | `cabin_co2` | automatic |
@@ -165,7 +165,7 @@ Computed per astronaut × metric. As NASA does, in-flight values are compared wi
 
 | Kind | Method |
 |---|---|
-| `preflight` | **Earth pre-flight**: daily values dated before `missions.start_at` (default 14 days, `--preflight-days`). Mean and SD, with SD floored at `METRIC_TYPICAL_SD`. This is the reference for drift. Without at least 2 Earth days (e.g. `cabin_co2`, `ared_load`, which only exist in the habitat), it falls back to `early_flight`. |
+| `preflight` | **Earth pre-flight**: daily values dated before `missions.start_at` (default 30 days, `--preflight-days`). Mean and SD, with SD floored at `METRIC_TYPICAL_SD`. This is the reference for drift. Without at least 2 Earth days (e.g. `cabin_co2`, `ared_load`, which only exist in the habitat), it falls back to `early_flight`. |
 | `early_flight` | Mission days 1–7: the adaptation reference. Radiation (`rad_dose`) drifts from this one, because its rise from Earth is environmental, not physiological (`DRIFT_FROM_EARLY_FLIGHT`). |
 | `rolling_14d` | The last 14 in-flight days: median, MAD, mean, SD, p05 and p95. This is the "your normal" band in the HUD. |
 | `hour_of_day` | `heart_rate` minute data over 14 days, grouped by UTC hour. This is the circadian reference, so the 03:00 heart rate is compared with that person's own 03:00. |

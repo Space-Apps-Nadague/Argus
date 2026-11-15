@@ -45,7 +45,9 @@ export function computePresetValue(
   const threshold = getMetricThreshold(metricId, environment);
   const range = METRIC_INPUT_RANGES[metricId];
   const clamp = (v: number) => Math.min(range.max, Math.max(range.min, v));
-  const round = (v: number) => Number(v.toFixed(1));
+  // Narrow-range metrics such as urine specific gravity (1.005–1.025) need 3 decimals to land in the right band.
+  const digits = range.max - range.min <= 0.1 ? 3 : 1;
+  const round = (v: number) => Number(v.toFixed(digits));
 
   if (preset === 'nominal') {
     return round(clamp((threshold.nominalMin + threshold.nominalMax) / 2));

@@ -6,7 +6,6 @@
 import React, { useMemo, useState } from 'react';
 import { Brain, CalendarCheck, Flame, Medal, RotateCcw, Trophy, Volume2, VolumeX, Play } from 'lucide-react';
 import { useMission } from '../context/MissionContext';
-import { useAssistant } from '../context/AssistantContext';
 import { formatCommDelay } from '../data/spaceLocations';
 import { Card } from './ui/Card';
 import { StatusPill } from './ui/StatusPill';
@@ -34,7 +33,6 @@ const statusLabel = (e: CognitionEvaluation) =>
 
 export const CognitionTab: React.FC = () => {
   const { activeCrewMember, crewRoster, zoneStatuses, queueEarthPacket, addCheckIn, latestDay, spaceLocation, setActiveTab } = useMission();
-  const { setEmergencyPickerOpen } = useAssistant();
   const { byCrew, addSession } = useCognitionStore();
   const [playing, setPlaying] = useState<{ gameId: CognitionGameId; retest: boolean } | null>(null);
   const [last, setLast] = useState<LastRun | null>(null);
@@ -309,11 +307,6 @@ export const CognitionTab: React.FC = () => {
           onRetest={() => {
             setAlertOpen(false);
             setPlaying({ gameId: last.session.gameId, retest: true });
-          }}
-          onOpenEmergency={() => {
-            setAlertOpen(false);
-            setEmergencyPickerOpen(true);
-            setActiveTab('console');
           }}
           onClose={() => setAlertOpen(false)}
         />

@@ -21,7 +21,7 @@ const CREW_ROLES: CrewRole[] = [
   'Payload & Science Specialist',
   'EVA Surface Specialist',
 ];
-const SCENARIO_IDS: ScenarioId[] = ['nominal', 'unexplained_fatigue', 'sans_alert', 'high_co2', 'solar_storm'];
+const SCENARIO_IDS: ScenarioId[] = ['nominal', 'unexplained_fatigue', 'sans_alert', 'high_co2', 'solar_storm', 'dehydration', 'sleep_loss', 'deconditioning'];
 
 const Field: React.FC<{ id: string; label: string; className?: string; children: React.ReactNode }> = ({
   id,

@@ -5,10 +5,9 @@
  */
 
 import React, { useRef } from 'react';
-import { Activity, Bot, Brain, Camera, Eye, LineChart, Siren, Telescope, UserCog, Users } from 'lucide-react';
+import { Activity, Bot, Brain, Camera, Eye, LineChart, Telescope, UserCog, Users } from 'lucide-react';
 import { HudTabId } from '../types/argus';
 import { useMission } from '../context/MissionContext';
-import { useAssistant } from '../context/AssistantContext';
 
 export interface HudTabDef {
   id: HudTabId;
@@ -46,7 +45,6 @@ export const panelId = (id: HudTabId) => `hud-panel-${id}`;
 
 export const TabBar: React.FC<{ access: TabAccess; activeTab: HudTabId }> = ({ access, activeTab }) => {
   const { setActiveTab, zoneStatuses } = useMission();
-  const { setEmergencyPickerOpen, emergency } = useAssistant();
   const refs = useRef<Record<string, HTMLButtonElement | null>>({});
   const tabs = visibleTabs(access);
   const redCount = Object.values(zoneStatuses).filter((s) => s === 'red').length;
@@ -110,20 +108,6 @@ export const TabBar: React.FC<{ access: TabAccess; activeTab: HudTabId }> = ({ a
               </button>
             );
           })}
-        </div>
-        <div className="flex items-center px-2 py-1.5 md:px-2 md:pb-4">
-          <button
-            type="button"
-            onClick={() => {
-              setEmergencyPickerOpen(true);
-              setActiveTab('console');
-            }}
-            className="hud-focus flex items-center justify-center gap-2 rounded-lg border border-red-500/60 bg-red-600/20 px-3 py-2 font-display text-xs font-bold tracking-widest text-red-200 transition-colors hover:bg-red-600/40 md:w-full"
-            aria-label={emergency ? `SOS: emergency running, ${emergency.title}` : 'SOS: open emergency protocols'}
-          >
-            <Siren className="h-4 w-4" aria-hidden="true" />
-            SOS
-          </button>
         </div>
       </div>
     </nav>

@@ -110,7 +110,7 @@ export const VOICE_TOOL_DECLARATIONS: VoiceToolDeclaration[] = [
         metricId: {
           type: 'STRING',
           description:
-            'Canonical metric ID (onsd, iop, cabin_co2, resting_hr, hrv_rmssd, spo2, systolic_bp, hydration_intake, bmd_delta, ared_load, blood_glucose, caloric_intake, rad_dose, wbc_lymph, core_temp, sleep_eff, pvt_lapses, daily_sleep_hours, mood_index).',
+            'Canonical metric ID (onsd, iop, cabin_co2, resting_hr, hrv_rmssd, spo2, systolic_bp, hydration_intake, bmd_delta, ared_load, blood_glucose, caloric_intake, rad_dose, wbc_lymph, core_temp, sleep_eff, pvt_lapses, daily_sleep_hours, mood_index, diastolic_bp, sleep_resp_rate, vo2_max, hemoglobin, urine_sg, grip_strength, body_mass_delta, crp, cortisol, reaction_time, headache_severity, hyperopic_shift).',
         },
         value: {
           type: 'NUMBER',
