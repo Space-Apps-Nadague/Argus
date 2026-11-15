@@ -1,6 +1,7 @@
 /**
  * ARGUS — Forecast tab (specs/02-ui-dashboard.md §2.3)
- * Readable 3-day outlook: readiness per day + one plain sentence per metric, worst first.
+ * Readable 3-day outlook: readiness per day + one plain sentence per metric, worst first,
+ * then the health outlook (possible conditions and the checks that confirm or rule them out).
  */
 
 import React, { useMemo, useState } from 'react';
@@ -10,6 +11,7 @@ import { buildForecastSummary, type ForecastDirection, formatValue } from '../ut
 import { STATUS_COLORS } from '../utils/triageEngine';
 import { readinessStatus } from './TopMissionBar';
 import { Card } from './ui/Card';
+import { HealthOutlookCard } from './HealthOutlookCard';
 import { StatusIcon, StatusPill, STATUS_WORD } from './ui/StatusPill';
 import { ZoneIcon, ZONE_SHORT_NAME } from './ui/ZoneIcon';
 
@@ -127,6 +129,8 @@ export const ForecastTab: React.FC = () => {
           Projection from the last 10 days with a 90% range. Not a diagnosis. Tap a row to open its trend.
         </p>
       </Card>
+
+      <HealthOutlookCard />
     </div>
   );
 };
