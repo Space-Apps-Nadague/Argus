@@ -27,7 +27,7 @@
   - **Location / Habitat Selector** dropdown (`iss_leo`, `lunar_base`, `0g_transit`, `mars_base` presets) dynamically updating comm delay, gravity thresholds, Earth packet metadata, and autonomous urgency.
   - **Crew Readiness Score** `0–100%` with status color + daily countermeasure streak.
   - **Milestone Badges Trigger**: Interactive badge chip (`🏆 <n> Badges`) with popover/modal to inspect unlocked readiness milestones and streak progress (`REQ-09`).
-  - **Simulate Medical Event** dropdown (`nominal`, `sans_alert`, `high_co2`, `solar_storm`).
+  - **Simulate Medical Event** dropdown (`nominal`, `unexplained_fatigue`, `sans_alert`, `high_co2`, `solar_storm`).
   - Optional Clinical AI key button (icon only + tooltip).
   - **Crew Roster Strip:** selectable pills (callsign, name, live readiness dot) + `+ Add crew` (opens `CrewManagerModal.tsx` in create mode).
 - **Scheduled Mission Routine Banner (`ScheduledRoutineBanner.tsx`, PR #22):** shown above tab content for users who can see health data.

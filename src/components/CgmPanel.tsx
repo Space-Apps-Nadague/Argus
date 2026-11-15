@@ -46,8 +46,8 @@ function formatMinute(minuteOfDay: number): string {
 }
 
 export const CgmPanel: React.FC = () => {
-  const { activeCrewId } = useMission();
-  const dataset = useMemo(() => getCrewCgmMockData(activeCrewId), [activeCrewId]);
+  const { activeCrewId, scenarioId } = useMission();
+  const dataset = useMemo(() => getCrewCgmMockData(activeCrewId, scenarioId), [activeCrewId, scenarioId]);
 
   const latest = dataset.readings[dataset.readings.length - 1];
   const trend = TREND_META[latest.trendArrow];

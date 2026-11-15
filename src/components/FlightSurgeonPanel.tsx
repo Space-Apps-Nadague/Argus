@@ -75,6 +75,11 @@ const SYMPTOM_PRESETS = [
 
 const VOICE_QUICK_UTTERANCES = [
   {
+    label: 'Unexplained fatigue & blur',
+    utterance: 'I feel unusually fatigued with mild blurred near vision — check vocal stress jitter, Node 2 CO2, and early SANS.',
+    syncSymptoms: true,
+  },
+  {
     label: 'Check readiness & vitals',
     utterance: 'Check my current readiness score and zone vitals.',
     syncSymptoms: false,
