@@ -132,6 +132,15 @@ Columns:
 | SRC-107 | [Soukupová & Čech, Real-Time Eye Blink Detection using Facial Landmarks (CVWW 2016)](https://vision.fe.uni-lj.si/cvww2016/proceedings/papers/05.pdf) (eye aspect ratio) | paper | open | `src/services/vision/signals.ts`, `src/services/vision/observer.ts` |
 | SRC-108 | [The distribution of blink rate among young adults: a cross-sectional study (2023)](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9899223/) (normal spontaneous blink rate 6–30/min) | paper | open | `src/services/vision/signals.ts` (`blinkRateHigh`) |
 | SRC-109 | [Transformers.js](https://huggingface.co/docs/transformers.js) with [Kokoro-82M ONNX](https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX) (via kokoro-js) and [Whisper base ONNX](https://huggingface.co/onnx-community/whisper-base): in-browser TTS and STT (WebGPU / WebAssembly) | software | open | `src/services/speech/deviceSpeech.worker.ts`, `src/services/speech/deviceSpeech.ts` |
+
+## Wearable sensor research (The Thousand Eyes sensor ring)
+
+Research sensors behind the inner ring in `src/features/thousandEyes/indicators.ts` (specs/02 §2.4b). Most are laboratory prototypes, not space-qualified devices. Flown precedents stay in "Wearables and passive monitoring flown in space" (Bio-Monitor: SRC-020, SRC-022; CGM on Polaris Dawn: SRC-028).
+
+### Biochemistry: microneedles, electronic skin, sweat patches
+
+| ID | Source | Type | Access | Used in |
+|---|---|---|---|---|
 | SRC-110 | [Gao et al. 2016, Fully integrated wearable sensor arrays for multiplexed in situ perspiration analysis, Nature 529:509](https://doi.org/10.1038/nature16521) (sweat glucose, lactate, Na⁺, K⁺) | paper | open | `src/features/thousandEyes/indicators.ts` (sensor ring: glu, lac, na, k), `specs/02-ui-dashboard.md` §2.4b |
 | SRC-111 | [Tehrani et al. 2022, An integrated wearable microneedle array for the continuous monitoring of multiple biomarkers in interstitial fluid, Nat Biomed Eng 6:1214](https://doi.org/10.1038/s41551-022-00887-1) | paper | open | `src/features/thousandEyes/indicators.ts` (sensor ring: glu, lac), `specs/02-ui-dashboard.md` §2.4b |
 | SRC-112 | [Koh et al. 2016, A soft, wearable microfluidic device for the capture, storage, and colorimetric sensing of sweat, Sci Transl Med 8:366ra165](https://doi.org/10.1126/scitranslmed.aaf2593) (chloride, pH, sweat rate) | paper | open | `src/features/thousandEyes/indicators.ts` (sensor ring: cl, ph, swr), `specs/02-ui-dashboard.md` §2.4b |
@@ -140,11 +149,34 @@ Columns:
 | SRC-115 | [A simple and sensitive wearable SERS sensor utilizing plasmonic-active gold nanostars, ACS Omega 2024](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC11411535/) (sweat urea, lactate, glucose) | paper | open | `src/features/thousandEyes/indicators.ts` (sensor ring: urea), `specs/02-ui-dashboard.md` §2.4b |
 | SRC-116 | [Yu et al. 2020, Biofuel-powered soft electronic skin with multiplexed and wireless sensing for human-machine interfaces, Sci Robot 5:eaaz7946](https://doi.org/10.1126/scirobotics.aaz7946) (urea, NH₄⁺, glucose, pH) | paper | open | `src/features/thousandEyes/indicators.ts` (sensor ring: urea, nh4, ph), `specs/02-ui-dashboard.md` §2.4b |
 | SRC-117 | [Microneedle aptamer-based sensors for continuous, real-time therapeutic drug monitoring, Anal Chem 2022](https://pubmed.ncbi.nlm.nih.gov/35653647/) | paper | open | `src/features/thousandEyes/indicators.ts` (sensor ring: drug), `specs/02-ui-dashboard.md` §2.4b |
+| SRC-126 | [Xu et al. 2024, A physicochemical-sensing electronic skin for stress response monitoring, Nat Electron 7:168](https://doi.org/10.1038/s41928-023-01116-6) (PMC10906959; multimodal physical and sweat-chemistry sensing over 24 h) | paper | open | Reference library (not cited in code yet): candidate for `src/features/thousandEyes/indicators.ts` sensor ring (`eda`, `apw`, sweat biochemistry) |
+| SRC-128 | [Yang et al. 2025, A wearable SERS-microfluidic patch for continuous monitoring of kidney health-related biomarkers in sweat, Talanta](https://doi.org/10.1016/j.talanta.2025.128039) (PMID 40168798; sweat urea and uric acid) | paper | open | Reference library (not cited in code yet): candidate for `src/features/thousandEyes/indicators.ts` sensor ring (`urea`, `ua`) |
+| SRC-129 | [Nyein et al. 2021, A wearable patch for continuous analysis of thermoregulatory sweat at rest, Nat Commun 12:1823](https://doi.org/10.1038/s41467-021-22109-z) (sweat rate, pH, chloride, levodopa) | paper | open | Reference library (not cited in code yet): candidate for `src/features/thousandEyes/indicators.ts` sensor ring (`swr`, `ph`, `cl`, `drug`) |
+
+### Heart and vessels: wearable ultrasound and hybrid patches
+
+| ID | Source | Type | Access | Used in |
+|---|---|---|---|---|
 | SRC-118 | [Wang et al. 2018, Monitoring of the central blood pressure waveform via a conformal ultrasonic device, Nat Biomed Eng 2:687](https://doi.org/10.1038/s41551-018-0287-x) (carotid and jugular waveforms) | paper | open | `src/features/thousandEyes/indicators.ts` (sensor ring: cbp, apw, vd), `specs/02-ui-dashboard.md` §2.4b |
 | SRC-119 | [Hu et al. 2023, A wearable cardiac ultrasound imager, Nature 613:667](https://doi.org/10.1038/s41586-022-05498-z) (stroke volume, cardiac output, ejection fraction) | paper | open | `src/features/thousandEyes/indicators.ts` (sensor ring: co, sv, ef), `specs/02-ui-dashboard.md` §2.4b |
-| SRC-120 | [A-Patch: wearable skin-VOC sensing patch, EU Horizon 2020 project 824270](https://cordis.europa.eu/project/id/824270) (Technion) | web | open | `src/features/thousandEyes/indicators.ts` (sensor ring: svoc), `specs/02-ui-dashboard.md` §2.4b |
+| SRC-127 | [Lin et al., A fully integrated wearable ultrasound system to monitor deep tissues in moving subjects, Nat Biotechnol 42 (2024)](https://doi.org/10.1038/s41587-023-01800-0) (PMID 37217752; USoP: central BP, heart rate, cardiac output, down to 164 mm deep) | paper | open | Reference library (not cited in code yet): candidate for `src/features/thousandEyes/indicators.ts` sensor ring (`cbp`, `co`) |
+| SRC-131 | [Sempionatto et al. 2021, An epidermal patch for the simultaneous monitoring of haemodynamic and metabolic biomarkers, Nat Biomed Eng 5:737](https://doi.org/10.1038/s41551-021-00685-1) (ultrasound BP and heart rate + glucose, lactate, caffeine, alcohol) | paper | open | Reference library (not cited in code yet): candidate for `src/features/thousandEyes/indicators.ts` sensor ring (`cbp`, `glu`, `lac`) |
+| SRC-132 | [Integration of chemical and physical inputs for monitoring metabolites and cardiac signals in diabetes, Nat Biomed Eng (2025)](https://doi.org/10.1038/s41551-025-01439-z) (UC San Diego wristband: microneedle glucose, lactate, alcohol + ultrasound BP and arterial stiffness) | paper | open | Reference library (not cited in code yet): candidate for `src/features/thousandEyes/indicators.ts` sensor ring (`glu`, `lac`, `cbp`, `apw`) |
+| SRC-133 | [NASA Glenn: Flexible Ultrasound System (FUS)](https://www.nasa.gov/glenn/glenn-expertise-space-exploration/human-health-performance/exploration-medical-technologies/flexible-ultrasound-system/) (exploration-medicine ultrasound: bone, kidney stones, intracranial pressure, cardiovascular); [NTRS 20150010331](https://ntrs.nasa.gov/citations/20150010331) | web | open | Reference library (not cited in code yet): space-qualified path for sensor ring ultrasound (`vd`, `co`, `sv`, `ef`) |
+
+### Chemical signatures: skin VOCs and breath
+
+| ID | Source | Type | Access | Used in |
+|---|---|---|---|---|
+| SRC-120 | [A-Patch: wearable skin-VOC sensing patch, EU Horizon 2020 project 824270](https://cordis.europa.eu/project/id/824270) (Technion); results: [CORDIS article 442387](https://cordis.europa.eu/article/id/442387-patching-up-the-problems-of-diagnosing-infectious-diseases) | web | open | `src/features/thousandEyes/indicators.ts` (sensor ring: svoc), `specs/02-ui-dashboard.md` §2.4b |
 | SRC-121 | [Nakhleh et al. 2017, Diagnosis and classification of 17 diseases from 1404 subjects via pattern analysis of exhaled molecules, ACS Nano 11:112](https://pmc.ncbi.nlm.nih.gov/articles/PMC5269643) (electronic-nose breath VOC patterns) | paper | open | `src/features/thousandEyes/indicators.ts` (sensor ring: bvoc), `specs/02-ui-dashboard.md` §2.4b |
 | SRC-122 | [Issitt et al. 2022, Volatile compounds in human breath: critical review and meta-analysis, J Breath Res](https://eprints.whiterose.ac.uk/183477/) (acetone, isoprene) | paper | open | `src/features/thousandEyes/indicators.ts` (sensor ring: ace, iso), `specs/02-ui-dashboard.md` §2.4b |
+
+### Skin physiology, spectroscopy and reviews
+
+| ID | Source | Type | Access | Used in |
+|---|---|---|---|---|
 | SRC-123 | [Boucsein et al. 2012, Publication recommendations for electrodermal measurements, Psychophysiology 49:1017](https://doi.org/10.1111/j.1469-8986.2012.01384.x) | paper | open | `src/features/thousandEyes/indicators.ts` (sensor ring: eda), `specs/02-ui-dashboard.md` §2.4b |
 | SRC-124 | [Kim et al. 2011, Epidermal electronics, Science 333:838](https://doi.org/10.1126/science.1206157) (skin-mounted strain, temperature and electrophysiology sensors) | paper | open | `src/features/thousandEyes/indicators.ts` (sensor ring: strn), `specs/02-ui-dashboard.md` §2.4b |
 | SRC-125 | [In vivo Raman spectroscopy tutorial review, J Biomed Opt 23(7):071210, 2018](https://doi.org/10.1117/1.JBO.23.7.071210) (NIR excitation for skin) | paper | open | `src/features/thousandEyes/indicators.ts` (sensor ring: rmn), `specs/02-ui-dashboard.md` §2.4b |
+| SRC-130 | [Kurul et al., Wearable sensors for health monitoring: current applications, trends, and future directions, Biosens Bioelectron X 28:100727 (2026)](https://doi.org/10.1016/j.biosx.2025.100727) (general review of biochemical and physical wearables; not Raman/NIR-specific) | paper | open | Reference library (not cited in code yet): background for the sensor ring as a whole |
