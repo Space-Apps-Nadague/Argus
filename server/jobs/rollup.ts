@@ -83,14 +83,18 @@ export async function rollupDays(db: Db, astronautId: string, from: Date, to: Da
     group by o.astronaut_id, ${day}
     ${upsert}`);
 
-  // 4. Resting HR fallback when no nightly ring value exists: 5th percentile of minute heart rate.
+  // 4. Resting HR fallback when no nightly watch value exists: 5th percentile of minute heart rate.
+  //    Recomputed as the day fills in, but never overrides a real nightly value (method last_of_day).
   await db.execute(sql`
     insert into daily_metrics (astronaut_id, metric_id, day, value, n, method, origin, pipeline_version)
     select o.astronaut_id, 'resting_hr', ${day}, percentile_cont(0.05) within group (order by o.value), count(*),
       'p05_minute_hr', (array_agg(o.origin))[1], ${ROLLUP_VERSION}
     from observations o where ${window} and o.metric_id = 'heart_rate'
     group by o.astronaut_id, ${day}
-    on conflict (astronaut_id, metric_id, day) do nothing`);
+    on conflict (astronaut_id, metric_id, day) do update set
+      value = excluded.value, n = excluded.n, origin = excluded.origin,
+      pipeline_version = excluded.pipeline_version, computed_at = now()
+      where daily_metrics.method = 'p05_minute_hr'`);
 
   const [{ n }] = await queryRows<{ n: number }>(
     db,
