@@ -24,6 +24,7 @@ const ZONE_KEYWORDS: Array<[BodyZoneId, RegExp]> = [
   ['neuro', /\b(eye|eyes|vision|blurry|head|headache|onsd|pressure|brain|co2|carbon)\b/i],
   ['cardio', /\b(heart|pulse|hr|hrv|chest|oxygen|spo2|breath|breathing)\b/i],
   ['musculo', /\b(bone|bones|muscle|muscles|back|ared|exercise|workout|strength)\b/i],
+  ['metabolic', /\b(glucose|blood\s*sugar|cgm|insulin|metabolic|nutrition|calor|appetite)\b/i],
   ['immune', /\b(radiation|dose|solar|storm|immune|infection|sick|fever|blood)\b/i],
   ['behavioral', /\b(sleep|tired|fatigue|stress|stressed|mood|sad|lonely|anxious|anxiety|focus|reaction)\b/i],
 ];

@@ -30,7 +30,7 @@ export const ORGANS: readonly Organ[] = [
   { id: 'eyes', label: 'Eyes', zone: 'neuro', indicators: ['vis'], levels: ['body', 'organs', 'deep'] },
   { id: 'heart', label: 'Heart', zone: 'cardio', indicators: ['rhr', 'hrv', 'sbp', 'dbp'], levels: ['body', 'organs'] },
   { id: 'lungs', label: 'Lungs', zone: 'cardio', indicators: ['spo2', 'resp'], levels: ['body', 'organs'] },
-  { id: 'liver', label: 'Liver', zone: 'immune', indicators: ['crp', 'wt', 'kcal'], levels: ['body', 'organs'] },
+  { id: 'liver', label: 'Liver', zone: 'metabolic', indicators: ['crp', 'wt', 'kcal'], levels: ['body', 'organs'] },
   { id: 'spleen', label: 'Spleen', zone: 'immune', indicators: ['temp', 'sym'], levels: ['body', 'organs', 'deep'] },
   { id: 'kidneys', label: 'Kidneys', zone: 'immune', indicators: ['urine', 'fluid'], levels: ['body', 'organs', 'deep'] },
   { id: 'muscles', label: 'Muscles', zone: 'musculo', indicators: ['grip', 'resist', 'aero'], levels: ['body'] },

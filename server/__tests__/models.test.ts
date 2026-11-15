@@ -71,7 +71,7 @@ describe('diagnostic rules', () => {
   });
 
   it('never lets the LLM lower urgency below the deterministic floor', () => {
-    const floor = urgencyFloor({ neuro: 'red', cardio: 'green', musculo: 'green', immune: 'green', behavioral: 'green' });
+    const floor = urgencyFloor({ neuro: 'red', cardio: 'green', musculo: 'green', metabolic: 'green', immune: 'green', behavioral: 'green' });
     expect(floor).toBe('immediate_emergency_packet');
     expect(maxUrgency('routine_downlink', floor)).toBe('immediate_emergency_packet');
   });

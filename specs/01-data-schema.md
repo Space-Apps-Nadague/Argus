@@ -19,8 +19,9 @@ ARGUS supports 5 canonical mission location / habitat presets grounded in NASA H
 1. `'neuro'` — **Neuro-Ocular & CNS** (Brain, Optic Nerve Sheath, Cerebral Perfusion)
 2. `'cardio'` — **Cardiovascular & Pulmonary** (Heart, Thoracic Vessels, Gas Exchange)
 3. `'musculo'` — **Musculoskeletal & Spine** (Vertebral Column, Femoral Neck, Load-Bearing Muscle)
-4. `'immune'` — **Immune, Radiation & Dermal** (Lymphatic Core, Bone Marrow, Skin Barrier)
-5. `'behavioral'` — **Behavioral, Circadian & Cognitive** (Neural Halo, Sleep Architecture, Alertness)
+4. `'metabolic'` — **Metabolic & Nutrition** (Hepatic Core, Pancreatic Islets, Glycemic & Energy Balance)
+5. `'immune'` — **Immune, Radiation & Dermal** (Lymphatic Core, Bone Marrow, Skin Barrier)
+6. `'behavioral'` — **Behavioral, Circadian & Cognitive** (Neural Halo, Sleep Architecture, Alertness)
 
 ### Anatomical 3D Render Layers (`AnatomicalLayer`)
 - `'all'` — Full multi-layer holographic composite
@@ -34,13 +35,13 @@ ARGUS supports 5 canonical mission location / habitat presets grounded in NASA H
 - `'red'` — Critical threshold exceeded; immediate autonomous protocol & Earth packet queue required (`#ef4444`)
 
 ### Crisis Scenarios (`ScenarioId`)
-- `'nominal'` — **Nominal Deep-Space Cruise**: All 5 zones within expected spaceflight norms.
+- `'nominal'` — **Nominal Deep-Space Cruise**: All 6 zones within expected spaceflight norms.
 - `'sans_alert'` — **SANS Optic Disc Edema Alert**: Elevated Optic Nerve Sheath Diameter (ONSD `6.4 mm`) and intraocular pressure (`23 mmHg`) in `neuro`.
 - `'high_co2'` — **Habitat $\text{CO}_2$ Scrubber Degradation**: Elevated cabin $\text{ppCO}_2$ (`5.8 mmHg`) driving cerebral vasodilation (`neuro` yellow/red), tachycardia (`cardio` yellow), and cognitive fatigue (`behavioral` yellow).
 - `'solar_storm'` — **SPE Radiation Storm Alert**: Acute solar particle event raising cumulative dose rate (`immune` red, lymphocyte drop `1.05 k/µL`, skin erythema risk) and stress response (`cardio` / `behavioral` yellow).
 
 ### Metric Identifiers (`MetricId`)
-The 19 canonical metric IDs tracked across the 5 zones (see §2 catalog):
+The 19 canonical metric IDs tracked across the 6 zones (see §2 catalog):
 ```typescript
 export type MetricId =
   | 'onsd' | 'iop' | 'cabin_co2'
@@ -122,8 +123,8 @@ export interface ThresholdRange {
 | `cardio` | `hydration_intake` | Daily Hydration Intake | `L/day` | `2.5–3.8` (`2.0–4.5`) | `2.5–3.8` (`2.0–4.5`) | `2.7–4.0` (`2.2–4.8`) | `2.7–4.0` (`2.2–4.8`) | `2.2–3.5` (`1.8–4.2`) |
 | `musculo` | `bmd_delta` | Femoral BMD Monthly $\Delta$ | `%` | `-0.8–0.2` (`-1.3–0.5`) | `-0.8–0.2` (`-1.3–0.5`) | `-0.6–0.2` (`-1.0–0.5`) | `-0.4–0.3` (`-0.8–0.6`) | `-0.2–0.2` (`-0.5–0.5`) |
 | `musculo` | `ared_load` | Daily ARED Resistance Load | `kN·reps` | `18–30` (`12–35`) | `18–30` (`12–35`) | `14–26` (`10–30`) | `12–24` (`8–28`) | `0–16` (`0–24`) |
-| `musculo` | `blood_glucose` | Blood Glucose | `mg/dL` | `70–110` (`60–140`) | `70–110` (`60–140`) | `70–110` (`60–140`) | `70–110` (`60–140`) | `70–110` (`60–140`) |
 | `musculo` | `caloric_intake` | Daily Caloric Intake | `kcal/day` | `2200–3200` (`1800–3600`) | `2200–3200` (`1800–3600`) | `2400–3400` (`2000–3800`) | `2400–3400` (`2000–3800`) | `2000–3000` (`1600–3400`) |
+| `metabolic` | `blood_glucose` | Blood Glucose | `mg/dL` | `70–110` (`60–140`) | `70–110` (`60–140`) | `70–110` (`60–140`) | `70–110` (`60–140`) | `70–110` (`60–140`) |
 | `immune` | `rad_dose` | 24h Radiation Dose Rate | `mSv/d` | `0.4–1.2` (`0.0–2.5`) | `0.2–0.6` (`0.0–1.2`) | `0.3–0.9` (`0.0–2.0`) | `0.3–0.8` (`0.0–1.8`) | `0.0–0.05` (`0.0–0.1`) |
 | `immune` | `wbc_lymph` | Lymphocyte Count | `k/µL` | `1.5–3.5` (`1.2–4.0`) | `1.5–3.5` (`1.2–4.0`) | `1.5–3.5` (`1.2–4.0`) | `1.5–3.5` (`1.2–4.0`) | `1.5–3.5` (`1.2–4.0`) |
 | `immune` | `core_temp` | Core Body Temperature | `°C` | `36.5–37.5` (`36.0–38.0`) | `36.5–37.5` (`36.0–38.0`) | `36.5–37.5` (`36.0–38.0`) | `36.5–37.5` (`36.0–38.0`) | `36.5–37.5` (`36.0–38.0`) |

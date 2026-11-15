@@ -170,7 +170,7 @@ export const CompanionDrawer: React.FC = () => {
       id: `initial-${activeCrewMember.id}`,
       crewId: activeCrewMember.id,
       role: 'argus',
-      text: `Good sol, ${activeCrewMember.callsign}. ARGUS Companion is online with 100% autonomous capability in ${envMeta.label} (${commDelay} to Earth). I am reading your 5-zone biological telemetry against your pre-flight baselines. How are you feeling today?`,
+      text: `Good sol, ${activeCrewMember.callsign}. ARGUS Companion is online with 100% autonomous capability in ${envMeta.label} (${commDelay} to Earth). I am reading your 6-zone biological telemetry against your pre-flight baselines. How are you feeling today?`,
       timestampIso: new Date().toISOString(),
       intent: 'status',
       source: 'offline_brain',

@@ -17,7 +17,7 @@ export interface LocationPreset {
   hazardOverview: string;
 }
 
-export type BodyZoneId = 'neuro' | 'cardio' | 'musculo' | 'immune' | 'behavioral';
+export type BodyZoneId = 'neuro' | 'cardio' | 'musculo' | 'metabolic' | 'immune' | 'behavioral';
 
 export type AnatomicalLayer = 'all' | 'dermal' | 'skeletal' | 'organs';
 

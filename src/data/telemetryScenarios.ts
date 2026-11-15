@@ -113,6 +113,14 @@ export const BODY_ZONES: Record<BodyZoneId, BodyZoneMetadata> = {
     nasaHazardFocus:
       'Unloaded osteoclastic bone mineral loss (~1–1.5%/mo in 0g), intervertebral disc expansion, and EVA suit strain.',
   },
+  metabolic: {
+    id: 'metabolic',
+    name: 'Metabolic & Nutrition',
+    shortLabel: 'METAB / NUTR',
+    anatomicalSubtitle: 'Hepatic Core, Pancreatic Islets & Glycemic Balance',
+    nasaHazardFocus:
+      'Spaceflight insulin resistance, altered energy expenditure, hepatic lipid shifts, and closed-loop nutritional adequacy.',
+  },
   immune: {
     id: 'immune',
     name: 'Immune, Radiation & Dermal',
@@ -135,6 +143,7 @@ export const ZONE_ORDER: BodyZoneId[] = [
   'neuro',
   'cardio',
   'musculo',
+  'metabolic',
   'immune',
   'behavioral',
 ];
@@ -297,17 +306,6 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
           history: build30DaySeries(22.5, 24.2, 1, 1.1),
         },
         {
-          metricId: 'blood_glucose',
-          label: 'Blood Glucose',
-          unit: 'mg/dL',
-          currentValue: 92,
-          deltaFromBaseline: 'Euglycemic Post-ARED',
-          flightNormLabel: '0g Norm: 70–110 mg/dL',
-          plainDescription:
-            'Fasting blood glucose concentration. Tracks metabolic insulin sensitivity in unloaded muscle.',
-          history: build30DaySeries(89, 92, 0, 1.5),
-        },
-        {
           metricId: 'caloric_intake',
           label: 'Daily Caloric Intake',
           unit: 'kcal/day',
@@ -317,6 +315,19 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
           plainDescription:
             'Total daily dietary energy intake. Sustains lean muscle mass and offsets ARED exercise expenditure.',
           history: build30DaySeries(2620, 2680, 0, 80),
+        },
+      ],
+      metabolic: [
+        {
+          metricId: 'blood_glucose',
+          label: 'Blood Glucose',
+          unit: 'mg/dL',
+          currentValue: 92,
+          deltaFromBaseline: 'Euglycemic Post-ARED',
+          flightNormLabel: '0g Norm: 70–110 mg/dL',
+          plainDescription:
+            'Fasting blood glucose concentration. Tracks metabolic insulin sensitivity in unloaded muscle.',
+          history: build30DaySeries(89, 92, 0, 1.5),
         },
       ],
       immune: [
@@ -524,17 +535,6 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
           history: build30DaySeries(24.0, 21.0, 1, 0.8),
         },
         {
-          metricId: 'blood_glucose',
-          label: 'Blood Glucose',
-          unit: 'mg/dL',
-          currentValue: 96,
-          deltaFromBaseline: 'Fasting Glucose Stable',
-          flightNormLabel: '0g Norm: 70–110 mg/dL',
-          plainDescription:
-            'Metabolic glucose levels within spaceflight expectations.',
-          history: build30DaySeries(90, 96, 0, 1.4),
-        },
-        {
           metricId: 'caloric_intake',
           label: 'Daily Caloric Intake',
           unit: 'kcal/day',
@@ -544,6 +544,19 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
           plainDescription:
             'Caloric intake adequate; monitor for cranial-discomfort-related appetite suppression.',
           history: build30DaySeries(2600, 2450, 0, 75),
+        },
+      ],
+      metabolic: [
+        {
+          metricId: 'blood_glucose',
+          label: 'Blood Glucose',
+          unit: 'mg/dL',
+          currentValue: 96,
+          deltaFromBaseline: 'Fasting Glucose Stable',
+          flightNormLabel: '0g Norm: 70–110 mg/dL',
+          plainDescription:
+            'Metabolic glucose levels within spaceflight expectations.',
+          history: build30DaySeries(90, 96, 0, 1.4),
         },
       ],
       immune: [
@@ -745,17 +758,6 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
           history: build30DaySeries(24.0, 14.5, 1, 1.0, 22),
         },
         {
-          metricId: 'blood_glucose',
-          label: 'Blood Glucose',
-          unit: 'mg/dL',
-          currentValue: 104,
-          deltaFromBaseline: 'Mild Sympathetic Glycemia',
-          flightNormLabel: '0g Norm: 70–110 mg/dL',
-          plainDescription:
-            'Slight elevation in fasting glucose secondary to systemic hypercapnic stress response.',
-          history: build30DaySeries(90, 104, 0, 1.3, 22),
-        },
-        {
           metricId: 'caloric_intake',
           label: 'Daily Caloric Intake',
           unit: 'kcal/day',
@@ -765,6 +767,19 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
           plainDescription:
             'Sub-target caloric intake caused by hypercapnic nausea and fatigue; risks lean mass catabolism.',
           history: build30DaySeries(2650, 2050, 0, 85, 22),
+        },
+      ],
+      metabolic: [
+        {
+          metricId: 'blood_glucose',
+          label: 'Blood Glucose',
+          unit: 'mg/dL',
+          currentValue: 104,
+          deltaFromBaseline: 'Mild Sympathetic Glycemia',
+          flightNormLabel: '0g Norm: 70–110 mg/dL',
+          plainDescription:
+            'Slight elevation in fasting glucose secondary to systemic hypercapnic stress response.',
+          history: build30DaySeries(90, 104, 0, 1.3, 22),
         },
       ],
       immune: [
@@ -1004,17 +1019,6 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
           history: build30DaySeries(24.0, 13.2, 1, 1.2, 24),
         },
         {
-          metricId: 'blood_glucose',
-          label: 'Blood Glucose',
-          unit: 'mg/dL',
-          currentValue: 102,
-          deltaFromBaseline: 'Stress Counter-Regulatory Glycemia',
-          flightNormLabel: '0g Norm: 70–110 mg/dL',
-          plainDescription:
-            'Mild metabolic counter-regulatory hormone release during emergency shelter protocol.',
-          history: build30DaySeries(91, 102, 0, 1.2, 24),
-        },
-        {
           metricId: 'caloric_intake',
           label: 'Daily Caloric Intake',
           unit: 'kcal/day',
@@ -1024,6 +1028,19 @@ export const TELEMETRY_SCENARIOS: Record<ScenarioId, ScenarioDefinition> = {
           plainDescription:
             'Reduced caloric intake in radiation storm shelter; supplement with compact high-protein meal bars.',
           history: build30DaySeries(2640, 2100, 0, 80, 24),
+        },
+      ],
+      metabolic: [
+        {
+          metricId: 'blood_glucose',
+          label: 'Blood Glucose',
+          unit: 'mg/dL',
+          currentValue: 102,
+          deltaFromBaseline: 'Stress Counter-Regulatory Glycemia',
+          flightNormLabel: '0g Norm: 70–110 mg/dL',
+          plainDescription:
+            'Mild metabolic counter-regulatory hormone release during emergency shelter protocol.',
+          history: build30DaySeries(91, 102, 0, 1.2, 24),
         },
       ],
       behavioral: [
@@ -1135,6 +1152,7 @@ export function getCrewAdjustedZones(
     neuro: baseZones.neuro.map(adjustReading),
     cardio: baseZones.cardio.map(adjustReading),
     musculo: baseZones.musculo.map(adjustReading),
+    metabolic: baseZones.metabolic.map(adjustReading),
     immune: baseZones.immune.map(adjustReading),
     behavioral: baseZones.behavioral.map(adjustReading),
   };
@@ -1418,6 +1436,36 @@ export function getOfflineFlightSurgeonGuidance(
           plainInstruction:
             'If daily caloric intake drops below 2200 kcal/day (2400 kcal/day on EVA days), add a high-protein spaceflight meal bar and rehydrated entrée to prevent muscle catabolism.',
           hardwareRequired: 'Galley Food Warmer + Crew Nutrition Log',
+          estimatedMinutes: 10,
+        },
+      ],
+    },
+    metabolic: {
+      headline:
+        triageStatus === 'green'
+          ? 'Glycemic & Metabolic Balance Nominal'
+          : 'Glycemic Excursion Detected — Metabolic Countermeasure Protocol',
+      hazardContextSummary: `${envContextMap[environment]} Microgravity muscle unloading and altered circadian meal timing can induce subclinical insulin resistance and glycemic variability.`,
+      plainLanguageExplanation:
+        'Your Continuous Glucose Monitor (CGM) tracks how your body processes fuel in space. Keep blood glucose steady with balanced protein-fiber meals and post-meal resistive or aerobic activity.',
+      earthConsultUrgency: triageStatus === 'green' ? 'routine_downlink' : 'priority_packet',
+      guidedSteps: [
+        {
+          id: 'met-def-1',
+          stepNumber: 1,
+          title: 'Verify CGM Patch & Finger-Prick Glucometer Calibration',
+          plainInstruction:
+            'Confirm CGM interstitial glucose trend arrow and perform a backup capillary finger-prick check if readings are < 70 or > 140 mg/dL.',
+          hardwareRequired: 'CGM Patch + Capillary Glucometer',
+          estimatedMinutes: 4,
+        },
+        {
+          id: 'met-def-2',
+          stepNumber: 2,
+          title: 'Post-Meal Glycemic Stabilization & Hydration',
+          plainInstruction:
+            'Pair complex carbohydrates with lean protein and 300 mL water; avoid isolated simple-sugar boluses outside EVA recovery.',
+          hardwareRequired: 'Galley Nutrition Pack + Potable Water Dispenser',
           estimatedMinutes: 10,
         },
       ],

@@ -9,7 +9,7 @@
  * - Camera Focus Presets (`Full Body`, `Cranial / SANS`, `Thorax / Core`), auto-rotate toggle,
  *   and holographic scanner sweep.
  * - Anatomical Layer Switcher (`All Layers`, `Dermal / Surface`, `Skeletal / Musculoskeletal`, `Organs / Vascular`).
- * - 5 clickable 3D anatomical regions (`neuro`, `cardio`, `musculo`, `immune`, `behavioral`)
+ * - 6 clickable 3D anatomical regions (`neuro`, `cardio`, `musculo`, `metabolic`, `immune`, `behavioral`)
  *   dynamically colored by deterministic `TriageStatus` (`#22c55e`, `#eab308`, `#ef4444`).
  */
 
@@ -23,6 +23,7 @@ import {
   Brain,
   Crosshair,
   Eye,
+  Flame,
   HeartPulse,
   Layers,
   Pause,
@@ -80,11 +81,12 @@ const CAMERA_PRESETS: Record<
 const STATUS_TO_TRIAGE: Record<Status, TriageStatus> = { 0: 'green', 1: 'yellow', 2: 'red' };
 
 const ZONE_ICONS: Record<BodyZoneId, React.ReactNode> = {
-  neuro: <Brain className="w-3.5 h-3.5" />,
-  cardio: <HeartPulse className="w-3.5 h-3.5" />,
-  musculo: <Bone className="w-3.5 h-3.5" />,
-  immune: <ShieldAlert className="w-3.5 h-3.5" />,
-  behavioral: <Eye className="w-3.5 h-3.5" />,
+  neuro: <Brain className="w-3.5 h-3.5" aria-hidden="true" />,
+  cardio: <HeartPulse className="w-3.5 h-3.5" aria-hidden="true" />,
+  musculo: <Bone className="w-3.5 h-3.5" aria-hidden="true" />,
+  metabolic: <Flame className="w-3.5 h-3.5" aria-hidden="true" />,
+  immune: <ShieldAlert className="w-3.5 h-3.5" aria-hidden="true" />,
+  behavioral: <Eye className="w-3.5 h-3.5" aria-hidden="true" />,
 };
 
 interface WebGLErrorBoundaryProps {
@@ -475,10 +477,10 @@ export const BioTwinMap: React.FC = () => {
       </div>
 
       {/* ============================================================
-          BOTTOM QUICK-SELECT 5-ZONE ANATOMICAL MATRIX
+          BOTTOM QUICK-SELECT 6-ZONE ANATOMICAL MATRIX
          ============================================================ */}
       <div className="border-t border-hud-line p-2 sm:p-3 min-w-0">
-        <div className="grid grid-cols-5 gap-1 sm:gap-2 min-w-0" role="group" aria-label="Body zones">
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 sm:gap-2 min-w-0" role="group" aria-label="Body zones">
           {ZONE_ORDER.map((zoneId) => {
             const zone = BODY_ZONES[zoneId];
             const status = zoneStatuses[zoneId];
@@ -493,7 +495,7 @@ export const BioTwinMap: React.FC = () => {
                   setSelectedZone(zoneId);
                   if (zoneId === 'neuro' || zoneId === 'behavioral') {
                     setCameraPreset('cranial_sans');
-                  } else if (zoneId === 'cardio') {
+                  } else if (zoneId === 'cardio' || zoneId === 'metabolic') {
                     setCameraPreset('thorax_core');
                   } else {
                     setCameraPreset('full_body');
@@ -501,7 +503,7 @@ export const BioTwinMap: React.FC = () => {
                 }}
                 aria-pressed={isSelected}
                 aria-label={`${ZONE_SHORT_NAME[zoneId]}: ${STATUS_WORD[status]}`}
-                className={`hud-focus hud-tile flex flex-col items-center justify-center p-1 sm:p-2 text-center min-w-0 ${isSelected ? 'hud-tile-selected' : ''}`}
+                className={`hud-focus hud-tile flex min-h-[44px] flex-col items-center justify-center p-1.5 sm:p-2 text-center min-w-0 ${isSelected ? 'hud-tile-selected' : ''}`}
               >
                 <div className="flex items-center gap-1 sm:gap-1.5 mb-0.5 sm:mb-1">
                   <span style={{ color }}>{ZONE_ICONS[zoneId]}</span>
