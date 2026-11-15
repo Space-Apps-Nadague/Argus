@@ -241,7 +241,7 @@ export const METRIC_INPUT_RANGES: Record<MetricId, MetricInputRange> = {
   hydration_intake: { min: 0.3, max: 8.0, how: 'Cumulative potable water & rehydration fluid dispenser log (L/day).' },
   bmd_delta: { min: -5, max: 3, how: 'Monthly QCT/DXA-equivalent scan result vs previous scan (%).' },
   ared_load: { min: 0, max: 60, how: 'Total from the ARED/resistance device log for today.' },
-  blood_glucose: { min: 40, max: 400, how: 'Weekly fasting finger-prick on the glucometer, then a photo of the meter screen.' },
+  blood_glucose: { min: 40, max: 400, how: 'Continuous glucose monitor (CGM) patch, 5-min interstitial reading (glucometer photo for calibration).' },
   caloric_intake: { min: 500, max: 6000, how: 'Total daily food & beverage energy from the crew nutrition log (kcal/day).' },
   rad_dose: { min: 0, max: 50, how: 'Personal dosimeter: last 24 h reading.' },
   wbc_lymph: { min: 0.1, max: 10, how: 'Point-of-care blood analyzer, finger-prick sample.' },

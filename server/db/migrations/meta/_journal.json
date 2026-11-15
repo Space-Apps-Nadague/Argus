@@ -43,6 +43,13 @@
       "when": 1794722713125,
       "tag": "0005_face_id",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794733902726,
+      "tag": "0006_demonic_lifeguard",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,1 @@
+ALTER TYPE "public"."device_kind" ADD VALUE 'cgm' BEFORE 'habitat_sensor';

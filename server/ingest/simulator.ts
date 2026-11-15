@@ -5,17 +5,19 @@
  * (`getCrewAdjustedZones`), so the database-backed HUD tells the same story as the offline demo, while
  * the minute data is realistic enough for baselines and anomaly detection.
  *
- * Kit (spec 05 §4.1): ONE smartwatch + ONE personal dosimeter are worn; habitat CO₂, the exercise-device log
- * and periodic exams arrive automatically; glucose comes from a weekly glucometer photo.
+ * Kit (spec 05 §4.1): THREE worn devices — smartwatch, personal dosimeter, and continuous glucose monitor (CGM)
+ * patch; habitat CO₂, exercise-device log and periodic exams arrive automatically; glucometer photo is backup.
  * - Watch: 1-min heart rate, activity, sleep state; SpO₂ and breathing rate every few minutes; nightly HRV,
  *   resting HR, sleep efficiency, sleep hours and body-temperature estimate; spot blood pressure 3×/day; PVT app
  *   (Source: SRC-027, SRC-074, SRC-075, SRC-023, SRC-029)
  * - The circadian rhythm drifts ~2 h later over the mission and body temperature rises (Source: SRC-025)
  * - Personal dosimeter dose rate, 1-min (Source: SRC-026)
+ * - CGM interstitial blood glucose, 5-min (Source: SRC-028, SRC-083, SRC-084)
  * Pure and deterministic for a given seed.
  */
 
 import type { CrewMemberProfile, MetricId, ScenarioId } from '../../src/types/argus';
+import { type CgmReadingPoint, generateCgm24hCurve } from '../../src/data/cgmMockData';
 import { getCrewAdjustedZones } from '../../src/data/telemetryScenarios';
 import type { DeviceKind } from '../db/catalog';
 import type { IncomingReading } from './normalize';
@@ -108,7 +110,14 @@ export function simulate(opts: SimulationOptions): SimulatedBatch {
   const fromMs = Math.floor(opts.from.getTime() / MIN_MS) * MIN_MS;
   const toMs = opts.to.getTime();
   let currentDay = -1;
-  let dayPlan: { awakeMinutes: Set<number>; shiftMin: number; tDay: number; progress: number; earth: boolean } | null = null;
+  let dayPlan: {
+    awakeMinutes: Set<number>;
+    shiftMin: number;
+    tDay: number;
+    progress: number;
+    earth: boolean;
+    cgmCurve: CgmReadingPoint[];
+  } | null = null;
 
   for (let ts = fromMs; ts < toMs; ts += MIN_MS) {
     const dayIndex = Math.floor((ts - opts.templateStart.getTime()) / DAY_MS);
@@ -131,7 +140,15 @@ export function simulate(opts: SimulationOptions): SimulatedBatch {
         const len = 3 + Math.floor(rand() * 12);
         for (let k = 0; k < len && awakeMinutes.size < awakeCount; k++) awakeMinutes.add(startBout + k);
       }
-      dayPlan = { awakeMinutes, shiftMin, tDay, progress, earth };
+      const glucoseTarget = T('blood_glucose');
+      const cgmCurve = generateCgm24hCurve({
+        crewId: opts.crew.id,
+        scenarioId: opts.scenarioId,
+        missionDay: tDay + 1,
+        baselineMgDl: Number.isFinite(glucoseTarget) ? glucoseTarget - 4 : 88,
+        shiftMin,
+      });
+      dayPlan = { awakeMinutes, shiftMin, tDay, progress, earth, cgmCurve };
 
       // Nightly summaries at wake time, 07:00 + shift (ring + actigraph) (Source: SRC-023, SRC-029).
       const wakeTs = Date.UTC(new Date(ts).getUTCFullYear(), new Date(ts).getUTCMonth(), new Date(ts).getUTCDate()) + (420 + shiftMin) * MIN_MS;
@@ -151,7 +168,6 @@ export function simulate(opts: SimulationOptions): SimulatedBatch {
       const daily: Array<[DeviceKind, string, number, number, number]> = [
         ['smartwatch', 'pvt_lapses', 8 * 60 + 30, Math.max(0, Math.round(T('pvt_lapses'))), 1],
         ['smartwatch', 'mood_index', 21 * 60, clamp(Math.round(T('mood_index') + gauss() * 0.5), 1, 10), 1],
-        ['manual', 'blood_glucose', 7 * 60 + 45 + shiftMin, Math.round(T('blood_glucose') + gauss() * 3), 7],
         ['habitat_sensor', 'cabin_co2', 12 * 60, r1(T('cabin_co2') + gauss() * 0.1), 1],
         ['exercise_device', 'ared_load', 18 * 60 + 45, r1(T('ared_load') + gauss() * 0.8), 1],
         ['clinical_exam', 'onsd', 9 * 60, r2(T('onsd') + gauss() * 0.03), 3],
@@ -196,6 +212,11 @@ export function simulate(opts: SimulationOptions): SimulatedBatch {
       // Dose rate (µGy/h) from the daily mSv target, ±8 % (Source: SRC-026).
       const dose = (targetFor('rad_dose', plan.tDay, plan.earth) * 1000) / 24;
       push('dosimeter', 'dose_rate', ts, r1(Math.max(0, dose * (1 + gauss() * 0.08))));
+    }
+    // CGM interstitial glucose every 5 minutes (Source: SRC-028, SRC-083, SRC-084).
+    if (minuteOfDay % 5 === 0) {
+      const cgmPoint = plan.cgmCurve[Math.floor(minuteOfDay / 5)];
+      if (cgmPoint) push('cgm', 'blood_glucose', ts, cgmPoint.glucoseMgDl);
     }
     // Watch blood pressure: spot readings morning, afternoon, evening while seated (Source: SRC-075).
     if (bodyMinute === 8 * 60 || bodyMinute === 14 * 60 || bodyMinute === 20 * 60) {

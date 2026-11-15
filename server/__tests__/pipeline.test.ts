@@ -69,14 +69,17 @@ describe('detectors', () => {
   });
 });
 
-describe('two-device kit (spec 05 §4)', () => {
-  it('only the smartwatch and the dosimeter are worn; every simulated stream comes from the active kit', () => {
-    const worn = SENSOR_KIT.filter((k) => k.kind === 'smartwatch' || k.kind === 'dosimeter');
-    expect(worn).toHaveLength(2);
+describe('three-device kit (spec 05 §4)', () => {
+  it('smartwatch, dosimeter, and cgm are worn; every simulated stream comes from the active kit', () => {
+    const worn = SENSOR_KIT.filter((k) => k.kind === 'smartwatch' || k.kind === 'dosimeter' || k.kind === 'cgm');
+    expect(worn).toHaveLength(3);
     const crew = DEFAULT_CREW_ROSTER[0];
     const start = new Date('2026-11-01T00:00:00Z');
     const batch = simulate({ crew, scenarioId: 'nominal', from: start, to: new Date(start.getTime() + 8 * 86_400_000), templateStart: start });
     for (const kind of batch.keys()) expect(ACTIVE_DEVICE_KINDS).toContain(kind);
+    const cgmReadings = batch.get('cgm') ?? [];
+    expect(cgmReadings).toHaveLength(8 * 288);
+    expect(cgmReadings.every((r) => r.metric === 'blood_glucose')).toBe(true);
     const metrics = new Set([...batch.values()].flat().map((r) => r.metric));
     for (const m of ['systolic_bp', 'diastolic_bp', 'blood_glucose', 'core_temp', 'daily_sleep_hours', 'mood_index', 'dose_rate', 'heart_rate']) expect(metrics.has(m)).toBe(true);
   });

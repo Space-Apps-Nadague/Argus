@@ -41,6 +41,7 @@ export const deviceKind = pgEnum('device_kind', [
   'dosimeter',
   'manual',
   'smartwatch',
+  'cgm',
   'habitat_sensor',
   'exercise_device',
   'clinical_exam',

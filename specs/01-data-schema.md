@@ -133,10 +133,10 @@ export interface ThresholdRange {
 | `behavioral` | `mood_index` | Behavioral Mood Index | `/10` | `7.0–10.0` (`5.0–10.0`) | `7.0–10.0` (`5.0–10.0`) | `7.0–10.0` (`5.0–10.0`) | `7.0–10.0` (`5.0–10.0`) | `7.0–10.0` (`5.0–10.0`) |
 
 ### Passive Wearable Metrics (non-triage) and how each indicator is collected
-With the two-device kit (`specs/05-data-platform.md` §4) nothing needs typing:
+With the three-device kit (`specs/05-data-platform.md` §4) nothing needs typing:
 - **From the watch:** `systolic_bp` (cuff-calibrated every 28 days [SRC-075]), `daily_sleep_hours`, `core_temp`, `mood_index` and `pvt_lapses`. Body temperature is *estimated* from overnight wrist temperature against the personal baseline [SRC-074]; a watch does not measure true core temperature. Mood is one tap a day.
-- **From a weekly glucometer photo:** `blood_glucose` [SRC-077], since watches cannot measure glucose [SRC-076].
-- **Clinical reference for the team bands** (PR #20): AHA blood pressure categories [SRC-070, SRC-071]; ADA glucose ranges [SRC-072, SRC-073].
+- **From the CGM patch:** `blood_glucose` streamed every 5 minutes [SRC-028, SRC-083, SRC-084], since watches cannot measure glucose [SRC-076]. A glucometer photo (`manual`) remains available for calibration/backup [SRC-077].
+- **Clinical reference for the team bands** (PR #20): AHA blood pressure categories [SRC-070, SRC-071]; ADA glucose ranges [SRC-072, SRC-073]; International Consensus on Time in Range 70–140 mg/dL and trend arrows [SRC-083].
 - **Minute-level streams with no thresholds of their own:** `heart_rate` (bpm), `resp_rate` (breaths/min), `activity` (g), `sleep_state` (0/1), `wrist_temp` (°C), `diastolic_bp` (mmHg) and `dose_rate` (µGy/h). They feed the daily values of `resting_hr`, `spo2`, `sleep_eff`, `core_temp` and `rad_dose` (spec 05 §5.1) and the AI context.
 - **Time:** timestamps are real UTC `timestamptz`, and `missionDay` is derived from the mission start.
 
@@ -157,7 +157,7 @@ Both tables live in `src/utils/triageEngine.ts` next to `METRIC_THRESHOLDS`. Nei
 | `hydration_intake` | `0.25` | `0.3` | `8.0` | Cumulative potable water & rehydration fluid dispenser log (L/day) [SRC-081]. |
 | `bmd_delta` | `0.15` | `-5` | `3` | Monthly QCT/DXA-equivalent scan result vs previous scan (%). |
 | `ared_load` | `2.5` | `0` | `60` | Total from the ARED/resistance device log for today. |
-| `blood_glucose` | `5` | `40` | `400` | Weekly fasting finger-prick, then a photo of the meter screen. |
+| `blood_glucose` | `5` | `40` | `400` | Continuous glucose monitor (CGM) patch, 5-min interstitial reading (glucometer photo for calibration). |
 | `caloric_intake` | `180` | `500` | `6000` | Total daily food & beverage energy from the crew nutrition log (kcal/day) [SRC-081]. |
 | `rad_dose` | `0.15` | `0` | `50` | Personal dosimeter: last 24 h reading. |
 | `wbc_lymph` | `0.2` | `0.1` | `10` | Point-of-care blood analyzer, finger-prick sample. |

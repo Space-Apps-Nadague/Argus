@@ -79,15 +79,14 @@ Stores what was said to the AI, which astronaut it was about, and the data the A
 | `conversations` | `id` uuid, `astronaut_id`, `started_by` (user), `started_at` |
 | `messages` | `id` uuid, `conversation_id`, `ts`, `role` (`user` \| `assistant`), `author_user_id` (null for assistant), `content`, `provider`, `model`, `source` (`ai` \| `offline_verified_cache`), `context_snapshot` jsonb (the zone statuses, flagged metrics and wellbeing summary sent with the prompt), `triage_event_id` (nullable: latest triage event at that time), `crisis_flag` bool |
 
-## 4. Passive Data: Assumed Kit (watch + dosimeter)
-No public dataset has per-astronaut, minute-level vitals. NASA LSDA and LSAH data are request-only or restricted [SRC-005, SRC-006]. **ARGUS assumes each astronaut wears exactly two devices: a smartwatch and a personal dosimeter.** Everything else arrives without typing. Data is simulated at realistic cadences until real devices are connected.
+## 4. Passive Data: Assumed Kit (watch + dosimeter + CGM)
+No public dataset has per-astronaut, minute-level vitals. NASA LSDA and LSAH data are request-only or restricted [SRC-005, SRC-006]. **ARGUS assumes each astronaut wears three devices: a smartwatch, a personal dosimeter, and a continuous glucose monitor (CGM) patch.** Everything else arrives without typing. Data is simulated at realistic cadences until real devices are connected.
 
-**Why only two.**
+**Why these three.**
 - A current smartwatch measures heart rate, HRV, SpO₂, breathing rate, sleep, activity, ECG, overnight wrist temperature against a personal baseline [SRC-074] and cuff-calibrated blood pressure [SRC-075].
 - Watches have flown: an Apple Watch on Inspiration4 [SRC-027] and a Garmin on Polaris Dawn [SRC-028]. NASA crews already wear wrist actigraphs continuously [SRC-009, SRC-023, SRC-024].
 - A watch **cannot** measure radiation, so a personal dosimeter stays [SRC-026, SRC-079]. A dosimeter with a wristwatch display is in development [SRC-078].
-- A watch **cannot** measure blood sugar: no non-invasive watch is authorized [SRC-076]. Glucose therefore comes from a weekly finger-prick on a glucometer, read from a **photo** of the meter. The challenge names camera images and blood sugar in mg/dL as an input [SRC-077].
-- A CGM patch flew on Polaris Dawn [SRC-028] but was not adopted. It would be a third device and needs replacing every 10–15 days, while healthy crews' fasting glucose changes slowly.
+- A watch **cannot** measure blood sugar: no non-invasive watch is authorized [SRC-076]. A Dexcom-class CGM patch flew on Polaris Dawn [SRC-028] and is adopted here to stream interstitial `blood_glucose` every 5 minutes [SRC-083, SRC-084], capturing postprandial peaks and ARED exercise dips. A glucometer photo (`manual`) remains available for ad-hoc calibration or backup [SRC-077].
 
 ### 4.1 Sources of data (`devices.kind`)
 | Kind | Worn? | Streams | Cadence stored |
@@ -99,10 +98,11 @@ No public dataset has per-astronaut, minute-level vitals. NASA LSDA and LSAH dat
 | | | `pvt_lapses` (reaction-time app) | daily |
 | | | wellbeing tap-survey | daily |
 | `dosimeter` | worn | `dose_rate` (µGy/h); the daily `rad_dose` is derived from it | every 1 min |
+| `cgm` | worn | `blood_glucose` (interstitial glucose, mg/dL) | every 5 min [SRC-028, SRC-083, SRC-084] |
 | `habitat_sensor` | no | `cabin_co2` | automatic |
 | `exercise_device` | no | `ared_load` from the device log | automatic, per session |
 | `clinical_exam` | no | `onsd`, `iop`, `wbc_lymph`, `bmd_delta`. Ultrasound and retina images go through the camera (Eyes tab) | every 3–7 days |
-| `manual` | no | `glucose` from a glucometer photo, fasting | weekly |
+| `manual` | no | `blood_glucose` from a glucometer photo (calibration / backup) | ad-hoc [SRC-077] |
 
 Devices from the earlier kit (`smart_shirt`, `bp_cuff`, `wrist_actigraph`, `ring`, `core_temp_patch`) are retired: `devices.retired_at` is set. Their enum values remain so historic rows stay valid.
 

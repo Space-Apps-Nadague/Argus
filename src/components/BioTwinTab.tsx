@@ -6,6 +6,7 @@
 import React from 'react';
 import { Stethoscope } from 'lucide-react';
 import { useMission } from '../context/MissionContext';
+import { computeCgmTrendArrow, computeTimeInRange, generateCgm24hCurve } from '../data/cgmMockData';
 import { BODY_ZONES } from '../data/telemetryScenarios';
 import { computeDrift } from '../utils/driftAnalytics';
 import { evaluateMetricStatus, formatFlightNormBadge } from '../utils/triageEngine';
@@ -24,6 +25,9 @@ export const BioTwinTab: React.FC = () => {
     currentZoneReadings,
     zoneStatuses,
     environment,
+    activeCrewMember,
+    scenarioId,
+    latestDay,
     setActiveTab,
     guidance,
   } = useMission();
@@ -66,28 +70,51 @@ export const BioTwinTab: React.FC = () => {
           }
           bodyClassName="px-4 pb-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2.5"
         >
-          {currentZoneReadings.map((r) => (
-            <StatTile
-              key={r.metricId}
-              label={r.label}
-              value={r.currentValue}
-              unit={r.unit}
-              status={evaluateMetricStatus(r.metricId, r.currentValue, environment)}
-              drift={computeDrift(r.metricId, r.history)}
-              selected={r.metricId === selectedMetricId}
-              onClick={() => {
-                setSelectedMetricId(r.metricId);
-                setActiveTab('trends');
-              }}
-              info={
-                <>
-                  <span className="block">{r.plainDescription}</span>
-                  <span className="mt-1 block font-mono text-hud-accent">{formatFlightNormBadge(r.metricId, r.unit, environment)}</span>
-                  <span className="block font-mono text-hud-muted">{r.deltaFromBaseline}</span>
-                </>
-              }
-            />
-          ))}
+          {currentZoneReadings.map((r) => {
+            let cgmBadge: React.ReactNode = undefined;
+            if (r.metricId === 'blood_glucose') {
+              const curve = generateCgm24hCurve({
+                crewId: activeCrewMember.id,
+                scenarioId,
+                missionDay: latestDay || 30,
+                baselineMgDl: r.currentValue - 4,
+              });
+              const trend = computeCgmTrendArrow(curve);
+              const tir = computeTimeInRange(curve);
+              cgmBadge = (
+                <span className="inline-flex items-center gap-1 rounded-full border border-hud-accent/35 bg-hud-accent/10 px-1.5 py-0.5 font-mono text-[11px] text-hud-accent whitespace-nowrap">
+                  <span aria-hidden="true">{trend.arrow}</span>
+                  <span>TIR {tir.percentInRange}%</span>
+                  <span className="sr-only">
+                    CGM trend {trend.label}, Time in Range 70 to 140 mg/dL is {tir.percentInRange}%
+                  </span>
+                </span>
+              );
+            }
+            return (
+              <StatTile
+                key={r.metricId}
+                label={r.label}
+                value={r.currentValue}
+                unit={r.unit}
+                status={evaluateMetricStatus(r.metricId, r.currentValue, environment)}
+                drift={computeDrift(r.metricId, r.history)}
+                extraBadge={cgmBadge}
+                selected={r.metricId === selectedMetricId}
+                onClick={() => {
+                  setSelectedMetricId(r.metricId);
+                  setActiveTab('trends');
+                }}
+                info={
+                  <>
+                    <span className="block">{r.plainDescription}</span>
+                    <span className="mt-1 block font-mono text-hud-accent">{formatFlightNormBadge(r.metricId, r.unit, environment)}</span>
+                    <span className="block font-mono text-hud-muted">{r.deltaFromBaseline}</span>
+                  </>
+                }
+              />
+            );
+          })}
         </Card>
 
         {zoneStatus !== 'green' && (

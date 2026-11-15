@@ -44,7 +44,7 @@ Columns:
 | SRC-025 | [ESA "Keeping the rhythm in space"](https://www.esa.int/Science_Exploration/Human_and_Robotic_Exploration/Research/Keeping_the_rhythm_in_space) (Circadian Rhythms, Double Sensor core temperature) | web | open | `server/ingest/simulator.ts` (~2 h circadian shift, body-temperature rise) |
 | SRC-026 | [ISS Crew Active Dosimeter](https://read.qxmd.com/read/37945094/the-importance-of-time-resolved-personal-dosimetry-in-space-the-iss-crew-active-dosimeter) (Gaza et al., 2023) | paper | open | `specs/05-data-platform.md` §4, `server/db/catalog.ts`, `server/ingest/simulator.ts` (dosimeter, the 2nd worn device) |
 | SRC-027 | [Inspiration4 wearables (Apple Watch)](https://pmc.ncbi.nlm.nih.gov/articles/PMC11357997) | paper | open | `specs/05-data-platform.md` §4, `server/db/catalog.ts` (smartwatch flown on Inspiration4) |
-| SRC-028 | [Polaris Dawn health research data collection](https://trialx.com/supporting-health-research-data-collection-for-the-polaris-dawn-commercial-space-mission) (Garmin, Dexcom, TRISH EXPAND) | web | open | `specs/05-data-platform.md` §4 (Garmin watch and a Dexcom CGM flown on Polaris Dawn; CGM considered, not adopted) |
+| SRC-028 | [Polaris Dawn health research data collection](https://trialx.com/supporting-health-research-data-collection-for-the-polaris-dawn-commercial-space-mission) (Garmin, Dexcom, TRISH EXPAND) | web | open | `specs/05-data-platform.md` §4, `server/db/catalog.ts`, `server/ingest/simulator.ts` (Garmin watch and Dexcom CGM flown on Polaris Dawn; CGM adopted for 5-min glucose) |
 | SRC-029 | [Ax-4 ISS edge computing for crew readiness](https://axiomspace.com/research/iss-edge-computing-for-crew-readiness-demonstration) (Oura ring) | web | open | `specs/05-data-platform.md` §4, `server/ingest/simulator.ts` (nightly HRV and resting HR, now from the watch) |
 
 ## Radiation and open datasets
@@ -94,4 +94,11 @@ Columns:
 | SRC-080 | [US NRC: Backgrounder on Biological Effects of Radiation](https://www.nrc.gov/reading-rm/doc-collections/fact-sheets/bio-effects-radiation) (natural background ≈ 3.1 mSv/yr in the US) | standard | open | `server/ingest/simulator.ts` (Earth pre-flight `rad_dose`), `specs/05-data-platform.md` §5.2 |
 | SRC-081 | [NASA-STD-3001 Vol 2 Rev D: Human Factors, Habitability, and Environmental Health](https://standards.nasa.gov/standard/NASA/NASA-STD-3001-VOL-2) (EER caloric equations, +200 kcal/hr EVA, 2.5 L/day baseline potable water) | standard | open | `specs/01-data-schema.md` §2, `src/utils/triageEngine.ts` (`caloric_intake`, `hydration_intake`), `server/db/catalog.ts` |
 | SRC-082 | [NASA HRP Risk of Inadequate Food and Nutrition](https://humanresearchroadmap.nasa.gov/Risks/risk.aspx?i=93) (spaceflight energy balance, flavor fatigue, hypohydration & renal stone risk) | web | open | `specs/01-data-schema.md` §2, `src/utils/triageEngine.ts`, `src/data/telemetryScenarios.ts` |
+
+## Continuous Glucose Monitoring (CGM)
+
+| ID | Source | Type | Access | Used in |
+|---|---|---|---|---|
+| SRC-083 | [International Consensus on Time in Range (Battelino et al., Diabetes Care 2019)](https://diabetesjournals.org/care/article/42/8/1593/36184/) (5-min CGM cadence, rate-of-change trend arrows, Time-in-Range 70–140 mg/dL tight target) | paper | open | `specs/05-data-platform.md` §4, `specs/01-data-schema.md` §2, `src/data/cgmMockData.ts`, `src/components/CgmGlucoseCard.tsx`, `server/db/catalog.ts` |
+| SRC-084 | [ADA Standards of Care 2023, §7 Diabetes Technology](https://diabetesjournals.org/care/article/46/Supplement_1/S111/148049/) (interstitial CGM 5-min sampling, trend arrows, sensor wear) | standard | open | `specs/05-data-platform.md` §4, `specs/01-data-schema.md` §2, `server/ingest/simulator.ts` |
 

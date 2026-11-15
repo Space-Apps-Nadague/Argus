@@ -10,6 +10,7 @@ export type MetricKind = 'passive' | 'clinical' | 'self_report' | 'environment' 
 export type DeviceKind =
   | 'smartwatch'
   | 'dosimeter'
+  | 'cgm'
   | 'habitat_sensor'
   | 'exercise_device'
   | 'clinical_exam'
@@ -66,7 +67,7 @@ export const TRIAGE_METRICS: MetricDef[] = [
   triage('pvt_lapses', 'Psychomotor Vigilance Lapses', 'lapses', 'behavioral', 'self_report', 'SRC-009'),
   // Challenge core indicators (spec 03 §2, metric ids from PR #20): watch, glucometer photo, watch tap-survey.
   triage('systolic_bp', 'Systolic Blood Pressure', 'mmHg', 'cardio', 'passive', 'SRC-075'),
-  triage('blood_glucose', 'Blood Glucose', 'mg/dL', 'musculo', 'self_report', 'SRC-077'),
+  triage('blood_glucose', 'Blood Glucose', 'mg/dL', 'musculo', 'passive', 'SRC-083'),
   triage('core_temp', 'Body Temperature (watch estimate)', '°C', 'immune', 'derived', 'SRC-074'),
   triage('daily_sleep_hours', 'Daily Sleep Duration', 'hours', 'behavioral', 'passive', 'SRC-074'),
   triage('mood_index', 'Mood Index (watch tap)', '/10', 'behavioral', 'self_report', 'SRC-009'),
@@ -90,9 +91,9 @@ export const ALL_METRICS: MetricDef[] = [...TRIAGE_METRICS, ...PASSIVE_METRICS];
 export const METRIC_BY_ID = new Map(ALL_METRICS.map((m) => [m.id, m]));
 
 /**
- * Assumed per-astronaut kit (spec 05 §4.1): only TWO worn devices, a smartwatch and a personal dosimeter.
- * Everything else arrives automatically from the habitat and exercise equipment, from periodic exams, or as
- * a photo (glucometer). No metric needs typing.
+ * Assumed per-astronaut kit (spec 05 §4.1): THREE worn devices — a smartwatch, a personal dosimeter, and a
+ * continuous glucose monitor (CGM) patch. Everything else arrives automatically from the habitat and exercise
+ * equipment, from periodic exams, or as a calibration photo (glucometer). No metric needs typing.
  */
 export const SENSOR_KIT: Array<{ kind: DeviceKind; model: string; streams: string[]; sourceId: string }> = [
   {
@@ -102,10 +103,11 @@ export const SENSOR_KIT: Array<{ kind: DeviceKind; model: string; streams: strin
     sourceId: 'SRC-027',
   },
   { kind: 'dosimeter', model: 'Personal active dosimeter (Crew Active Dosimeter-class)', streams: ['dose_rate'], sourceId: 'SRC-026' },
+  { kind: 'cgm', model: 'Continuous Glucose Monitor patch (Dexcom-class, 5-min interstitial)', streams: ['blood_glucose'], sourceId: 'SRC-028' },
   { kind: 'habitat_sensor', model: 'Cabin CO₂ monitor (habitat, not worn)', streams: ['cabin_co2'], sourceId: 'SRC-001' },
   { kind: 'exercise_device', model: 'Resistive exercise device log (ARED-class, not worn)', streams: ['ared_load'], sourceId: 'SRC-001' },
   { kind: 'clinical_exam', model: 'Periodic exams: ocular ultrasound, tonometer, blood analyzer, bone scan', streams: ['onsd', 'iop', 'wbc_lymph', 'bmd_delta'], sourceId: 'SRC-009' },
-  { kind: 'manual', model: 'Glucometer read from a photo (camera)', streams: ['blood_glucose'], sourceId: 'SRC-077' },
+  { kind: 'manual', model: 'Glucometer read from a photo (calibration / backup)', streams: ['blood_glucose'], sourceId: 'SRC-077' },
 ];
 
 export const ACTIVE_DEVICE_KINDS = SENSOR_KIT.map((k) => k.kind);

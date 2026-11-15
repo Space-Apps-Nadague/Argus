@@ -45,6 +45,7 @@ import {
   STATUS_COLORS,
 } from '../utils/triageEngine';
 import { validateCheckInValue } from '../utils/checkIns';
+import { CgmGlucoseCard } from './CgmGlucoseCard';
 import { InfoTip } from './InfoTip';
 import { Card } from './ui/Card';
 import { StatusIcon, STATUS_WORD } from './ui/StatusPill';
@@ -95,6 +96,7 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
     setChartWindowDays,
     environment,
     activeCrewMember,
+    scenarioId,
     logVitalReading,
     isSynthesizingAi,
     latestDay,
@@ -486,6 +488,15 @@ export const TelemetryPanel: React.FC<TelemetryPanelProps> = ({
             </li>
           </ul>
         </Card>
+      )}
+
+      {showChart && reading.metricId === 'blood_glucose' && (
+        <CgmGlucoseCard
+          crewId={activeCrewMember.id}
+          scenarioId={scenarioId}
+          missionDay={latestDay || 30}
+          baselineMgDl={reading.currentValue - 4}
+        />
       )}
     </div>
   );

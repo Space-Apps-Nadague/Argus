@@ -43,6 +43,7 @@ interface StatTileProps {
   unit: string;
   status: TriageStatus;
   drift?: DriftResult | null;
+  extraBadge?: React.ReactNode;
   info?: React.ReactNode;
   selected?: boolean;
   onClick?: () => void;
@@ -54,6 +55,7 @@ export const StatTile: React.FC<StatTileProps> = ({
   unit,
   status,
   drift,
+  extraBadge,
   info,
   selected = false,
   onClick,
@@ -68,6 +70,7 @@ export const StatTile: React.FC<StatTileProps> = ({
       <span className="mt-2 flex flex-wrap items-center gap-1.5">
         <StatusPill status={status} />
         <DriftChip drift={drift ?? null} />
+        {extraBadge}
       </span>
     </>
   );

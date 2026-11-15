@@ -39,7 +39,7 @@
 ## 2. Tabs
 
 ### 2.1 Bio-Twin (`BioTwinTab.tsx`) — default tab
-- Grid: 3D stage (≈ 2/3 width, `BioTwinMap.tsx`, unchanged behavior) + side column (≈ 1/3) of **vital tiles** for the selected zone (`StatTile`: big value, small unit, status pill, drift chip, ⓘ with `plainDescription` + flight norm). Clicking a tile selects the metric and switches to **Trends**.
+- Grid: 3D stage (≈ 2/3 width, `BioTwinMap.tsx`, unchanged behavior) + side column (≈ 1/3) of **vital tiles** for the selected zone (`StatTile`: big value, small unit, status pill, drift chip, ⓘ with `plainDescription` + flight norm; `blood_glucose` also displays the live CGM rate-of-change trend arrow and 24h Time-in-Range 70–140 mg/dL badge with non-color status cue). Clicking a tile selects the metric and switches to **Trends**.
 - 3D Bio-Twin details (preserved from Sprint 3):
   - **Anatomically Sculpted 3D Human Morphology (Male & Female Differentiation):**
     - Continuous parametric vertex-sculpted cranial/facial mesh, neck (sternocleidomastoid/trapezius), torso (pectoralis major plates & rectus abdominis in `male`; anatomically sculpted mammary contours, narrower ribcage, indented waist, and flared iliac/trochanteric hip curves in `female`), sculpted upper limbs (deltoids, biceps/triceps, forearms, hands with fingers), and sculpted lower limbs (quadriceps, hamstrings, femorotibial Q-angle, patella, gastrocnemius calves, ankles, and feet).
@@ -65,6 +65,7 @@
   - Submitting calls `logVitalReading(zoneId, metricKey, value)` to update `MD-30` live, re-evaluate deterministic status & readiness score, update the 3D Bio-Twin colors, and trigger Flight Surgeon AI guidance synthesis.
 - **Main chart (Recharts `ComposedChart`):** history line/area (14d / 30d toggle) · shaded nominal band (`ReferenceArea`) · dashed yellow limit lines · dotted **personal baseline** band (mean ± 1 SD) · dashed **forecast** line for `MD+1..+3` with shaded 90% interval · check-in and logged points drawn as larger dots. A legend with 4 swatches replaces explanatory text.
 - **Drift card:** big `↑ 1.8σ` with level word (`Steady` / `Watch` / `Drifting`), one line "vs your first-week baseline (mean ± SD)". Forecast summary: `MD+3 ≈ value (lo–hi)`.
+- **24h CGM Glucose Curve (`CgmGlucoseCard.tsx`):** Shown in `TelemetryPanel` when `blood_glucose` is selected (and summarized on the `blood_glucose` Bio-Twin tile). Renders the deterministic 5-minute 24h CGM curve (288 points) with postprandial peaks, ARED exercise dips, nocturnal baseline, shaded 70–140 mg/dL target band, rate-of-change trend arrow (`↑↑`/`↑`/`↗`/`→`/`↘`/`↓`/`↓↓` + text label), and Time-in-Range (`70–140 mg/dL` %) with non-color status cues.
 - **"Why" card:** up to 5 `MetricLink` rows: `Sleep eff ↓ → HRV ↓ · next day`, a strength bar for `|r|`, the mechanism in an ⓘ tooltip. Footer: "Association, not cause." Empty state: "No strong links yet".
 
 ### 2.3 Forecast (`ForecastTab.tsx`)
