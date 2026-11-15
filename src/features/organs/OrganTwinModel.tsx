@@ -21,6 +21,7 @@ import {
   createLungGeometry,
   createLymphaticConduitGeometries,
   createNeuroVascularGeometries,
+  createPancreasGeometry,
   createPelvicGirdleGeometries,
   createSculptedArmGeometry,
   createSculptedHeadAndNeckGeometry,
@@ -117,6 +118,7 @@ const OrganTwinModelImpl: React.FC<OrganTwinModelProps> = ({
       leftLung: createLungGeometry(1, sex),
       airways: createAirwayGeometries(),
       liver: createLiverGeometry(sex),
+      pancreas: createPancreasGeometry(),
       spleen: createSpleenGeometry(),
       thymus: createThymusGeometry(),
     }),
@@ -396,11 +398,14 @@ const OrganTwinModelImpl: React.FC<OrganTwinModelProps> = ({
         </group>
       )}
 
-      {/* ── Liver ── */}
+      {/* ── Liver & Pancreas (Metabolic & Nutrition) ── */}
       {visible('liver') && (
         <group {...events('liver')}>
           <mesh position={[isFemale ? -0.055 : -0.065, 0.49, 0.035]} rotation={[0.05, 0, 0.1]} geometry={anatomies.liver}>
             <meshStandardMaterial {...organMat('liver', 0.6)} />
+          </mesh>
+          <mesh position={[0.015, 0.39, 0.025]} rotation={[0.04, 0.08, 0.12]} geometry={anatomies.pancreas}>
+            <meshStandardMaterial {...organMat('liver', 0.85)} />
           </mesh>
         </group>
       )}

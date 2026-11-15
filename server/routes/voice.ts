@@ -76,14 +76,14 @@ export const VOICE_TOOL_DECLARATIONS: VoiceToolDeclaration[] = [
   {
     name: 'get_crew_snapshot',
     description:
-      'Returns the active astronaut deterministic 5-zone triage statuses, readiness score, personal baselines, and flagged metric drift.',
+      'Returns the active astronaut deterministic 6-zone triage statuses, readiness score, personal baselines, and flagged metric drift.',
     behavior: 'NON_BLOCKING',
     parameters: {
       type: 'OBJECT',
       properties: {
         zoneId: {
           type: 'STRING',
-          description: 'Optional anatomical zone filter: neuro, cardio, musculo, immune, or behavioral.',
+          description: 'Optional anatomical zone filter: neuro, cardio, musculo, metabolic, immune, or behavioral.',
         },
       },
     },
@@ -98,7 +98,7 @@ export const VOICE_TOOL_DECLARATIONS: VoiceToolDeclaration[] = [
       properties: {
         zoneId: {
           type: 'STRING',
-          description: 'Anatomical zone (neuro, cardio, musculo, immune, behavioral).',
+          description: 'Anatomical zone (neuro, cardio, musculo, metabolic, immune, behavioral).',
         },
         metricId: {
           type: 'STRING',
@@ -371,7 +371,7 @@ const SPOKEN_METRIC_ALIASES: Array<{ pattern: RegExp; metricId: MetricId; zoneId
   { pattern: /\b(?:core\s+temp|body\s+temperature|temperature)\b/i, metricId: 'core_temp', zoneId: 'immune' },
   { pattern: /\b(?:sleep\s+efficiency)\b/i, metricId: 'sleep_eff', zoneId: 'behavioral' },
   { pattern: /\b(?:sleep\s+hours|hours\s+of\s+sleep)\b/i, metricId: 'daily_sleep_hours', zoneId: 'behavioral' },
-  { pattern: /\b(?:blood\s+glucose|glucose|blood\s+sugar)\b/i, metricId: 'blood_glucose', zoneId: 'musculo' },
+  { pattern: /\b(?:blood\s+glucose|glucose|blood\s+sugar)\b/i, metricId: 'blood_glucose', zoneId: 'metabolic' },
   { pattern: /\b(?:caloric\s+intake|calories|calorie\s+intake)\b/i, metricId: 'caloric_intake', zoneId: 'musculo' },
   { pattern: /\b(?:hydration\s+intake|hydration|water\s+intake|fluid\s+intake)\b/i, metricId: 'hydration_intake', zoneId: 'cardio' },
 ];

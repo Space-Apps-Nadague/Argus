@@ -5,7 +5,7 @@
  * Port of the ARGOS prototype's pure deterministic companion brain (`brain()` in `ARGOS_The_Thousand_Eyes.html`).
  * Operates 100% offline with zero network dependencies, answering astronaut questions on:
  * - Red flag clinical emergencies & crisis language (English & Hebrew)
- * - Overall crew readiness & 5-zone status breakdown
+ * - Overall crew readiness & 6-zone status breakdown
  * - Specific vital signs vs personal baselines & normal flight ranges
  * - Spaceflight symptoms (SANS, hypercapnia, fatigue, back pain, vertigo)
  * - 72-hour forecast & personal baseline drift
@@ -651,7 +651,7 @@ export function generateOfflineCompanionReply(
     }
 
     reply += `\n**5-Zone Biological Triage**:\n`;
-    const zoneKeys: BodyZoneId[] = ['neuro', 'cardio', 'musculo', 'immune', 'behavioral'];
+    const zoneKeys: BodyZoneId[] = ['neuro', 'cardio', 'musculo', 'metabolic', 'immune', 'behavioral'];
     for (const z of zoneKeys) {
       const st = context.zoneStatuses[z] || 'green';
       const label = STATUS_LABELS[st];
@@ -689,7 +689,7 @@ export function generateOfflineCompanionReply(
     let reply = `**ARGUS Companion — Autonomous Crew Health Assistant**\n\n`;
     reply += `I operate directly onboard your vehicle with 100% offline capability, synthesizing your personal baselines, NASA Human Research Program (HRP) clinical protocols, and real-time telemetry.\n\n`;
     reply += `**Things you can ask me**:\n`;
-    reply += `• **"How am I?"** — Complete readiness score & 5-zone health breakdown\n`;
+    reply += `• **"How am I?"** — Complete readiness score & 6-zone health breakdown\n`;
     reply += `• **"What is my ONSD?"** (or HRV, SpO₂, CO₂, sleep) — Biomarker values vs your personal flight baseline\n`;
     reply += `• **"I have a headache"** (or dizziness, blurred vision, back pain) — Autonomous spaceflight symptom triage\n`;
     reply += `• **"Why is my HRV low?"** — Identifies confirmed multi-metric associations in your own data\n`;

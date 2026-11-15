@@ -328,7 +328,7 @@ export function evaluateZoneStatus(
 }
 
 /**
- * Deterministically computes the TriageStatus map for all 5 anatomical zones.
+ * Deterministically computes the TriageStatus map for all 6 anatomical zones.
  */
 export function evaluateAllZones(
   zones: Record<BodyZoneId, VitalSignReading[]>,
@@ -338,6 +338,7 @@ export function evaluateAllZones(
     neuro: evaluateZoneStatus(zones.neuro, environment),
     cardio: evaluateZoneStatus(zones.cardio, environment),
     musculo: evaluateZoneStatus(zones.musculo, environment),
+    metabolic: evaluateZoneStatus(zones.metabolic, environment),
     immune: evaluateZoneStatus(zones.immune, environment),
     behavioral: evaluateZoneStatus(zones.behavioral, environment),
   };

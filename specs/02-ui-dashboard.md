@@ -52,13 +52,13 @@
     - **Clickable organs** (`OrganTwinModel.tsx`): brain, eyes, heart, lungs, liver, spleen, kidneys, muscles (skin envelope, `Body` level) and bones (`Skeleton` level), each its own click target and coloured by its own status. Thymus, lymph nodes and vessels are shown but not targets. Kidneys are modelled posterior to the liver/spleen.
     - **Organ status:** worst Thousand Eyes status among the organ's indicators (`ORGANS` in `organs.ts`: heart = rhr, hrv, sbp, dbp; lungs = spo2, resp; brain = mood, stress, energy, cohes, priv, motiv, sleep, slq, diz; eyes = vis; liver = crp, wt, kcal; spleen = temp, sym; kidneys = urine, fluid; muscles = grip, resist, aero; bones = back, height). No indicator with data → grey.
     - **Markers:** a DOM button on every visible organ (outside the breathing animation so it holds still). Red flag → red ring with `!` (pulses unless reduced motion); drifting → amber ring with `!`; on baseline → small green dot; no data → grey dot. `aria-label` = organ + status.
-    - **Organ details** (`OrganPanel.tsx`): click/tap a marker or the organ opens a card (bottom sheet on mobile) listing the organ's indicators, problems first: value + unit, status word + symbol, personal baseline, expected shift at the current location, and a tip when off baseline; "No data yet" + how to measure otherwise. Closes with Esc, ✕ or a click on empty space. Selecting an organ also selects its HUD zone (`neuro` / `cardio` / `immune` / `musculo`) so the side tiles follow.
+    - **Organ details** (`OrganPanel.tsx`): click/tap a marker or the organ opens a card (bottom sheet on mobile) listing the organ's indicators, problems first: value + unit, status word + symbol, personal baseline, expected shift at the current location, and a tip when off baseline; "No data yet" + how to measure otherwise. Closes with Esc, ✕ or a click on empty space. Selecting an organ also selects its HUD zone (`neuro` / `cardio` / `musculo` / `metabolic` / `immune`) so the side tiles follow (`liver` maps to `metabolic`, with an abdominal pancreatic/hepatic metabolic mesh).
 
 ### 2.2 Trends (`TrendsTab.tsx`, `TelemetryPanel.tsx`)
-- **Metric picker row:** every metric of the selected zone as compact chips (label + value + drift arrow). Zone switcher (5 zone pills with status color).
+- **Metric picker row:** every metric of the selected zone as compact chips (label + value + drift arrow). Zone switcher (6 zone pills with status color).
 - **Interactive Vital Reading Logger (`TelemetryPanel.tsx`):**
   - Collapsible/inline **"+ Log Vital Reading"** interactive form to record live astronaut health readings directly onto `MD-30` (latest day).
-  - Zone selector (5 zones: Neuro, Cardio, Musculo, Immune, Behavioral).
+  - Zone selector (6 zones: Neuro, Cardio, Musculo, Metabolic, Immune, Behavioral).
   - Metric picker covering all 17 canonical metrics, including systolic blood pressure (`systolic_bp`), blood glucose (`blood_glucose`), core body temperature (`core_temp`), daily sleep duration (`daily_sleep_hours`), and behavioral mood index (`mood_index`).
   - Numeric input with instant client validation against `METRIC_INPUT_RANGES`, measurement guidance tooltip (`how`), live Green/Yellow/Red triage preview badge, and one-click presets (`Nominal`, `Caution`, `Alert`) for rapid demonstration/testing.
   - **Responsive Layout:** Separated 3-column input fields row (`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 min-w-0`) and dedicated action footer (`presets · range · Record reading`) with `flex-wrap` and `min-w-0`, ensuring controls never spill into the adjacent Drift card at any viewport or column width.
@@ -104,7 +104,7 @@ A readable version of the prototype's "Thousand Eyes" ring plus the full data/co
 - Footer: "Generic training aid based on public ISS practice — follow your mission's flight rules."
 
 ### 2.5 Crew (`CrewTab.tsx`) — admin only
-- Grid of crew cards: callsign, name, role, sex icon, readiness (computed for that member's `defaultScenarioId`, or the active scenario for the active member), 5-dot zone status row, check-in streak, `Set active` button. Custom crew can be deleted.
+- Grid of crew cards: callsign, name, role, sex icon, readiness (computed for that member's `defaultScenarioId`, or the active scenario for the active member), 6-dot zone status row, check-in streak, `Set active` button. Custom crew can be deleted.
 - `+ Add crew member` opens the existing creator form in `CrewManagerModal.tsx`. Crew details (baselines, blood type, age, medical notes) appear in an expandable section on each card.
 
 ## 3. UI Primitives (`src/components/ui/`, `InfoTip.tsx`)
@@ -121,7 +121,7 @@ A readable version of the prototype's "Thousand Eyes" ring plus the full data/co
 - Responsive Layout Architecture (360px–1920px widths, ≥650px window heights):
   - **Grid & Flex Child Contraction (`min-w-0`):** All CSS grid items and flex containers across tabs (`BioTwinTab`, `TrendsTab`, `FlightSurgeonPanel`, `TelemetryPanel`) explicitly declare `min-w-0` to override the default CSS `min-width: auto`, preventing wide inputs, tables, or Recharts from expanding columns and overflowing into adjacent cards.
   - **Wrapping Card Headers:** The `Card` component header uses `flex-wrap` and `min-w-0` on both titles and right-side action trays so titles, badges, and action buttons wrap gracefully rather than pushing past card borders.
-  - **Responsive 3D Bio-Twin Stage:** Central 3D canvas viewport (`BioTwinMap.tsx`) scales smoothly (`min-h-[320px]` on small screens up to `min-h-[520px]` on desktop), remaining fully operational and preventing vertical viewport blowouts on windows as short as 650px. Camera view presets, layer switcher, and bottom 5-zone matrix buttons wrap and scale cleanly down to 360px mobile viewports.
+  - **Responsive 3D Bio-Twin Stage:** Central 3D canvas viewport (`BioTwinMap.tsx`) scales smoothly (`min-h-[320px]` on small screens up to `min-h-[520px]` on desktop), remaining fully operational and preventing vertical viewport blowouts on windows as short as 650px. Camera view presets, layer switcher, and bottom 6-zone matrix buttons (`grid-cols-3 sm:grid-cols-6`) wrap and scale cleanly down to 360px mobile viewports.
   - **Screen-Constrained Popovers:** `TopMissionBar` popovers (Readiness Milestone Badges and Clinical AI key) use viewport-safe positioning (`fixed inset-x-3 top-16` on mobile `< sm`, `absolute right-0` with `max-w-[calc(100vw-1.5rem)]` on desktop) with keyboard Esc dismiss to eliminate horizontal scroll and viewport spillover.
   - The tab rail becomes a horizontal scroll bar below `md`; no page-level horizontal overflow. The Bio-Twin grid stacks on `< lg`, and Trends / Check-in grids stack on `< xl`.
 

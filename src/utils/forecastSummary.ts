@@ -67,7 +67,7 @@ export function buildForecastSummary(
 ): ForecastSummary {
   const rows: MetricForecastRow[] = [];
   const projectedZones: Array<Record<BodyZoneId, VitalSignReading[]>> = [1, 2, 3].map(
-    () => ({ neuro: [], cardio: [], musculo: [], immune: [], behavioral: [] })
+    () => ({ neuro: [], cardio: [], musculo: [], metabolic: [], immune: [], behavioral: [] })
   );
 
   (Object.keys(zones) as BodyZoneId[]).forEach((zoneId) => {

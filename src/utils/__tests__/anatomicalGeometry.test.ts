@@ -7,6 +7,7 @@ import {
   createHeartGeometry,
   createLiverGeometry,
   createLungGeometry,
+  createPancreasGeometry,
   createSpleenGeometry,
   createThymusGeometry,
 } from '../anatomicalGeometry';
@@ -123,8 +124,9 @@ describe('sculpted visceral organ geometries', () => {
     expect(rightMaxY - rightMinY).toBeGreaterThan(leftMaxY - leftMinY);
   });
 
-  it('generates valid crescent spleen and bilobed thymus', () => {
+  it('generates valid crescent spleen, pancreas metabolic core, and bilobed thymus', () => {
     assertValidGeometry(createSpleenGeometry());
+    assertValidGeometry(createPancreasGeometry());
     assertValidGeometry(createThymusGeometry());
   });
 });
