@@ -64,7 +64,6 @@ function seedDefaultSessions(): ByCrew {
         dateKey: dk(0),
         timestampIso: iso(0),
         daily: false,
-        practice: true,
         points: 610,
         metric: 398,
         accuracy: 0.82,
